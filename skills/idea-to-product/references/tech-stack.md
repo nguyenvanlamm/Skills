@@ -2,7 +2,7 @@
 
 ## Backend: FastAPI + SQLAlchemy + SQLite
 
-### Entry Point (`backend/main.py`)
+### Entry Point (`main.py` — server root)
 
 ```python
 from fastapi import FastAPI
@@ -23,7 +23,7 @@ async def health():
     return {"status": "ok"}
 ```
 
-### Database (`backend/database.py`)
+### Database (`database.py` — server root)
 
 ```python
 from sqlalchemy import create_engine
@@ -45,7 +45,7 @@ def get_db():
         db.close()
 ```
 
-### Models (`backend/models.py`)
+### Models (`models.py` — server root)
 
 ```python
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Float
@@ -56,7 +56,7 @@ from database import Base
 # Define models per architecture.md
 ```
 
-### Requirements (`backend/requirements.txt`)
+### Requirements (`requirements.txt` — server root)
 
 ```
 fastapi>=0.110.0
@@ -73,14 +73,15 @@ ruff>=0.3.0
 ### Run Command
 
 ```bash
-cd backend && uvicorn main:app --reload --port 8000
+cd <product-slug>-server && uvicorn main:app --reload --port 8000
+# Or: make dev
 ```
 
 ---
 
 ## Frontend: React + Vite + Tailwind + shadcn/ui
 
-### Vite Config (`frontend/vite.config.ts`)
+### Vite Config (`vite.config.ts` — client root)
 
 ```typescript
 import { defineConfig } from 'vite'
@@ -101,7 +102,7 @@ export default defineConfig({
 })
 ```
 
-### API Client (`frontend/src/api/client.ts`)
+### API Client (`src/api/client.ts` — client root)
 
 ```typescript
 const BASE = '/api/v1'
@@ -127,11 +128,11 @@ export const api = {
 
 ---
 
-## Project Structure Convention
+## Project Structure Convention (2 Repos Riêng)
 
 ```
-product-name/
-├── backend/
+YYYY_MM_DD_<product-slug>/
+├── <product-slug>-server/           # FastAPI backend — riêng 1 GitHub repo
 │   ├── main.py
 │   ├── database.py
 │   ├── models.py
@@ -142,21 +143,39 @@ product-name/
 │   ├── services/
 │   │   ├── __init__.py
 │   │   └── ...
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── api/
-│   │   │   └── client.ts
-│   │   ├── pages/
-│   │   ├── components/
-│   │   ├── hooks/
-│   │   └── App.tsx
-│   ├── package.json
-│   └── vite.config.ts
-├── tests/
-│   ├── test_backend/
-│   └── test_frontend/
-├── Makefile
-├── README.md
-└── .gitignore
+│   ├── requirements.txt
+│   ├── Makefile
+│   ├── README.md                    # Ghi rõ URL của client repo
+│   └── .gitignore
+│
+└── <product-slug>-client/           # React frontend — riêng 1 GitHub repo
+    ├── src/
+    │   ├── api/
+    │   │   └── client.ts
+    │   ├── pages/
+    │   ├── components/
+    │   ├── hooks/
+    │   ├── App.tsx
+    │   └── main.tsx
+    ├── index.html
+    ├── package.json
+    ├── vite.config.ts               # Proxy /api → http://localhost:8000
+    ├── tailwind.config.js
+    ├── tsconfig.json
+    ├── Makefile
+    ├── README.md                    # Ghi rõ URL của server repo
+    └── .gitignore
+
+```
+
+### Cách chạy fullstack
+
+```bash
+# Terminal 1 — Server
+cd <product-slug>-server && make dev
+# → http://localhost:8000/docs
+
+# Terminal 2 — Client
+cd <product-slug>-client && make dev
+# → http://localhost:5173
 ```

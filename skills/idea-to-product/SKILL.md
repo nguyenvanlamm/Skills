@@ -1,6 +1,6 @@
 ---
 name: idea-to-product
-description: "End-to-end product builder from trend analysis to runnable code. Fetches trending topics, validates the best idea, generates PRD/architecture/tasks, builds a full-stack product (FastAPI + React/Vite/Tailwind), reviews code, adds tests, and prepares for shipping. Use when asked to build a product from scratch, turn a trend into a product, or go from idea to working app. Don't use for single-phase work — invoke the sibling skill directly."
+description: "End-to-end product builder from trend analysis to runnable code. Fetches trending topics, validates the best idea, generates PRD/architecture/tasks, builds a full-stack product (server + client as 2 separate GitHub repos), reviews code, adds tests, and prepares for shipping. Use when asked to build a product from scratch, turn a trend into a product, or go from idea to working app. Don't use for single-phase work — invoke the sibling skill directly."
 license: MIT
 effort: max
 metadata:
@@ -12,7 +12,9 @@ metadata:
 
 4-phase orchestrator that takes trending topics and produces a runnable full-stack product — idea validation, product definition, implementation, and ship preparation.
 
-Stack: FastAPI (Python) + React (Vite/Tailwind/shadcn/ui) + SQLite. Runs locally with `make dev`.
+Stack: FastAPI (Python) + React (Vite/Tailwind/shadcn/ui) + SQLite.
+
+**Server và client là 2 project riêng biệt**, mỗi project là một GitHub repo độc lập để dễ dàng deploy và maintain.
 
 ## When to Use
 
@@ -70,10 +72,24 @@ npx skills add https://github.com/luongnv89/skills
 
 ## Setup
 
-1. **Resolve working directory** — where the product will be built. If `$PRODUCT_DIR` is set, use it. Otherwise ask the user once and save to `~/.config/idea-to-product-dir.txt`. Default: `~/workspace/products`.
-2. **Create project folder**: `YYYY_MM_DD_<product-slug>/` under the resolved root.
+1. **Resolve working directory** — where the product repos will live. If `$PRODUCT_DIR` is set, use it. Otherwise ask the user once and save to `~/.config/idea-to-product-dir.txt`. Default: `~/workspace/products`.
+2. **Create parent folder**: `YYYY_MM_DD_<product-slug>/` under the resolved root.
 3. **Set `$PRODUCT_DIR`** to the created folder path.
-4. **Verify all prerequisite skills** are installed. If any missing, report the list and stop.
+4. **Create 2 sub-directories** — one cho server, một cho client:
+   ```
+   $PRODUCT_DIR/
+   ├── <product-slug>-server/    # FastAPI backend (Python repo)
+   └── <product-slug>-client/    # React frontend (Node repo)
+   ```
+5. **Ask user for GitHub repo names** (hoặc dùng slug mặc định):
+   - Server repo: `gh repo create <product-slug>-server --private`
+   - Client repo: `gh repo create <product-slug>-client --private`
+6. **Initialize git** trong từng project:
+   ```bash
+   cd <product-slug>-server && git init && git add . && git commit -m "Initial commit"
+   cd <product-slug>-client && git init && git add . && git commit -m "Initial commit"
+   ```
+7. **Verify all prerequisite skills** are installed. If any missing, report the list and stop.
 
 ## Workflow
 
@@ -194,16 +210,16 @@ Invoke `frontend-design` to generate the UI shell:
 /frontend-design --product "<product-name>" --output "$PRODUCT_DIR/frontend" --framework react --styling tailwind --components shadcn
 ```
 
-### Step 3c: Implement Product (AI-driven)
+### Step 3c: Implement Product (AI-driven) — 2 Repos Riêng
 
-Using the PRD, architecture, and tasks as specifications, build the full product. The AI agent writes all code.
+Using the PRD, architecture, and tasks as specifications, build the full product. **Server và client là 2 project riêng biệt**, mỗi project có git repo riêng để push lên GitHub.
 
-**Backend (FastAPI + SQLite):**
+---
 
-Create `$PRODUCT_DIR/backend/` with:
+#### Server Project: `<product-slug>-server/` (FastAPI + SQLite)
 
 ```
-backend/
+<product-slug>-server/
 ├── main.py              # FastAPI app entry point with CORS
 ├── database.py          # SQLAlchemy engine + session
 ├── models.py            # All database models
@@ -211,196 +227,231 @@ backend/
 ├── routes/
 │   ├── __init__.py
 │   ├── auth.py          # If needed
-│   ├── items.py         # Domain-specific routes per architecture.md
-│   └── ...
+│   └── ...              # Domain-specific routes per architecture.md
 ├── services/
 │   ├── __init__.py
 │   └── ...              # Business logic layer
-├── requirements.txt     # fastapi, uvicorn, sqlalchemy, pydantic, ...
-└── seed.py              # Optional seed data script
+├── requirements.txt     # fastapi, uvicorn, sqlalchemy, pydantic
+├── seed.py              # Optional seed data script
+├── Makefile
+├── README.md
+└── .gitignore
 ```
 
-Backend conventions:
+**Makefile (server):**
+```makefile
+.PHONY: install dev test lint
+
+install:
+	pip install -r requirements.txt
+
+dev:
+	uvicorn main:app --reload --port 8000
+
+test:
+	python -m pytest
+
+lint:
+	ruff check .
+```
+
+Server conventions:
 - Use `SQLAlchemy 2.0` style (declarative base, async not required for SQLite)
 - All routes under prefix `/api/v1`
-- CORS allow `http://localhost:5173` (Vite dev server)
+- CORS allow client's production URL + `http://localhost:5173`
 - Health check at `GET /api/v1/health`
+- `README.md` ghi rõ client repo URL + cách clone cả 2 để chạy fullstack
 
-**Frontend (React + Vite + Tailwind + shadcn/ui):**
+---
 
-The `frontend-design` skill already scaffolded the frontend. Now implement:
+#### Client Project: `<product-slug>-client/` (React + Vite + Tailwind + shadcn/ui)
 
-- Pages per PRD requirements (in `frontend/src/pages/`)
-- API client layer (in `frontend/src/api/`) using `fetch` or `axios`
-- Auth flow if specified in PRD
-- All business logic interactions with backend
-- Responsive layout per Tailwind design
+```
+<product-slug>-client/
+├── src/
+│   ├── api/client.ts    # API client (gọi server URL)
+│   ├── pages/           # Page components
+│   ├── components/      # UI components
+│   ├── hooks/           # Custom hooks
+│   ├── App.tsx
+│   └── main.tsx
+├── index.html
+├── package.json
+├── vite.config.ts
+├── tailwind.config.js
+├── tsconfig.json
+├── Makefile
+├── README.md
+└── .gitignore
+```
 
-**Root project files:**
-
-Create at `$PRODUCT_DIR/`:
-
-- `Makefile` — targets: `install`, `dev`, `test`, `lint`, `build`
-- `README.md` — project description, quick start, tech stack
-- `.gitignore` — Python + Node defaults
-
-**Makefile template:**
-
+**Makefile (client):**
 ```makefile
 .PHONY: install dev test lint build
 
 install:
-	cd frontend && npm install
-	cd backend && python3 -m venv venv && . venv/bin/activate && pip install -r requirements.txt
+	npm install
 
 dev:
-	@echo "Starting frontend (http://localhost:5173) and backend (http://localhost:8000)..."
-	cd frontend && npm run dev &
-	cd backend && uvicorn main:app --reload --port 8000 &
-	wait
+	npm run dev
 
 test:
-	cd frontend && npm run test
-	cd backend && . venv/bin/activate && python -m pytest
+	npm run test
 
 lint:
-	cd frontend && npm run lint
-	cd backend && . venv/bin/activate && ruff check .
+	npm run lint
 
 build:
-	cd frontend && npm run build
+	npm run build
 ```
 
-**Verification:** After implementation, start both servers and confirm:
-- Frontend loads at `http://localhost:5173`
-- Backend health check: `curl http://localhost:8000/api/v1/health` → `200 OK`
-- At least one API endpoint returns real data
-- Frontend can communicate with backend (check browser console for CORS/network errors)
+**vite.config.ts** proxy trỏ tới server:
+```typescript
+server: {
+  port: 5173,
+  proxy: {
+    '/api': { target: 'http://localhost:8000', changeOrigin: true },
+  },
+}
+```
+
+Client conventions:
+- API base URL: dùng relative path `/api/v1` (dev server proxy) hoặc env var `VITE_API_URL` cho production
+- `README.md` ghi rõ server repo URL + cách chạy fullstack
+
+---
+
+**Verification:** Sau khi implement cả 2 project, chạy thử fullstack:
+- `cd <product-slug>-server && make dev` → `http://localhost:8000/docs` (200 OK)
+- `cd <product-slug>-client && make dev` → `http://localhost:5173` (200 OK)
+- Frontend gọi được API backend qua proxy
+- Mỗi project có git init + initial commit sẵn sàng push
 
 ### Step 3d: Code Review
 
-Invoke `code-review` on the full product:
+Invoke `code-review` on both repos:
 
 ```
-/code-review "$PRODUCT_DIR/backend" "$PRODUCT_DIR/frontend" --output "$PRODUCT_DIR/code-review-report.md"
+/code-review "$PRODUCT_DIR/<slug>-server" --output "$PRODUCT_DIR/code-review-server.md"
+/code-review "$PRODUCT_DIR/<slug>-client" --output "$PRODUCT_DIR/code-review-client.md"
 ```
 
 Apply any critical fixes from the review before proceeding.
 
 ### Step 3e: Test Coverage
 
-Invoke `test-coverage` on both frontend and backend:
+Invoke `test-coverage` on both repos:
 
 ```
-/test-coverage "$PRODUCT_DIR/backend" --framework pytest --output "$PRODUCT_DIR/test-coverage-backend.md"
-/test-coverage "$PRODUCT_DIR/frontend" --framework vitest --output "$PRODUCT_DIR/test-coverage-frontend.md"
+/test-coverage "$PRODUCT_DIR/<slug>-server" --framework pytest --output "$PRODUCT_DIR/test-coverage-server.md"
+/test-coverage "$PRODUCT_DIR/<slug>-client" --framework vitest --output "$PRODUCT_DIR/test-coverage-client.md"
 ```
 
 **Check:**
-- [ ] Logo assets exist
-- [ ] Frontend compiles and runs (`npm run dev` without errors)
-- [ ] Backend starts (`uvicorn main:app --reload` without errors)
+- [ ] Logo assets exist (client repo)
+- [ ] Client compiles and runs (`npm run dev` without errors)
+- [ ] Server starts (`uvicorn main:app --reload` without errors)
 - [ ] Health endpoint returns 200
-- [ ] At least 1 end-to-end flow works (frontend → backend → DB)
+- [ ] At least 1 end-to-end flow works (client → server → DB)
 - [ ] Code review completed, critical issues fixed
 - [ ] Test coverage gaps addressed
+- [ ] Client README links to server repo
+- [ ] Server README links to client repo
+- [ ] Both repos have `git init` + initial commit
 
 **Step Completion Report:**
 ```
 ◆ Build Product (step 3 of 4)
 ······································································
   Logo:                 √ pass
-  Frontend scaffold:    √ pass
-  Backend implemented:  √ pass (<N> routes)
-  Frontend implemented: √ pass (<N> pages)
-  Local dev verified:   √ pass (frontend + backend running)
+  Server implemented:   √ pass (<N> routes, 1 repo)
+  Client implemented:   √ pass (<N> pages, 1 repo)
+  Cross-links:          √ pass (READMEs link each other)
+  Local dev verified:   √ pass (client + server running)
   Code review:          √ pass (<N> issues, <N> fixed)
-  Tests added:          √ pass (backend: <N>%, frontend: <N>%)
+  Tests added:          √ pass (server: <N>%, client: <N>%)
   ____________________________
   Result:               PASS
 ```
 
 ### GATE: Demo the running product to user for approval.
 
-Run both servers (`make dev` in a terminal or background), show the user the URLs, and ask them to approve before proceeding to Phase 4.
+Run both servers (`make dev` trong mỗi repo), show the user the URLs, và nhờ user approve trước khi chuyển sang Phase 4.
 
 ---
 
-## Phase 4: Ship Preparation
+## Phase 4: Ship Preparation (2 Repos)
+
+Mỗi bước dưới đây chạy **riêng cho từng repo** (server + client), trừ khi có ghi chú khác.
 
 ### Step 4a: DevOps Pipeline
 
-Invoke `devops-pipeline` at the product root:
-
 ```
-/devops-pipeline "$PRODUCT_DIR" --output "$PRODUCT_DIR"
+/devops-pipeline "$PRODUCT_DIR/<slug>-server" --output "$PRODUCT_DIR/<slug>-server"
+/devops-pipeline "$PRODUCT_DIR/<slug>-client" --output "$PRODUCT_DIR/<slug>-client"
 ```
-
-Sets up pre-commit hooks and GitHub Actions workflow.
 
 ### Step 4b: Open Source Ready
 
-Invoke `oss-ready`:
-
 ```
-/oss-ready "$PRODUCT_DIR" --output "$PRODUCT_DIR"
+/oss-ready "$PRODUCT_DIR/<slug>-server" --output "$PRODUCT_DIR/<slug>-server"
+/oss-ready "$PRODUCT_DIR/<slug>-client" --output "$PRODUCT_DIR/<slug>-client"
 ```
-
-Generates LICENSE, CONTRIBUTING.md, CODE_OF_CONDUCT.md, issue/PR templates.
 
 ### Step 4c: Documentation
 
-Invoke `docs-generator`:
-
 ```
-/docs-generator "$PRODUCT_DIR" --output "$PRODUCT_DIR/docs"
-```
-
-Restructures and organizes project documentation.
-
-### Step 4d: SEO Optimization
-
-Invoke `seo-ai-optimizer` on the project landing page (README → landing page output):
-
-```
-/seo-ai-optimizer "$PRODUCT_DIR/landing" --output "$PRODUCT_DIR/seo-report.md"
+/docs-generator "$PRODUCT_DIR/<slug>-server" --output "$PRODUCT_DIR/<slug>-server/docs"
+/docs-generator "$PRODUCT_DIR/<slug>-client" --output "$PRODUCT_DIR/<slug>-client/docs"
 ```
 
-### Step 4e: Landing Page from README
+### Step 4d: Push to GitHub
 
-Invoke `readme-to-landing-page`:
+Push cả 2 repo lên GitHub:
+
+```bash
+cd $PRODUCT_DIR/<slug>-server
+git remote add origin git@github.com:<user>/<slug>-server.git
+git push -u origin main
+
+cd $PRODUCT_DIR/<slug>-client
+git remote add origin git@github.com:<user>/<slug>-client.git
+git push -u origin main
+```
+
+### Step 4e: Landing Page from README (client repo)
 
 ```
-/readme-to-landing-page "$PRODUCT_DIR/README.md" --output "$PRODUCT_DIR/landing"
+/readme-to-landing-page "$PRODUCT_DIR/<slug>-client/README.md" --output "$PRODUCT_DIR/<slug>-client/landing"
 ```
 
-### Step 4f: Release
-
-Invoke `release-manager` to create the first release:
+### Step 4f: Release (cả 2 repo)
 
 ```
-/release-manager "$PRODUCT_DIR" --version 0.1.0 --output "$PRODUCT_DIR"
+/release-manager "$PRODUCT_DIR/<slug>-server" --version 0.1.0 --output "$PRODUCT_DIR/<slug>-server"
+/release-manager "$PRODUCT_DIR/<slug>-client" --version 0.1.0 --output "$PRODUCT_DIR/<slug>-client"
 ```
 
 **Check:**
-- [ ] Pre-commit hooks installed
-- [ ] GitHub Actions workflow created
-- [ ] LICENSE, CONTRIBUTING, CODE_OF_CONDUCT created
-- [ ] Documentation organized under docs/
-- [ ] Landing page generated
-- [ ] SEO report produced
-- [ ] Release tagged (v0.1.0)
+- [ ] Server pushed to GitHub
+- [ ] Client pushed to GitHub
+- [ ] Pre-commit hooks installed (cả 2 repo)
+- [ ] GitHub Actions workflow created (cả 2 repo)
+- [ ] LICENSE, CONTRIBUTING, CODE_OF_CONDUCT created (cả 2 repo)
+- [ ] Documentation organized under docs/ (cả 2 repo)
+- [ ] Landing page generated (client)
+- [ ] Release tagged v0.1.0 (cả 2 repo)
 
 **Step Completion Report:**
 ```
 ◆ Ship Preparation (step 4 of 4)
 ······································································
-  CI/CD:                √ pass (.github/workflows/)
-  Open source files:    √ pass (LICENSE, CONTRIBUTING, etc.)
-  Documentation:        √ pass (docs/)
-  Landing page:         √ pass (landing/)
-  SEO audit:            √ pass (seo-report.md)
-  Release:              √ pass (v0.1.0)
+  GitHub repos:         √ pass (2 repos created)
+  CI/CD:                √ pass (.github/workflows/ ×2)
+  Open source files:    √ pass (LICENSE, CONTRIBUTING ×2)
+  Documentation:        √ pass (docs/ ×2)
+  Landing page:         √ pass (client/landing)
+  Release:              √ pass (v0.1.0 ×2)
   ____________________________
   Result:               PASS
 ```
@@ -414,13 +465,13 @@ Invoke `release-manager` to create the first release:
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Phase 1  Idea Generation    √ pass  (<name> — <score>/100)
   Phase 2  Product Planning   √ approved (prd.md + tasks.md)
-  Phase 3  Build Product      √ approved (runs locally)
-  Phase 4  Ship Prep          √ pass  (v0.1.0)
+  Phase 3  Build Product      √ approved (2 repos, runs locally)
+  Phase 4  Ship Prep          √ pass  (pushed to GitHub)
 
-  Product:   $PRODUCT_DIR
-  Frontend:  http://localhost:5173
-  Backend:   http://localhost:8000
-  API docs:  http://localhost:8000/docs
+  Parent:      $PRODUCT_DIR
+  Server repo: <slug>-server  → http://localhost:8000  → GitHub
+  Client repo: <slug>-client  → http://localhost:5173  → GitHub
+  API docs:    http://localhost:8000/docs
 ```
 
 Final delivery summary file: `$PRODUCT_DIR/final-report.md` containing:
@@ -431,29 +482,30 @@ Final delivery summary file: `$PRODUCT_DIR/final-report.md` containing:
 
 ## Summary
 - **Idea**: <name> (validated <score>/100)
-- **Stack**: FastAPI + React/Vite/Tailwind + SQLite
-- **Local run**: `make dev`
+- **Stack**: FastAPI (server) + React/Vite/Tailwind (client) + SQLite
 - **Version**: 0.1.0
 
-## What Was Built
-- Backend: <N> API routes, <N> database models
-- Frontend: <N> pages, <N> components
-- Tests: backend <N>%, frontend <N>% coverage
+## Repositories
+| Repo | URL | Local path |
+|------|-----|------------|
+| Server | github.com/<user>/<slug>-server | <slug>-server/ |
+| Client | github.com/<user>/<slug>-client | <slug>-client/ |
 
-## Artifacts
-- PRD: prd.md
-- Architecture: architecture.md
-- Tasks: tasks.md
-- Code review: code-review-report.md
-- SEO report: seo-report.md
-- Landing page: landing/
+## What Was Built
+- Server: <N> API routes, <N> database models
+- Client: <N> pages, <N> components
+- Tests: server <N>%, client <N>% coverage
 
 ## Quick Start
 ```bash
-cd <product-dir>
-make install
-make dev
+# Terminal 1 — Server
+cd <slug>-server && make dev
+
+# Terminal 2 — Client
+cd <slug>-client && make dev
 ```
+
+Open http://localhost:5173
 ```
 
 ---
