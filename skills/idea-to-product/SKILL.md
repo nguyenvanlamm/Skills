@@ -46,7 +46,7 @@ All of these must be installed before starting:
 | `frontend-design` | 1.2.0+ | 3 |
 | `code-review` | 1.0.0+ | 3 |
 | `test-coverage` | 1.2.0+ | 3 |
-| `firebase-auth-setup` | 1.0.0+ | 3 (nếu cần auth) |
+| `firebase-auth-setup` | 1.0.0+ | 3 (bắt buộc — thay thế JWT tự build) |
 | `devops-pipeline` | 1.0.0+ | 4 |
 | `docs-generator` | 1.2.0+ | 4 |
 | `deploy-render` | 1.0.0+ | 4 (nếu cần deploy server) |
@@ -213,9 +213,9 @@ Invoke `frontend-design` to generate the UI shell:
 /frontend-design --product "<product-name>" --output "$PRODUCT_DIR/frontend" --framework react --styling tailwind --components shadcn
 ```
 
-### Step 3c: Firebase Auth Setup (nếu PRD yêu cầu đăng nhập)
+### Step 3c: Firebase Auth Setup (bắt buộc — thay thế JWT tự build)
 
-Nếu PRD yêu cầu authentication (đăng nhập bằng tài khoản/mật khẩu hoặc Google):
+Khi PRD có yêu cầu register/login (F1), **bắt buộc dùng Firebase Auth**. Không tự build JWT.
 
 ```markdown
 /firebase-auth-setup --slug "<product-slug>" --output "$PRODUCT_DIR/firebase-config"
@@ -244,14 +244,14 @@ Using the PRD, architecture, and tasks as specifications, build the full product
 ├── schemas.py           # Pydantic request/response schemas
 ├── routes/
 │   ├── __init__.py
-│   ├── auth.py          # If Firebase: verify ID token; else: JWT + hash password
+│   ├── auth.py          # Verify Firebase ID token (firebase_admin.auth.verify_id_token)
 │   └── ...              # Domain-specific routes per architecture.md
 ├── services/
 │   ├── __init__.py
 │   └── ...              # Business logic layer
-├── firebase_config.py   # [Nếu dùng Firebase] Init firebase_admin SDK
-├── requirements.txt     # fastapi, uvicorn, sqlalchemy, pydantic [+ firebase-admin nếu dùng Firebase]
-├── .env                 # [Nếu dùng Firebase] FIREBASE_PROJECT_ID, GOOGLE_APPLICATION_CREDENTIALS
+├── firebase_config.py   # Init firebase_admin SDK với service account key
+├── requirements.txt     # fastapi, uvicorn, sqlalchemy, pydantic, firebase-admin
+├── .env                 # FIREBASE_PROJECT_ID, GOOGLE_APPLICATION_CREDENTIALS
 ├── seed.py              # Optional seed data script
 ├── Makefile
 ├── README.md
@@ -281,8 +281,8 @@ Server conventions:
 - CORS allow client's production URL + `http://localhost:5173`
 - Health check at `GET /api/v1/health`
 - `README.md` ghi rõ client repo URL + cách clone cả 2 để chạy fullstack
-- [Nếu dùng Firebase Auth] `routes/auth.py` verify Firebase ID token bằng `firebase_admin.auth.verify_id_token`
-- [Nếu dùng Firebase Auth] `firebase_config.py` init `firebase_admin` với service account key
+- `routes/auth.py` verify Firebase ID token bằng `firebase_admin.auth.verify_id_token` (không hash password, không dùng JWT tự build)
+- `firebase_config.py` init `firebase_admin` với service account key
 
 ---
 
@@ -293,15 +293,15 @@ Server conventions:
 ├── src/
 │   ├── api/
 │   │   ├── client.ts    # API client (gọi server URL)
-│   │   └── firebase.ts  # [Nếu dùng Firebase] Init Firebase app + export auth
+│   │   └── firebase.ts  # Init Firebase app + export auth (signInWithEmailAndPassword, signInWithPopup)
 │   ├── pages/           # Page components
 │   ├── components/      # UI components
 │   ├── hooks/           # Custom hooks
 │   ├── App.tsx
 │   └── main.tsx
 ├── index.html
-├── package.json         # + firebase dependency nếu dùng Firebase
-├── .env                 # [Nếu dùng Firebase] VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, ...
+├── package.json         # dependencies bao gồm firebase
+├── .env                 # VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, ...
 ├── vite.config.ts
 ├── tailwind.config.js
 ├── tsconfig.json
@@ -343,8 +343,8 @@ server: {
 Client conventions:
 - API base URL: dùng relative path `/api/v1` (dev server proxy) hoặc env var `VITE_API_URL` cho production
 - `README.md` ghi rõ server repo URL + cách chạy fullstack
-- [Nếu dùng Firebase Auth] `src/api/firebase.ts` init Firebase app với config từ `.env` (VITE_FIREBASE_*)
-- [Nếu dùng Firebase Auth] Login page dùng `signInWithEmailAndPassword` và `signInWithPopup` (Google)
+- `src/api/firebase.ts` init Firebase app với config từ `.env` (VITE_FIREBASE_*)
+- Login page dùng Firebase SDK: `signInWithEmailAndPassword` (email/password) và `signInWithPopup` (Google)
 
 ---
 
@@ -352,8 +352,8 @@ Client conventions:
 - `cd <product-slug>-server && make dev` → `http://localhost:8000/docs` (200 OK)
 - `cd <product-slug>-client && make dev` → `http://localhost:5173` (200 OK)
 - Frontend gọi được API backend qua proxy
-- [Nếu dùng Firebase] Client login được với Email/Password hoặc Google
-- [Nếu dùng Firebase] Server verify được Firebase ID token (kiểm tra bằng `curl /api/v1/auth/me`)
+- Client login được với Email/Password hoặc Google (qua Firebase SDK)
+- Server verify được Firebase ID token (kiểm tra bằng `curl /api/v1/auth/me`)
 - Mỗi project có git init + initial commit sẵn sàng push
 
 ### Step 3e: Code Review
@@ -387,16 +387,16 @@ Invoke `test-coverage` on both repos:
 - [ ] Client README links to server repo
 - [ ] Server README links to client repo
 - [ ] Both repos have `git init` + initial commit
-- [ ] [Nếu dùng Firebase] Firebase project created, auth enabled, keys downloaded
-- [ ] [Nếu dùng Firebase] Client login flow works (Email/Password + Google)
-- [ ] [Nếu dùng Firebase] Server verifies Firebase ID token correctly
+- [ ] Firebase project created, auth enabled, keys downloaded (từ firebase-auth-setup)
+- [ ] Client login flow works (Email/Password + Google) qua Firebase SDK
+- [ ] Server verifies Firebase ID token correctly
 
 **Step Completion Report:**
 ```
 ◆ Build Product (step 3 of 4)
 ······································································
   Logo:                 √ pass
-  Firebase auth:        √ pass (hoặc N/A nếu không cần login)
+  Firebase auth:        √ pass (hoặc N/A nếu product không cần auth)
   Server implemented:   √ pass (<N> routes, 1 repo)
   Client implemented:   √ pass (<N> pages, 1 repo)
   Cross-links:          √ pass (READMEs link each other)
