@@ -46,6 +46,7 @@ All of these must be installed before starting:
 | `frontend-design` | 1.2.0+ | 3 |
 | `code-review` | 1.0.0+ | 3 |
 | `test-coverage` | 1.2.0+ | 3 |
+| `firebase-auth-setup` | 1.0.0+ | 3 (nếu cần auth) |
 | `devops-pipeline` | 1.0.0+ | 4 |
 | `docs-generator` | 1.2.0+ | 4 |
 | `oss-ready` | 1.1.0+ | 4 |
@@ -210,7 +211,22 @@ Invoke `frontend-design` to generate the UI shell:
 /frontend-design --product "<product-name>" --output "$PRODUCT_DIR/frontend" --framework react --styling tailwind --components shadcn
 ```
 
-### Step 3c: Implement Product (AI-driven) — 2 Repos Riêng
+### Step 3c: Firebase Auth Setup (nếu PRD yêu cầu đăng nhập)
+
+Nếu PRD yêu cầu authentication (đăng nhập bằng tài khoản/mật khẩu hoặc Google):
+
+```markdown
+/firebase-auth-setup --slug "<product-slug>" --output "$PRODUCT_DIR/firebase-config"
+```
+
+Sau khi chạy xong, đọc `$PRODUCT_DIR/firebase-config/firebase-output.json` để lấy:
+- `project_id` → ghi vào server `.env` là `FIREBASE_PROJECT_ID`
+- `web_app` → ghi vào client `.env` là `VITE_FIREBASE_*`
+- `service_account.key_path` → ghi vào server `.env` là `GOOGLE_APPLICATION_CREDENTIALS`
+
+---
+
+### Step 3d: Implement Product (AI-driven) — 2 Repos Riêng
 
 Using the PRD, architecture, and tasks as specifications, build the full product. **Server và client là 2 project riêng biệt**, mỗi project có git repo riêng để push lên GitHub.
 
@@ -226,12 +242,14 @@ Using the PRD, architecture, and tasks as specifications, build the full product
 ├── schemas.py           # Pydantic request/response schemas
 ├── routes/
 │   ├── __init__.py
-│   ├── auth.py          # If needed
+│   ├── auth.py          # If Firebase: verify ID token; else: JWT + hash password
 │   └── ...              # Domain-specific routes per architecture.md
 ├── services/
 │   ├── __init__.py
 │   └── ...              # Business logic layer
-├── requirements.txt     # fastapi, uvicorn, sqlalchemy, pydantic
+├── firebase_config.py   # [Nếu dùng Firebase] Init firebase_admin SDK
+├── requirements.txt     # fastapi, uvicorn, sqlalchemy, pydantic [+ firebase-admin nếu dùng Firebase]
+├── .env                 # [Nếu dùng Firebase] FIREBASE_PROJECT_ID, GOOGLE_APPLICATION_CREDENTIALS
 ├── seed.py              # Optional seed data script
 ├── Makefile
 ├── README.md
@@ -261,6 +279,8 @@ Server conventions:
 - CORS allow client's production URL + `http://localhost:5173`
 - Health check at `GET /api/v1/health`
 - `README.md` ghi rõ client repo URL + cách clone cả 2 để chạy fullstack
+- [Nếu dùng Firebase Auth] `routes/auth.py` verify Firebase ID token bằng `firebase_admin.auth.verify_id_token`
+- [Nếu dùng Firebase Auth] `firebase_config.py` init `firebase_admin` với service account key
 
 ---
 
@@ -269,14 +289,17 @@ Server conventions:
 ```
 <product-slug>-client/
 ├── src/
-│   ├── api/client.ts    # API client (gọi server URL)
+│   ├── api/
+│   │   ├── client.ts    # API client (gọi server URL)
+│   │   └── firebase.ts  # [Nếu dùng Firebase] Init Firebase app + export auth
 │   ├── pages/           # Page components
 │   ├── components/      # UI components
 │   ├── hooks/           # Custom hooks
 │   ├── App.tsx
 │   └── main.tsx
 ├── index.html
-├── package.json
+├── package.json         # + firebase dependency nếu dùng Firebase
+├── .env                 # [Nếu dùng Firebase] VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, ...
 ├── vite.config.ts
 ├── tailwind.config.js
 ├── tsconfig.json
@@ -318,6 +341,8 @@ server: {
 Client conventions:
 - API base URL: dùng relative path `/api/v1` (dev server proxy) hoặc env var `VITE_API_URL` cho production
 - `README.md` ghi rõ server repo URL + cách chạy fullstack
+- [Nếu dùng Firebase Auth] `src/api/firebase.ts` init Firebase app với config từ `.env` (VITE_FIREBASE_*)
+- [Nếu dùng Firebase Auth] Login page dùng `signInWithEmailAndPassword` và `signInWithPopup` (Google)
 
 ---
 
@@ -325,9 +350,11 @@ Client conventions:
 - `cd <product-slug>-server && make dev` → `http://localhost:8000/docs` (200 OK)
 - `cd <product-slug>-client && make dev` → `http://localhost:5173` (200 OK)
 - Frontend gọi được API backend qua proxy
+- [Nếu dùng Firebase] Client login được với Email/Password hoặc Google
+- [Nếu dùng Firebase] Server verify được Firebase ID token (kiểm tra bằng `curl /api/v1/auth/me`)
 - Mỗi project có git init + initial commit sẵn sàng push
 
-### Step 3d: Code Review
+### Step 3e: Code Review
 
 Invoke `code-review` on both repos:
 
@@ -338,7 +365,7 @@ Invoke `code-review` on both repos:
 
 Apply any critical fixes from the review before proceeding.
 
-### Step 3e: Test Coverage
+### Step 3f: Test Coverage
 
 Invoke `test-coverage` on both repos:
 
@@ -358,12 +385,16 @@ Invoke `test-coverage` on both repos:
 - [ ] Client README links to server repo
 - [ ] Server README links to client repo
 - [ ] Both repos have `git init` + initial commit
+- [ ] [Nếu dùng Firebase] Firebase project created, auth enabled, keys downloaded
+- [ ] [Nếu dùng Firebase] Client login flow works (Email/Password + Google)
+- [ ] [Nếu dùng Firebase] Server verifies Firebase ID token correctly
 
 **Step Completion Report:**
 ```
 ◆ Build Product (step 3 of 4)
 ······································································
   Logo:                 √ pass
+  Firebase auth:        √ pass (hoặc N/A nếu không cần login)
   Server implemented:   √ pass (<N> routes, 1 repo)
   Client implemented:   √ pass (<N> pages, 1 repo)
   Cross-links:          √ pass (READMEs link each other)
