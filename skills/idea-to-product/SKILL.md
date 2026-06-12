@@ -49,6 +49,7 @@ All of these must be installed before starting:
 | `firebase-auth-setup` | 1.0.0+ | 3 (nếu cần auth) |
 | `devops-pipeline` | 1.0.0+ | 4 |
 | `docs-generator` | 1.2.0+ | 4 |
+| `deploy-render` | 1.0.0+ | 4 (nếu cần deploy) |
 | `oss-ready` | 1.1.0+ | 4 |
 | `seo-ai-optimizer` | 1.0.0+ | 4 |
 | `readme-to-landing-page` | 2.0.0+ | 4 |
@@ -450,13 +451,23 @@ git remote add origin git@github.com:<user>/<slug>-client.git
 git push -u origin main
 ```
 
-### Step 4e: Landing Page from README (client repo)
+### Step 4e: Deploy Server to Render (nếu cần)
+
+Deploy server FastAPI lên Render.com với PostgreSQL:
+
+```
+/deploy-render --server-dir "$PRODUCT_DIR/<slug>-server" --slug "<slug>"
+```
+
+→ URL production: `https://<slug>-server.onrender.com`
+
+### Step 4f: Landing Page from README (client repo)
 
 ```
 /readme-to-landing-page "$PRODUCT_DIR/<slug>-client/README.md" --output "$PRODUCT_DIR/<slug>-client/landing"
 ```
 
-### Step 4f: Release (cả 2 repo)
+### Step 4g: Release (cả 2 repo)
 
 ```
 /release-manager "$PRODUCT_DIR/<slug>-server" --version 0.1.0 --output "$PRODUCT_DIR/<slug>-server"
@@ -470,6 +481,7 @@ git push -u origin main
 - [ ] GitHub Actions workflow created (cả 2 repo)
 - [ ] LICENSE, CONTRIBUTING, CODE_OF_CONDUCT created (cả 2 repo)
 - [ ] Documentation organized under docs/ (cả 2 repo)
+- [ ] [Nếu deploy] Server deployed to Render and accessible at URL
 - [ ] Landing page generated (client)
 - [ ] Release tagged v0.1.0 (cả 2 repo)
 
@@ -481,6 +493,7 @@ git push -u origin main
   CI/CD:                √ pass (.github/workflows/ ×2)
   Open source files:    √ pass (LICENSE, CONTRIBUTING ×2)
   Documentation:        √ pass (docs/ ×2)
+  Deploy Render:        √ pass (hoặc N/A nếu không deploy)
   Landing page:         √ pass (client/landing)
   Release:              √ pass (v0.1.0 ×2)
   ____________________________
@@ -503,6 +516,7 @@ git push -u origin main
   Server repo: <slug>-server  → http://localhost:8000  → GitHub
   Client repo: <slug>-client  → http://localhost:5173  → GitHub
   API docs:    http://localhost:8000/docs
+  [Nếu deploy] Server production: https://<slug>-server.onrender.com
 ```
 
 Final delivery summary file: `$PRODUCT_DIR/final-report.md` containing:

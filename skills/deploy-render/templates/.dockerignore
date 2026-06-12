@@ -1,0 +1,13 @@
+__pycache__
+*.pyc
+*.pyo
+.env
+.env.*
+.git
+.gitignore
+*.md
+Makefile
+.DS_Store
+venv
+.venv
+*.db
