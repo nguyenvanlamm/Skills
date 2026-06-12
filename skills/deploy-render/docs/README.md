@@ -7,7 +7,11 @@ Tự động deploy FastAPI server lên Render.com — từ sửa code, push Git
 ## Usage
 
 ```bash
-/deploy-render --server-dir <path> --slug <slug> [--gh-user <user>] [--output <dir>]
+# Có database:
+/deploy-render --server-dir <path> --slug <slug>
+
+# Không cần database:
+/deploy-render --server-dir <path> --slug <slug> --no-db
 ```
 
 ### Parameters
@@ -18,6 +22,7 @@ Tự động deploy FastAPI server lên Render.com — từ sửa code, push Git
 | `--slug` | Yes | — | Product slug (VD: `task-manager`) |
 | `--gh-user` | No | auto | GitHub username |
 | `--output` | No | server-dir | Output directory cho `deploy-output.json` |
+| `--no-db` | No | false | Skip PostgreSQL setup (server không cần database) |
 
 ### Output
 

@@ -7,16 +7,17 @@ SERVER_DIR=""
 SLUG=""
 GH_USER=""
 OUTPUT_DIR=""
+NO_DB=false
 
-# --- Parse args ---
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --server-dir) SERVER_DIR="$2"; shift 2 ;;
     --slug) SLUG="$2"; shift 2 ;;
     --gh-user) GH_USER="$2"; shift 2 ;;
     --output) OUTPUT_DIR="$2"; shift 2 ;;
+    --no-db) NO_DB=true; shift ;;
     --help)
-      echo "Usage: $0 --server-dir <path> --slug <slug> [--gh-user <user>] [--output <dir>]"
+      echo "Usage: $0 --server-dir <path> --slug <slug> [--gh-user <user>] [--output <dir>] [--no-db]"
       echo ""
       echo "Required:"
       echo "  --server-dir   Path to server project directory"
@@ -24,6 +25,7 @@ while [[ $# -gt 0 ]]; do
       echo "Optional:"
       echo "  --gh-user      GitHub username (auto-detected if omitted)"
       echo "  --output       Output directory for deploy-output.json (default: server-dir)"
+      echo "  --no-db        Skip PostgreSQL setup (server doesn't need a database)"
       exit 0
       ;;
     *) echo "Unknown arg: $1. Use --help for usage."; exit 1 ;;
@@ -39,17 +41,23 @@ SERVER_DIR="$(cd "$SERVER_DIR" 2>/dev/null && pwd)" || {
 if [ -z "$OUTPUT_DIR" ]; then OUTPUT_DIR="$SERVER_DIR"; fi
 mkdir -p "$OUTPUT_DIR"
 
+DB_LABEL="with PostgreSQL"
+if [ "$NO_DB" = true ]; then DB_LABEL="without database"; fi
+
 echo ""
 echo "═══════════════════════════════════════════════"
-echo "  Deploy Render — $SLUG"
+echo "  Deploy Render — $SLUG ($DB_LABEL)"
 echo "═══════════════════════════════════════════════"
 echo ""
 
 # --- Step 1: Prepare Server ---
 echo "◆ Step 1/3: Preparing server code..."
+NO_DB_FLAG=""
+if [ "$NO_DB" = true ]; then NO_DB_FLAG="--no-db"; fi
 bash "$SCRIPT_DIR/prepare-server.sh" \
   --server-dir "$SERVER_DIR" \
-  --slug "$SLUG"
+  --slug "$SLUG" \
+  $NO_DB_FLAG
 echo ""
 
 # --- Step 2: Push to GitHub ---
@@ -79,7 +87,8 @@ echo "◆ Step 3/3: Deploying to Render..."
 bash "$SCRIPT_DIR/render-client.sh" \
   --slug "$SLUG" \
   --gh-user "$GH_USER" \
-  --output "$OUTPUT_DIR"
+  --output "$OUTPUT_DIR" \
+  $NO_DB_FLAG
 echo ""
 
 echo "═══════════════════════════════════════════════"

@@ -454,10 +454,14 @@ git push -u origin main
 
 ### Step 4e: Deploy Server to Render (nếu cần)
 
-Deploy server FastAPI lên Render.com với PostgreSQL:
+Deploy server FastAPI lên Render.com. Kiểm tra xem server có cần database không (dựa vào PRD hoặc kiểm tra có `models.py` với `Base` không):
 
-```
+```bash
+# Có database (mặc định):
 /deploy-render --server-dir "$PRODUCT_DIR/<slug>-server" --slug "<slug>"
+
+# Không cần database (thêm --no-db):
+/deploy-render --server-dir "$PRODUCT_DIR/<slug>-server" --slug "<slug>" --no-db
 ```
 
 → URL production: `https://<slug>-server.onrender.com`

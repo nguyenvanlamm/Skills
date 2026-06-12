@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: {{slug}}-server
+    runtime: docker
+    repo: https://github.com/{{gh_user}}/{{slug}}-server
+    branch: main
+    plan: free
+    dockerfilePath: ./Dockerfile

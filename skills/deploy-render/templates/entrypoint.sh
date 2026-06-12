@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Wait for PostgreSQL to be ready
+# Wait for PostgreSQL to be ready (if DATABASE_URL is set)
 if [ -n "${DATABASE_URL:-}" ]; then
     echo "Waiting for PostgreSQL..."
     RETRIES=30
@@ -14,14 +14,16 @@ if [ -n "${DATABASE_URL:-}" ]; then
     fi
 fi
 
-# Auto-create database tables
-echo "Creating database tables..."
-python -c "
+# Auto-create database tables (if models/Base exists)
+if python -c "from models import Base" 2>/dev/null; then
+    echo "Creating database tables..."
+    python -c "
 from database import engine
 from models import Base
 Base.metadata.create_all(bind=engine)
 print('Tables created successfully')
 "
+fi
 
 # Start server
 echo "Starting server..."

@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 SLUG=""
 GH_USER=""
 OUTPUT_DIR=""
+NO_DB=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --slug) SLUG="$2"; shift 2 ;;
     --gh-user) GH_USER="$2"; shift 2 ;;
     --output) OUTPUT_DIR="$2"; shift 2 ;;
+    --no-db) NO_DB=true; shift ;;
     *) echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
@@ -42,53 +42,84 @@ REPO_URL="https://github.com/$GH_USER/${SLUG}-server"
 OUTPUT_FILE="$OUTPUT_DIR/deploy-output.json"
 
 echo "◆ Deploying to Render..."
+TOTAL_STEPS=3
+if [ "$NO_DB" = false ]; then TOTAL_STEPS=4; fi
 
-# --- Step 1: Create PostgreSQL database ---
-echo "  1/4 Creating PostgreSQL database..."
-DB_RESP=$(curl -s -X POST "$RENDER_API/postgres" \
-  -H "Authorization: Bearer $RENDER_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"name\": \"${SLUG}-db\",
-    \"plan\": \"free\",
-    \"region\": \"oregon\",
-    \"version\": \"16\"
-  }")
+CURRENT=1
 
-DB_ID=$(echo "$DB_RESP" | jq -r '.id // .database.id // empty' 2>/dev/null)
-DB_URL=$(echo "$DB_RESP" | jq -r '.connectionInfo.connectionString // .database.connectionInfo.connectionString // empty' 2>/dev/null)
-
-if [ -n "$DB_ID" ]; then
-  echo "  ✅ PostgreSQL database created: $DB_ID"
+# --- Step 1: Create PostgreSQL database (skip if --no-db) ---
+DB_ID=""
+if [ "$NO_DB" = true ]; then
+  echo "  ⏭  --no-db: skipping PostgreSQL creation"
 else
-  # Check if DB already exists
-  echo "  ⚠ Could not parse DB creation response. Listing existing databases..."
-  EXISTING_DB=$(curl -s -H "Authorization: Bearer $RENDER_API_KEY" "$RENDER_API/postgres" | \
-    jq -r --arg name "${SLUG}-db" '.[] | select(.name == $name) | .id // .database.id' 2>/dev/null | head -1)
-  if [ -n "$EXISTING_DB" ]; then
-    DB_ID="$EXISTING_DB"
-    echo "  Using existing database: $DB_ID"
+  echo "  $CURRENT/$TOTAL_STEPS Creating PostgreSQL database..."
+  CURRENT=$((CURRENT + 1))
+  DB_RESP=$(curl -s -X POST "$RENDER_API/postgres" \
+    -H "Authorization: Bearer $RENDER_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"name\": \"${SLUG}-db\",
+      \"plan\": \"free\",
+      \"region\": \"oregon\",
+      \"version\": \"16\"
+    }")
+
+  DB_ID=$(echo "$DB_RESP" | jq -r '.id // .database.id // empty' 2>/dev/null)
+
+  if [ -n "$DB_ID" ]; then
+    echo "  ✅ PostgreSQL database created: $DB_ID"
   else
-    echo "  ⚠ Database creation may have failed. Check Render Dashboard."
-    echo "  Response: $(echo "$DB_RESP" | head -c 500)"
+    echo "  ⚠ Could not parse DB creation response. Listing existing databases..."
+    EXISTING_DB=$(curl -s -H "Authorization: Bearer $RENDER_API_KEY" "$RENDER_API/postgres" | \
+      jq -r --arg name "${SLUG}-db" '.[] | select(.name == $name) | .id // .database.id' 2>/dev/null | head -1)
+    if [ -n "$EXISTING_DB" ]; then
+      DB_ID="$EXISTING_DB"
+      echo "  Using existing database: $DB_ID"
+    else
+      echo "  ⚠ Database creation may have failed. Check Render Dashboard."
+      echo "  Response: $(echo "$DB_RESP" | head -c 500)"
+    fi
   fi
 fi
 
-# --- Step 2: Sync Blueprint ---
-echo "  2/4 Syncing Render Blueprint..."
+# --- Step 2 (or 1): Sync Blueprint ---
+echo "  $CURRENT/$TOTAL_STEPS Syncing Render Blueprint..."
+CURRENT=$((CURRENT + 1))
+
+if [ "$NO_DB" = true ]; then
+  BLUEPRINT_DATA="{
+    \"repoUrl\": \"$REPO_URL\",
+    \"branch\": \"main\"
+  }"
+else
+  BLUEPRINT_DATA="{
+    \"repoUrl\": \"$REPO_URL\",
+    \"branch\": \"main\",
+    \"serviceOverrides\": [
+      {
+        \"type\": \"web\",
+        \"envVars\": [
+          {
+            \"key\": \"DATABASE_URL\",
+            \"fromDatabase\": {
+              \"name\": \"${SLUG}-db\"
+            }
+          }
+        ]
+      }
+    ]
+  }"
+fi
+
 BLUEPRINT_RESP=$(curl -s -X POST "$RENDER_API/blueprints/sync" \
   -H "Authorization: Bearer $RENDER_API_KEY" \
   -H "Content-Type: application/json" \
-  -d "{
-    \"repoUrl\": \"$REPO_URL\",
-    \"branch\": \"main\"
-  }")
+  -d "$BLUEPRINT_DATA")
 
 SERVICE_ID=$(echo "$BLUEPRINT_RESP" | jq -r '.service.id // .serviceId // (.services[0].id // empty)' 2>/dev/null)
 DEPLOY_ID=$(echo "$BLUEPRINT_RESP" | jq -r '.deploy.id // .deployId // (.deploys[0].id // empty)' 2>/dev/null)
 
 if [ -z "$SERVICE_ID" ]; then
-  # Blueprint returns services array sometimes
   SERVICE_ID=$(echo "$BLUEPRINT_RESP" | jq -r '.[0].id // .[0].service.id // empty' 2>/dev/null)
 fi
 
@@ -96,7 +127,6 @@ if [ -n "$SERVICE_ID" ]; then
   echo "  ✅ Blueprint synced: Service $SERVICE_ID"
 else
   echo "  ⚠ Blueprint sync response, trying to find service..."
-  # List all services to find ours
   SERVICE_ID=$(curl -s -H "Authorization: Bearer $RENDER_API_KEY" "$RENDER_API/services" | \
     jq -r --arg name "${SLUG}-server" '.[] | select(.name == $name) | .id // .service.id' 2>/dev/null | head -1)
   if [ -z "$SERVICE_ID" ]; then
@@ -107,11 +137,11 @@ else
   fi
 fi
 
-# --- Step 3: Poll deploy status ---
+# --- Step 3 (or 2): Poll deploy status ---
 if [ -n "$SERVICE_ID" ]; then
-  echo "  3/4 Waiting for deploy to complete..."
-  
-  # If no deploy_id from blueprint, trigger a new deploy
+  echo "  $CURRENT/$TOTAL_STEPS Waiting for deploy to complete..."
+  CURRENT=$((CURRENT + 1))
+
   if [ -z "$DEPLOY_ID" ]; then
     echo "  Triggering new deploy..."
     DEPLOY_RESP=$(curl -s -X POST "$RENDER_API/services/$SERVICE_ID/deploys" \
@@ -125,7 +155,7 @@ if [ -n "$SERVICE_ID" ]; then
     echo "  Deploy ID: $DEPLOY_ID"
     echo "  Polling (this may take 3-5 minutes)..."
     
-    MAX_POLLS=90  # 90 * 10s = 15 minutes max
+    MAX_POLLS=90
     POLL=0
     while [ "$POLL" -lt "$MAX_POLLS" ]; do
       STATUS_RESP=$(curl -s -H "Authorization: Bearer $RENDER_API_KEY" \
@@ -163,8 +193,9 @@ if [ -n "$SERVICE_ID" ]; then
   fi
 fi
 
-# --- Step 4: Get service URL ---
-echo "  4/4 Getting service URL..."
+# --- Step 4 (or 3): Get service URL ---
+echo "  $CURRENT/$TOTAL_STEPS Getting service URL..."
+CURRENT=$((CURRENT + 1))
 SERVICE_URL=""
 if [ -n "$SERVICE_ID" ]; then
   SVC_RESP=$(curl -s -H "Authorization: Bearer $RENDER_API_KEY" \
@@ -180,15 +211,28 @@ else
 fi
 
 # --- Write output ---
-cat > "$OUTPUT_FILE" <<EOF
+if [ "$NO_DB" = true ]; then
+  cat > "$OUTPUT_FILE" <<EOF
+{
+  "url": "$SERVICE_URL",
+  "service_id": "${SERVICE_ID:-unknown}",
+  "repo_url": "$REPO_URL",
+  "status": "${STATUS:-unknown}",
+  "has_db": false
+}
+EOF
+else
+  cat > "$OUTPUT_FILE" <<EOF
 {
   "url": "$SERVICE_URL",
   "database_id": "${DB_ID:-unknown}",
   "service_id": "${SERVICE_ID:-unknown}",
   "repo_url": "$REPO_URL",
-  "status": "${STATUS:-unknown}"
+  "status": "${STATUS:-unknown}",
+  "has_db": true
 }
 EOF
+fi
 
 echo "✅ Output written to $OUTPUT_FILE"
 echo ""
@@ -199,4 +243,5 @@ echo ""
 echo "  URL:        $SERVICE_URL"
 echo "  API docs:   $SERVICE_URL/docs"
 echo "  Repo:       $REPO_URL"
+echo "  Database:   $([ "$NO_DB" = true ] && echo 'None' || echo "Created ($DB_ID)")"
 echo ""

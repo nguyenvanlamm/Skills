@@ -1,10 +1,10 @@
 ---
 name: deploy-render
-description: "Tự động deploy FastAPI server lên Render.com — sửa code hỗ trợ PostgreSQL, tạo Dockerfile, tạo GitHub repo, gọi Render API tạo database + deploy, trả về URL. Dùng khi cần deploy server lên production. Don't use for client-side deploy (Vercel/Netlify), non-FastAPI backends, or non-Render platforms."
+description: "Tự động deploy FastAPI server lên Render.com — sửa code hỗ trợ PostgreSQL, tạo Dockerfile, tạo GitHub repo, gọi Render API tạo database + deploy, trả về URL. Hỗ trợ --no-db cho server không cần database. Dùng khi cần deploy server lên production. Don't use for client-side deploy (Vercel/Netlify), non-FastAPI backends, or non-Render platforms."
 license: MIT
 effort: high
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: "Nguyen Van Lam"
 ---
 
@@ -49,18 +49,32 @@ chmod 600 ~/.config/render/api-key
 | `--server-dir` | Yes | — | Thư mục server project (VD: `$PRODUCT_DIR/task-manager-server`) |
 | `--slug` | Yes | — | Product slug (VD: `task-manager`) |
 | `--gh-user` | No | — | GitHub username. Nếu không có, đọc từ `gh auth status`. |
+| `--no-db` | No | false | Skip PostgreSQL setup (server không cần database) |
 
 ## Output
 
 Sau khi chạy thành công, `$PRODUCT_DIR/deploy-output.json`:
 
+### Với database (mặc định)
 ```json
 {
   "url": "https://task-manager.onrender.com",
-  "database_url": "postgres://...",
-  "service_id": "srv-xxx",
   "database_id": "db-xxx",
-  "repo_url": "https://github.com/user/task-manager-server"
+  "service_id": "srv-xxx",
+  "repo_url": "https://github.com/user/task-manager-server",
+  "status": "live",
+  "has_db": true
+}
+```
+
+### Không database (`--no-db`)
+```json
+{
+  "url": "https://task-manager.onrender.com",
+  "service_id": "srv-xxx",
+  "repo_url": "https://github.com/user/task-manager-server",
+  "status": "live",
+  "has_db": false
 }
 ```
 
@@ -69,16 +83,15 @@ Sau khi chạy thành công, `$PRODUCT_DIR/deploy-output.json`:
 ### Step 1: Prepare Server Code
 
 ```bash
-bash scripts/prepare-server.sh --server-dir <path> --slug <slug>
+bash scripts/prepare-server.sh --server-dir <path> --slug <slug> [--no-db]
 ```
 
-- Modify `database.py` → đọc `DATABASE_URL` từ env, fallback SQLite local
-- Add `psycopg2-binary`, `gunicorn` vào `requirements.txt`
-- Tạo `Dockerfile`
-- Tạo `entrypoint.sh` (wait DB → create tables → start gunicorn)
-- Tạo `.dockerignore`
-- Tạo `render.yaml` (Blueprint)
-- Tạo `.env.production` mẫu
+Với `--no-db`:
+- Giữ nguyên `database.py` (SQLite mặc định)
+- Không thêm `psycopg2-binary` vào requirements
+- Không thêm auto-create tables vào `main.py`
+- Sinh `render.yaml` không có database section
+- Sinh `.env.production` không có DATABASE_URL
 
 ### Step 2: Push to GitHub
 
@@ -86,53 +99,22 @@ bash scripts/prepare-server.sh --server-dir <path> --slug <slug>
 bash scripts/push-to-github.sh --server-dir <path> --slug <slug> [--gh-user <user>]
 ```
 
-- Kiểm tra GitHub remote đã có chưa
-- Nếu chưa: `gh repo create <slug>-server --private`
-- `git add . && git commit -m "Add Dockerfile + Render config"`
-- `git push -u origin main`
-
 ### Step 3: Deploy to Render
 
 ```bash
-bash scripts/render-client.sh --server-dir <path> --slug <slug> [--gh-user <user>] [--output <dir>]
+bash scripts/render-client.sh --slug <slug> --gh-user <user> [--no-db]
 ```
 
-- Render API: tạo PostgreSQL database (free tier)
-- Render API: sync Blueprint từ GitHub repo
-- Render API: poll deploy đến khi `status = live`
-- Render API: lấy URL service
-- Ghi output JSON
+Với `--no-db`: bỏ qua bước tạo PostgreSQL, không set DATABASE_URL trong blueprint.
 
 ### Orchestrator
 
 ```bash
-bash scripts/deploy.sh --server-dir <path> --slug <slug> [--gh-user <user>] [--output <dir>]
-```
+# Có database:
+bash scripts/deploy.sh --server-dir <path> --slug <slug>
 
-Chạy tuần tự 3 bước. Nếu bước nào fail → dừng, báo lỗi.
-
-## Render API Reference
-
-Các endpoint sử dụng:
-
-```
-# Tạo PostgreSQL
-POST https://api.render.com/v1/postgres
-Authorization: Bearer <RENDER_API_KEY>
-{ "name": "<slug>-db", "plan": "free", "region": "oregon", "version": "16" }
-
-# Sync Blueprint
-POST https://api.render.com/v1/blueprints/sync
-{ "repoUrl": "https://github.com/<user>/<slug>-server", "branch": "main" }
-
-# List services (lấy serviceId từ blueprint sync)
-GET https://api.render.com/v1/services
-
-# Poll deploy
-GET https://api.render.com/v1/services/{serviceId}/deploys/{deployId}
-
-# Get service URL
-GET https://api.render.com/v1/services/{serviceId}
+# Không database:
+bash scripts/deploy.sh --server-dir <path> --slug <slug> --no-db
 ```
 
 ## Edge Cases
@@ -143,3 +125,4 @@ GET https://api.render.com/v1/services/{serviceId}
 - **Deploy fail (build error)**: Lấy log từ Render API, báo lỗi chi tiết
 - **Free tier hết quota**: Báo lỗi, hướng dẫn upgrade
 - **Region không support free PostgreSQL**: Fallback về `oregon`
+- **`--no-db` mà có database.py**: Giữ nguyên database.py (vẫn dùng SQLite local), không ảnh hưởng
