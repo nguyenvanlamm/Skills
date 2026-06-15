@@ -217,6 +217,18 @@ Invoke `frontend-design` to generate the UI shell:
 
 Khi PRD có yêu cầu register/login (F1), **bắt buộc dùng Firebase Auth**. Không tự build JWT.
 
+**Prerequisites check** — xác nhận các tool sau đã được cài đặt và cấu hình trước khi chạy:
+
+| Tool | Check command | Nếu thiếu |
+|------|---------------|-----------|
+| `firebase-tools` | `firebase --version` | `npm install -g firebase-tools` |
+| `gcloud` | `gcloud --version` | https://cloud.google.com/sdk/docs/install |
+| `jq` | `jq --version` | `apt install jq` / `brew install jq` |
+| Firebase CI token | `cat ~/.config/firebase/ci-token` | `firebase login:ci --no-localhost` rồi lưu vào `~/.config/firebase/ci-token` |
+| gcloud auth | `gcloud auth list` | `gcloud auth login` hoặc `gcloud auth application-default login` |
+
+Nếu thiếu bất kỳ mục nào → báo lỗi + hướng dẫn cài đặt, **dừng lại**, không chạy `firebase-auth-setup`.
+
 ```markdown
 /firebase-auth-setup --slug "<product-slug>" --output "$PRODUCT_DIR/firebase-config"
 ```
@@ -225,6 +237,11 @@ Sau khi chạy xong, đọc `$PRODUCT_DIR/firebase-config/firebase-output.json` 
 - `project_id` → ghi vào server `.env` là `FIREBASE_PROJECT_ID`
 - `web_app` → ghi vào client `.env` là `VITE_FIREBASE_*`
 - `service_account.key_path` → ghi vào server `.env` là `GOOGLE_APPLICATION_CREDENTIALS`
+
+**Verify end-to-end** sau khi setup:
+1. Kiểm tra server start được: `cd server && uvicorn main:app --reload --port 8000` (200 OK)
+2. Kiểm tra client gọi được Firebase: dùng browser devtools verify `firebase.auth()` không báo lỗi
+3. Thử login Email/Password hoặc Google trên client, verify server nhận được ID token (gọi `GET /api/v1/auth/me` với token)
 
 ---
 
