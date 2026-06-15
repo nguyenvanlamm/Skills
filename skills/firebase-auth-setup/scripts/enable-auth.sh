@@ -38,14 +38,22 @@ FIREBASE_API="https://identitytoolkit.googleapis.com/v2/projects/$PROJECT_ID"
 # Enable Email/Password provider
 echo "  Enabling Email/Password provider..."
 EMAIL_PAYLOAD='{"signInProviders":{"email":true,"password":true}}'
-EMAIL_RESP=$(curl -s -X PATCH "${FIREBASE_API}/config?updateMask=signInProviders.email,signInProviders.password" \
-  -H "Authorization: Bearer $CI_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "$EMAIL_PAYLOAD" 2>&1)
+EMAIL_RESP=$(python3 -c "
+import urllib.request, json
+url = '${FIREBASE_API}/config?updateMask=signInProviders.email,signInProviders.password'
+req = urllib.request.Request(url, data=json.dumps($EMAIL_PAYLOAD).encode(), headers={
+    'Authorization': 'Bearer $CI_TOKEN',
+    'Content-Type': 'application/json',
+}, method='PATCH')
+try:
+    resp = urllib.request.urlopen(req)
+    print(resp.read().decode())
+except urllib.error.HTTPError as e:
+    print(json.dumps({'error': {'message': e.read().decode()}}))
+" 2>&1)
 
 if echo "$EMAIL_RESP" | jq -e '.error' &>/dev/null 2>&1; then
   echo "  ⚠ Email/Password REST API failed, trying alternative method..."
-  # Fallback: use gcloud to call Firebase Management API
   gcloud services enable firebase.googleapis.com --project "$PROJECT_ID" --quiet 2>/dev/null || true
   sleep 3
 fi
@@ -54,10 +62,19 @@ echo "  ✅ Email/Password provider enabled"
 # Enable Google provider
 echo "  Enabling Google sign-in provider..."
 GOOGLE_PAYLOAD='{"signInProviders":{"google":true}}'
-GOOGLE_RESP=$(curl -s -X PATCH "${FIREBASE_API}/config?updateMask=signInProviders.google" \
-  -H "Authorization: Bearer $CI_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "$GOOGLE_PAYLOAD" 2>&1)
+GOOGLE_RESP=$(python3 -c "
+import urllib.request, json
+url = '${FIREBASE_API}/config?updateMask=signInProviders.google'
+req = urllib.request.Request(url, data=json.dumps($GOOGLE_PAYLOAD).encode(), headers={
+    'Authorization': 'Bearer $CI_TOKEN',
+    'Content-Type': 'application/json',
+}, method='PATCH')
+try:
+    resp = urllib.request.urlopen(req)
+    print(resp.read().decode())
+except urllib.error.HTTPError as e:
+    print(json.dumps({'error': {'message': e.read().decode()}}))
+" 2>&1)
 
 if echo "$GOOGLE_RESP" | jq -e '.error' &>/dev/null 2>&1; then
   echo "  ⚠ Google REST API call had issues (may still work in Firebase Console)"
