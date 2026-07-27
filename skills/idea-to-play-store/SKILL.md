@@ -4,7 +4,7 @@ description: "End-to-end Flutter app builder: from idea to Google Play. Automate
 license: MIT
 effort: max
 metadata:
-  version: 1.0.0
+  version: 2.0.0
   author: "Nguyen Van Lam"
 ---
 
@@ -41,20 +41,20 @@ Do **not** use for:
 | `tasks-generator` | 1.0+ | 2 | global |
 | `logo-designer` | 1.0+ | 2 | global |
 | `frontend-design` | 1.0+ | 2 | global |
-| `flutter-init` | 1.0+ | 3 | skills repo |
-| `firebase-auth-setup` | 1.0+ | 3 (opt) | global |
+| `flutter-init` | 2.0+ | 3 | skills repo |
+| `firebase-auth-setup` | 2.0+ | 3 (opt) | global |
 | `devops-pipeline` | 1.0+ | 3 | global |
 | `code-review` | 1.0+ | 4 | global |
 | `test-coverage` | 1.0+ | 4 | global |
-| `flutter-signing` | 1.0+ | 5 | skills repo |
-| `flutter-build` | 1.0+ | 5 | skills repo |
-| `flutter-store-metadata` | 1.0+ | 5 | skills repo |
-| `flutter-store-compliance` | 1.0+ | 5 | skills repo |
-| `flutter-publish` | 1.0+ | 5 | skills repo |
+| `flutter-signing` | 2.0+ | 5 | skills repo |
+| `flutter-build` | 2.0+ | 5 | skills repo |
+| `flutter-store-metadata` | 2.0+ | 5 | skills repo |
+| `flutter-store-compliance` | 2.0+ | 5 | skills repo |
+| `flutter-publish` | 2.0+ | 5 | skills repo |
 | `release-manager` | 1.0+ | 5 | global |
 | `aso-marketing` | 1.0+ | 5 | global |
-| `social-poster` | 1.0+ | 5 (opt) | global |
-| `deploy-render` | 1.0+ | 3 (opt) | global |
+| ~~`social-poster`~~ | — | — | **không tồn tại** — xem Step 5h |
+| `deploy-render` | 2.0+ | 3 (opt) | global |
 
 ### Runtime Requirements
 
@@ -78,8 +78,11 @@ Do **not** use for:
 
 ```bash
 DATE=$(date +%Y_%m_%d)
-mkdir -p "$PRODUCT_DIR/$DATE_$SLUG"
-export PRODUCT_DIR="$PRODUCT_DIR/$DATE_$SLUG"
+# Dùng ${DATE}_${SLUG}, không phải $DATE_$SLUG: '_' là ký tự hợp lệ trong tên
+# biến, nên "$DATE_$SLUG" được đọc thành biến "$DATE_" (rỗng) nối "$SLUG" —
+# mọi project sẽ nằm ở thư mục chỉ có tên slug, mất phần ngày tháng.
+mkdir -p "$PRODUCT_DIR/${DATE}_${SLUG}"
+export PRODUCT_DIR="$PRODUCT_DIR/${DATE}_${SLUG}"
 ```
 
 ### Step 0.3: Create Sub-directories
@@ -120,13 +123,24 @@ Phase 4 — Build            → [feature-gen (parallel)] → build-runner
                              → test-coverage
                              GATE: user approves running app
 
+                             GATE: user approves entering Phase 5
+
 Phase 5 — Store & Publish  → flutter-signing → flutter-build
                              → flutter-store-metadata
                              → flutter-store-compliance
                              → flutter-publish
-                             → [aso-marketing → social-poster]
+                             → [aso-marketing]
                              → release-manager
 ```
+
+**Gate trước Phase 5.** Đây là phase hướng ra ngoài: tạo khoá ký vĩnh viễn cho app, chốt `applicationId` không đổi được sau lần publish đầu, đẩy AAB lên Play Console, và có thể đăng bài mạng xã hội. Trước khi bắt đầu, nói rõ với user:
+
+- `applicationId` sẽ là gì — **vĩnh viễn sau lần publish đầu**
+- Keystore sẽ được tạo ở đâu, và user phải tự backup (xem `flutter-signing`)
+- Track nào sẽ nhận bản build (mặc định `internal`, không phải `production`)
+- Tài khoản cá nhân mới còn cần 12 tester × 14 ngày trước khi lên production được
+
+Chờ đồng ý rồi mới chạy. Đồng ý cho `internal` không phải đồng ý cho `production`.
 
 ---
 
@@ -1000,12 +1014,21 @@ git tag v1.0.0
 
 ### Step 5h: Social Post (Optional)
 
-```bash
-/skill social-poster \
-  --app-name "$APP_NAME" \
-  --description "$SHORT_DESC" \
-  --play-store-url "https://play.google.com/store/apps/details?id=$PACKAGE_NAME"
+**Không có skill `social-poster`** — bản trước gọi một skill không tồn tại, nên bước này luôn hỏng ở giữa Phase 5.
+
+Đăng bài quảng bá là việc thủ công. Soạn sẵn nội dung cho user tự đăng:
+
 ```
+<APP_NAME> đã lên Google Play.
+
+<SHORT_DESC>
+
+https://play.google.com/store/apps/details?id=<PACKAGE_NAME>
+```
+
+`social-brand-sync` trong repo này **không** đăng bài — nó chỉ đồng bộ avatar, ảnh bìa và tên hiển thị. Đừng dùng thay thế.
+
+Và lưu ý: link store chỉ hoạt động sau khi app được duyệt và phát hành. Đăng bài trước khi review xong là link 404.
 
 ### Phase 5 Report
 

@@ -4,7 +4,7 @@ description: "End-to-end product builder from trend analysis to runnable code. F
 license: MIT
 effort: max
 metadata:
-  version: 1.0.0
+  version: 2.0.0
   author: "Nguyen Van Lam"
 ---
 
@@ -31,13 +31,15 @@ Do **not** use for:
 
 ## Prerequisites
 
-### Required Skills (from `luongnv89/skills`)
+### Required Skills
+
+Các skill `deploy-*`, `firebase-auth-setup`, `trend-ideas` nằm trong repo này; phần còn lại là skill global.
 
 All of these must be installed before starting:
 
 | Skill | Version | Phase |
 |-------|---------|-------|
-| `trend-ideas` | 2.0.0+ | 1 |
+| `trend-ideas` | 2.1.0+ | 1 |
 | `idea-validator` | 1.2.0+ | 1 |
 | `prd-generator` | 1.2.0+ | 2 |
 | `tad-generator` | 1.2.0+ | 2 |
@@ -46,25 +48,25 @@ All of these must be installed before starting:
 | `frontend-design` | 1.2.0+ | 3 |
 | `code-review` | 1.0.0+ | 3 |
 | `test-coverage` | 1.2.0+ | 3 |
-| `firebase-auth-setup` | 1.0.0+ | 3 (bắt buộc — thay thế JWT tự build) |
+| `firebase-auth-setup` | 2.0.0+ | 3 (bắt buộc — thay thế JWT tự build) |
 | `devops-pipeline` | 1.0.0+ | 4 |
 | `docs-generator` | 1.2.0+ | 4 |
-| `deploy-render` | 1.0.0+ | 4 (nếu cần deploy server) |
-| `deploy-netlify` | 1.0.0+ | 4 (nếu cần deploy client) |
+| `deploy-render` | 2.0.0+ | 4 (nếu cần deploy server) |
+| `deploy-netlify` | 2.0.0+ | 4 (nếu cần deploy client) |
 | `oss-ready` | 1.1.0+ | 4 |
 | `seo-ai-optimizer` | 1.0.0+ | 4 |
-| `readme-to-landing-page` | 2.0.0+ | 4 |
+| `landing-page-generator` | 1.0.0+ | 4 |
 | `release-manager` | 2.4.0+ | 4 |
 
 ### Install Command
 
 ```bash
-npx skills add https://github.com/luongnv89/skills --skill <skill-name>
+npx skills add https://github.com/nguyenvanlamm/Skills --skill <skill-name>
 ```
 
 Or install all at once:
 ```bash
-npx skills add https://github.com/luongnv89/skills
+npx skills add https://github.com/nguyenvanlamm/Skills
 ```
 
 ### Runtime Requirements
@@ -100,10 +102,12 @@ npx skills add https://github.com/luongnv89/skills
 Phase 1 — Idea Generation  → trend-ideas + idea-validator
 Phase 2 — Product Planning (GATE) → prd-generator + tad-generator + tasks-generator
 Phase 3 — Build Product (GATE) → logo-designer + frontend-design + implement + code-review + test-coverage
-Phase 4 — Ship Prep → devops-pipeline + docs-generator + oss-ready + seo-ai-optimizer + readme-to-landing-page + release-manager
+Phase 4 — Ship Prep → devops-pipeline + docs-generator + oss-ready + seo-ai-optimizer + landing-page-generator + release-manager
 ```
 
 Approval gates after Phase 1, 2, and 3: **must not advance** without explicit user approval.
+
+**Và một gate trước Phase 4.** Phase 4 đẩy code lên GitHub, deploy site công khai, và cắt release — những việc hướng ra ngoài, khó rút lại, và đụng tới tài khoản thật của user. Trước khi bắt đầu Phase 4, liệt kê chính xác: repo nào sẽ được tạo (public hay private), URL nào sẽ công khai, tag nào sẽ được đẩy. Chờ user đồng ý. Đồng ý cho deploy không phải đồng ý cho release.
 
 ---
 
@@ -502,7 +506,7 @@ fi
 ### Step 4g: Landing Page from README (client repo)
 
 ```
-/readme-to-landing-page "$PRODUCT_DIR/<slug>-client/README.md" --output "$PRODUCT_DIR/<slug>-client/landing"
+/landing-page-generator "$PRODUCT_DIR/<slug>-client/README.md" --output "$PRODUCT_DIR/<slug>-client/landing"
 ```
 
 ### Step 4h: Release (cả 2 repo)
