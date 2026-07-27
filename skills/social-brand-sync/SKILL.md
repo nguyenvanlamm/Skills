@@ -4,13 +4,31 @@ description: "Đồng bộ thương hiệu từ website lên mạng xã hội �
 license: MIT
 effort: max
 metadata:
-  version: 1.0.0
+  version: 2.0.0
   author: "Nguyen Van Lam"
 ---
 
 # Social Brand Sync
 
 Đồng bộ hóa thương hiệu từ website lên mạng xã hội — cập nhật ảnh đại diện, ảnh nền/banner, và tên hiển thị để thống nhất nhận diện thương hiệu trên tất cả nền tảng.
+
+## Nguyên tắc
+
+> **Mặc định không ghi.** Skill này thay avatar, ảnh bìa và tên hiển thị trên tài khoản thật của user, cùng lúc trên nhiều nền tảng, và không có nút hoàn tác nào. Mọi lệnh gọi API ghi dữ liệu đều đi qua `can_write` — chạy lần đầu là dry-run, in ra chính xác những gì sẽ đổi ở đâu.
+
+Chỉ `--apply` sau khi user đã xem danh sách thay đổi và đồng ý. Đồng ý cho một nền tảng không phải đồng ý cho tất cả — hỏi rõ phạm vi.
+
+**Đổi tên là hành động nặng nhất.** Facebook giới hạn số lần đổi tên Page và có thể đưa vào diện review; đổi hụt có thể khoá luôn khả năng đổi trong nhiều ngày. Mặc định nên chỉ đồng bộ ảnh (`--action profile-pic`, `--action cover`), và chỉ đổi tên khi user yêu cầu đích danh.
+
+**Backup trước khi ghi đè.** Ảnh đại diện hiện tại được tải về `<output>/backup/<platform>/` trước khi thay. Không backup được thì script nói rõ chứ không im lặng ghi đè.
+
+## Thất bại từng phần
+
+Sáu nền tảng, mỗi cái một API riêng. Nền tảng thứ ba lỗi không hoàn tác được hai nền tảng đầu. Vì vậy:
+
+- Chạy dry-run **toàn bộ** trước, rồi mới apply — để lỗi cấu hình lộ ra trước khi có gì bị đổi.
+- `report.json` ghi trạng thái từng nền tảng từng mục. Báo cáo cuối phải nói rõ cái nào đã đổi, cái nào chưa, chứ không gộp thành một dòng "hoàn tất".
+- Không tự retry một nền tảng đã đổi thành công.
 
 ## When to Use
 
@@ -264,11 +282,16 @@ convert cover.png -resize 1500x500^ -gravity center -extent 1500x500 "$OUTPUT_DI
 Chạy script `scripts/update-platform.sh` cho từng platform (tự động cập nhật logo + banner + tên):
 
 ```bash
+# Xem trước (mặc định — không ghi gì):
 bash scripts/update-platform.sh \
-  --platform <platform> \
-  --output-dir "$OUTPUT_DIR" \
-  --brand-name "$BRAND_NAME"
+  --platform <platform> --output-dir "$OUTPUT_DIR" --brand-name "$BRAND_NAME"
+
+# Thực hiện thật, sau khi user đã duyệt danh sách thay đổi:
+bash scripts/update-platform.sh \
+  --platform <platform> --output-dir "$OUTPUT_DIR" --brand-name "$BRAND_NAME" --apply
 ```
+
+`--action` giới hạn phạm vi: `profile-pic`, `cover`, `name`, hoặc `all`. Mặc định `all` là rộng nhất — cân nhắc thu hẹp.
 
 Hoặc gọi API trực tiếp bằng `curl` nếu platform đơn giản:
 

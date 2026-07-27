@@ -5,16 +5,25 @@
 #   --output-dir <path> \
 #   --brand-name <name> \
 #   --action <all|profile-pic|cover|name>
+#   [--apply]     thực sự ghi lên platform. Mặc định là dry-run.
+#
+# Mặc định KHÔNG ghi. Script này thay avatar, ảnh bìa và tên hiển thị trên tài
+# khoản thật, trên nhiều nền tảng — không hoàn tác được bằng một lệnh, và với
+# Facebook Page thì đổi tên còn bị giới hạn số lần. Chạy xem trước, rồi mới
+# --apply.
 
 set -euo pipefail
 
 # === Parse arguments ===
+APPLY=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --platform) PLATFORM="$2"; shift 2 ;;
     --output-dir) OUTPUT_DIR="$2"; shift 2 ;;
     --brand-name) BRAND_NAME="$2"; shift 2 ;;
     --action) ACTION="$2"; shift 2 ;;
+    --apply) APPLY=true; shift ;;
+    --dry-run) APPLY=false; shift ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -25,10 +34,35 @@ done
 : "${ACTION:=all}"
 
 REPORT_FILE="$OUTPUT_DIR/report.json"
+BACKUP_DIR="$OUTPUT_DIR/backup/$PLATFORM"
 
 # === Helper: ghi log ===
 log() {
   echo "[$PLATFORM] $*"
+}
+
+if [ "$APPLY" = false ]; then
+  log "DRY-RUN — không gọi API ghi nào. Thêm --apply để thực hiện thật."
+fi
+
+# Trả về 0 nếu được phép ghi. Mọi lệnh gọi API thay đổi dữ liệu phải đi qua đây.
+can_write() {
+  if [ "$APPLY" = true ]; then return 0; fi
+  log "  [dry-run] bỏ qua: $*"
+  return 1
+}
+
+# Lưu lại ảnh hiện tại trước khi ghi đè. Không backup được thì nói rõ —
+# đừng im lặng ghi đè một thứ không lấy lại được.
+backup_current() {  # backup_current <name> <url>
+  local name="$1" url="$2"
+  [ -n "$url" ] || { log "  ⚠ không lấy được $name hiện tại để backup"; return 0; }
+  mkdir -p "$BACKUP_DIR"
+  if curl -sSL --max-time 30 -o "$BACKUP_DIR/$name" "$url"; then
+    log "  backup: $BACKUP_DIR/$name"
+  else
+    log "  ⚠ backup $name thất bại"
+  fi
 }
 
 update_report() {
@@ -51,9 +85,14 @@ update_facebook() {
   if [[ "$ACTION" == "all" || "$ACTION" == "profile-pic" ]]; then
     if [ -f "$OUTPUT_DIR/facebook/profile-pic.png" ]; then
       log "Uploading profile picture..."
+      backup_current "profile-pic-old" \
+        "$(curl -s -H "Authorization: Bearer ${FB_PAGE_ACCESS_TOKEN}" \
+           "https://graph.facebook.com/v22.0/${FB_PAGE_ID}/picture?redirect=0&type=large" \
+           | jq -r '.data.url // empty')"
+      can_write "cập nhật avatar Facebook" || return 0
       local resp
       resp=$(curl -s -X POST "https://graph.facebook.com/v22.0/${FB_PAGE_ID}/picture" \
-        -F "access_token=${FB_PAGE_ACCESS_TOKEN}" \
+        -H "Authorization: Bearer ${FB_PAGE_ACCESS_TOKEN}" \
         -F "source=@$OUTPUT_DIR/facebook/profile-pic.png" \
         -F "type=profile_media")
       if echo "$resp" | jq -e '.error' &>/dev/null; then
@@ -74,16 +113,17 @@ update_facebook() {
     if [ -f "$OUTPUT_DIR/facebook/cover.png" ]; then
       log "Uploading cover photo..."
       local resp
+      can_write "cập nhật ảnh bìa Facebook" || return 0
       resp=$(curl -s -X POST "https://graph.facebook.com/v22.0/${FB_PAGE_ID}/photos" \
-        -F "access_token=${FB_PAGE_ACCESS_TOKEN}" \
+        -H "Authorization: Bearer ${FB_PAGE_ACCESS_TOKEN}" \
         -F "source=@$OUTPUT_DIR/facebook/cover.png" \
         -F "published=false")
       local photo_id
       photo_id=$(echo "$resp" | jq -r '.id // empty')
       if [ -n "$photo_id" ]; then
         curl -s -X POST "https://graph.facebook.com/v22.0/${FB_PAGE_ID}" \
-          -d "cover=$photo_id" \
-          -d "access_token=${FB_PAGE_ACCESS_TOKEN}" > /dev/null
+          -H "Authorization: Bearer ${FB_PAGE_ACCESS_TOKEN}" \
+          --data-urlencode "cover=$photo_id" > /dev/null
         log "Cover photo updated"
         update_report "cover" "updated"
       else
@@ -100,10 +140,14 @@ update_facebook() {
   if [[ "$ACTION" == "all" || "$ACTION" == "name" ]]; then
     if [ -n "$BRAND_NAME" ]; then
       log "Updating page name..."
+      log "  ⚠ Facebook giới hạn số lần đổi tên Page và có thể đưa vào diện review."
+      can_write "đổi tên Page thành '$BRAND_NAME'" || return 0
       local resp
+      # --data-urlencode: tên thương hiệu có dấu cách, '&' hay ký tự tiếng Việt
+      # sẽ làm hỏng payload nếu nối chuỗi thẳng vào -d.
       resp=$(curl -s -X POST "https://graph.facebook.com/v22.0/${FB_PAGE_ID}" \
-        -d "name=${BRAND_NAME}" \
-        -d "access_token=${FB_PAGE_ACCESS_TOKEN}")
+        -H "Authorization: Bearer ${FB_PAGE_ACCESS_TOKEN}" \
+        --data-urlencode "name=${BRAND_NAME}")
       if echo "$resp" | jq -e '.error' &>/dev/null; then
         local err=$(echo "$resp" | jq -r '.error.message // "Unknown"')
         log "Name update failed: $err"
@@ -121,6 +165,7 @@ update_facebook() {
 
 update_linkedin() {
   log "Updating LinkedIn..."
+  can_write "cập nhật LinkedIn ($ACTION)" || return 0
 
   if [[ "$ACTION" == "all" || "$ACTION" == "profile-pic" ]]; then
     if [ -f "$OUTPUT_DIR/linkedin/profile-pic.png" ]; then
@@ -195,6 +240,7 @@ update_linkedin() {
 
 update_twitter() {
   log "Updating Twitter/X..."
+  can_write "cập nhật Twitter/X ($ACTION)" || return 0
 
   if [[ "$ACTION" == "all" || "$ACTION" == "profile-pic" ]]; then
     if [ -f "$OUTPUT_DIR/twitter/profile-pic.png" ]; then
@@ -279,6 +325,7 @@ update_twitter() {
 
 update_tiktok() {
   log "TikTok API does not support profile updates — generating manual upload guide."
+  can_write "cập nhật TikTok ($ACTION)" || return 0
 
   update_report "profile_pic" "manual" "TikTok API không hỗ trợ update avatar. Upload thủ công tại TikTok Studio."
   update_report "name" "manual" "TikTok API không hỗ trợ update tên. Vào Settings → Edit profile."
@@ -286,6 +333,7 @@ update_tiktok() {
 
 update_youtube() {
   log "Updating YouTube..."
+  can_write "cập nhật YouTube ($ACTION)" || return 0
 
   if [[ "$ACTION" == "all" || "$ACTION" == "cover" ]]; then
     if [ -f "$OUTPUT_DIR/youtube/banner.png" ]; then
@@ -343,6 +391,7 @@ update_youtube() {
 
 update_github() {
   log "Updating GitHub..."
+  can_write "cập nhật GitHub ($ACTION)" || return 0
 
   if [[ "$ACTION" == "all" || "$ACTION" == "name" ]]; then
     if [ -n "$BRAND_NAME" ]; then
