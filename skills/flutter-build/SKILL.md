@@ -44,6 +44,7 @@ ls android/key.properties && grep -c storeFile android/key.properties
 |------|---------|
 | `android/key.properties` missing, or `storeFile` points at a nonexistent file | **BLOCK.** Flutter does not fail here — it silently falls back to the **debug key**, producing an AAB that Play refuses. Run `flutter-signing`. |
 | `applicationId` starts with `com.example.` | **BLOCK.** Play rejects it permanently and it cannot be changed after first publish. |
+| Other placeholder prefix — `com.myapp.`, `com.tenapp.`, `com.test.`, `com.app.` | **BLOCK.** Play accepts these, which is worse: the app ships forever under a name the user does not own. |
 | `targetSdk` is a literal < 36 | **BLOCK** from 31 Aug 2026 (WARN before): new apps and updates must target API 36+. |
 | `targetSdk = flutter.targetSdkVersion` | Implicit — resolves from the Flutter SDK version. Cannot verify now; Step 6 checks the built artifact. Recommend pinning it explicitly. |
 | `ndkVersion` unset or < 28 | **WARN.** NDK < r28 misaligns `.so` files for 16 KB pages, which Play has rejected since 1 Nov 2025. Harmless for pure-Dart apps, fatal with native plugins. Step 6 is the authoritative check. |

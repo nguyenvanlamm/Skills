@@ -64,8 +64,9 @@ Fallbacks, in order:
 MF "/manifest/@package"
 ```
 
-- Starts with `com.example.` → **BLOCK**. Play permanently rejects `com.example.*`, and the ID cannot be changed after first publish. Fix `applicationId` in `android/app/build.gradle{,.kts}` and rebuild.
-- Contains `test`, `demo`, `temp`, or `myapp` → **WARN**, same permanence argument.
+- Starts with `com.example.` → **BLOCK**. Play permanently rejects it, and the ID cannot be changed after first publish. Fix `applicationId` in `android/app/build.gradle{,.kts}` and rebuild.
+- Other placeholder prefixes — `com.myapp.`, `com.tenapp.`, `com.test.`, `com.app.` — → **BLOCK** too. Play accepts them, which is worse: the app ships under a name the user does not control and can never change. Ask for a reverse-domain they own.
+- Contains `test`, `demo`, or `temp` elsewhere in the ID → **WARN**, same permanence argument.
 - Differs from `publish-state.json` `app_id` → **BLOCK**. A changed ID is a different app on Play, not an update.
 
 ## Gate 3 — Target API level — BLOCK
@@ -106,7 +107,8 @@ MF "/manifest/@android:versionCode"; MF "/manifest/@android:versionName"
 - Must be strictly greater than `publish-state.json` → `last_uploaded.version_code`. Equal or lower → **BLOCK**: Play refuses a reused version code, and a code that was uploaded once is burned even if that release was discarded.
 - Must be ≤ 2,100,000,000.
 - Fix by bumping the build number in `pubspec.yaml` (`version: 1.0.0+2` → versionCode 2) and rebuilding.
-- On a first release with no state file, any value is fine; note it in the report so the user knows the baseline.
+- A `pending_upload` entry with this version code means a previous run prepared it but the user never confirmed the upload landed. Ask before proceeding: if it did land, the code is burned and must be bumped; if it did not, reuse is fine.
+- On a first release with no state file, any value is fine — but confirm with the user that the app really is new (see Step 1). Note the baseline in the report either way.
 
 ## Gate 6 — Signing — BLOCK if unsigned or debug-signed
 
@@ -143,7 +145,22 @@ BT get-size total --apks=/tmp/app.apks
 
 **WARN** above 200 MB, **BLOCK** above 500 MB base module. For a typical Flutter app, anything over ~60 MB is worth questioning — usually uncompressed assets.
 
-## Gate 9 — Store assets present — WARN
+## Gate 9 — Release credentials not committed — BLOCK
+
+A service account key grants release authority over the app; a keystore is unrecoverable if published. Both end up in the working tree, so check before an upload draws attention to the repo:
+
+```bash
+git ls-files | grep -E 'service-account.*\.json|\.jks$|\.keystore$|key\.properties'
+git log --all --oneline -- '*service-account*.json' '*.jks' 'android/key.properties' | head
+```
+
+- Tracked in HEAD → **BLOCK.** Remove from the index, add to `.gitignore`, and **rotate the key** — deleting a file does not un-publish it if the repo was ever pushed. For a service account: delete the key in Google Cloud IAM and issue a new one.
+- Present in history but not in HEAD → **BLOCK** the same way if the remote is public. History rewriting is the user's decision; rotating the credential is not optional.
+- Untracked and gitignored → OK.
+
+Report the finding without printing any of the file contents.
+
+## Gate 10 — Store assets present — WARN
 
 Play blocks submission (not upload) on missing assets. Check what `flutter-store-metadata` produced:
 

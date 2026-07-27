@@ -1,328 +1,176 @@
 ---
 name: flutter-init
-description: "Initialize a Flutter project from scratch: detect OS, install Flutter SDK + Android SDK (if missing), create project scaffold with clean architecture folders, and init Git. Use when the user says 'flutter init', 'bắt đầu flutter', 'create flutter project', 'cài flutter'. Skip for existing Flutter projects or non-Flutter stacks."
+description: "Initialize a Flutter project from scratch: detect OS, install Flutter SDK + Android SDK (if missing), create the project scaffold with clean architecture folders, and init Git. Use when the user says 'flutter init', 'bắt đầu flutter', 'create flutter project', 'cài flutter'. Skip for existing Flutter projects or non-Flutter stacks."
 license: MIT
+metadata:
+  version: 2.0.0
 ---
 
 # Flutter Init
 
-Automate steps 2-3 of the Flutter → Google Play pipeline: from a clean machine → Flutter project ready to code.
+Steps 2–3 of the Flutter → Google Play pipeline: from a bare machine to a project that will still build when it reaches Play.
 
-## Prerequisites
+## Core principle
 
-- Internet connection
-- `sudo` access (for Linux package installation)
-- For iOS targets: macOS with Xcode
+> **Decisions made here are the ones that cannot be undone later.** The application ID is permanent after first publish, and the SDK versions installed now decide whether the release build is accepted eight steps from here. Everything else in this skill is scaffolding that can be rewritten any time.
+
+So two things get real scrutiny: the **organization prefix** and the **SDK levels**. The folder layout does not.
 
 ## Input
 
-Ask the user for these fields if not provided in `$ARGUMENTS`:
-
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `project_name` | ✅ | — | App name (e.g. `chplay`) |
-| `org` | ❌ | `com.tenapp` | Bundle ID prefix |
-| `platforms` | ❌ | `android,ios` | `android`, `ios`, or both |
-| `ios_only` | ❌ | `false` | Skip Android setup if true |
+| `project_name` | ✅ | — | Directory and Dart package name; lowercase_with_underscores |
+| `org` | ✅ | — | Reverse-domain prefix, e.g. `com.acme` — **no default** |
+| `platforms` | ❌ | `android` | `android`, `ios`, or both |
+| `description` | ❌ | — | pubspec description |
 
-## Steps
+`org` has no default on purpose. It becomes `applicationId = <org>.<project_name>`, which is **permanent once the app is published** and cannot be reused if someone else registered it. A placeholder prefix (`com.example`, `com.tenapp`, `com.myapp`) means the app has to be rebuilt under a new ID before it can ever ship — `flutter-build` and `flutter-publish` both block on `com.example.*` for this reason.
 
-### Step 1: Detect OS & Installed Tools
+Ask for a domain the user controls, or a unique identifier they are content to keep forever. Explain the permanence once; do not pick for them.
 
-```bash
-# OS detection
-uname -s   # Linux / Darwin / MINGW*
-```
+## Workflow
 
-Check these tools:
+### Step 1 — Inspect the machine
 
 ```bash
-# Flutter
-which flutter && flutter --version 2>/dev/null || echo "NOT_FOUND"
-
-# Android SDK
-echo "ANDROID_HOME: ${ANDROID_HOME:-NOT_SET}"
-ls "$ANDROID_HOME" 2>/dev/null || echo "ANDROID_HOME dir NOT_FOUND"
-ls ~/Android/Sdk 2>/dev/null && echo "Found ~/Android/Sdk" || true
-ls ~/Library/Android/Sdk 2>/dev/null && echo "Found ~/Library/Android/Sdk" || true
-
-# Java
-which java && java --version 2>/dev/null || echo "NOT_FOUND"
-
-# Xcode (macOS only)
-which xcodebuild && xcodebuild -version 2>/dev/null || echo "NOT_FOUND"
-
-# CocoaPods (macOS only)
-which pod && pod --version 2>/dev/null || echo "NOT_FOUND"
+uname -s                                              # Linux / Darwin / MINGW*
+flutter --version 2>/dev/null || echo "flutter NOT_FOUND"
+java -version 2>&1 | head -1 || echo "java NOT_FOUND"
+echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
+ls ~/Android/Sdk ~/Library/Android/sdk 2>/dev/null
+adb version 2>/dev/null || echo "adb NOT_FOUND"
 ```
 
-**Decision logic:**
-- If Flutter ≥ 3.0 found → skip Step 2, offer `flutter upgrade`
-- If Flutter found but < 3.0 → run `flutter upgrade`
-- If Flutter not found → proceed to Step 2
-- If Android SDK not found → proceed to Step 3
-- If Xcode not found on macOS → warn iOS build unavailable
+Report what exists before installing anything. `adb` matters beyond this skill — `flutter-store-metadata` needs it to capture real screenshots, so a missing `platform-tools` here becomes placeholder screenshots later.
 
-### Step 2: Install Flutter SDK
+| Found | Action |
+|-------|--------|
+| Flutter, recent | Skip install; offer `flutter upgrade` |
+| Flutter, old (< 3.22) | Upgrade — 16 KB page support and current AGP need it |
+| No Flutter | Step 2 |
+| No Android SDK | Step 3 |
+| JDK ≠ 17 | Warn: AGP 8.x expects JDK 17, and a newer JDK breaks Gradle in confusing ways |
 
-**Linux:**
-```bash
-# Prefer snap (recommended by Flutter team for Linux)
-snap install flutter --classic
+### Step 2 — Install Flutter
 
-# Fallback: manual install
-FLUTTER_VERSION=$(curl -s https://raw.githubusercontent.com/flutter/flutter/master/releases/latest_linux.json | grep -oP '"version": "\K[^"]+' | head -1)
-cd ~/development
-curl -O "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
-tar xf "flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
-echo 'export PATH="$PATH:$HOME/development/flutter/bin"' >> ~/.bashrc
-```
+Read `references/toolchain.md` § Flutter. Prefer the tarball over `snap` on Linux: the snap has a history of lagging behind stable and of path problems with the Android SDK. Verify with `flutter doctor -v` and report each unmet dependency rather than only the summary line.
 
-**macOS:**
-```bash
-brew install --cask flutter
-```
+### Step 3 — Install the Android SDK
 
-**Windows:**
-```bash
-# Download and install via winget or manual
-# Instruct user if unable to automate
-```
+Read `references/toolchain.md` § Android SDK. Three things the naive version gets wrong, all of which break the install:
 
-After install:
-```bash
-flutter doctor 2>&1
-```
+- `cmdline-tools` must end up at `cmdline-tools/latest/`, not `cmdline-tools/` — `sdkmanager` will not run otherwise
+- the download URL is OS-specific (`commandlinetools-linux-…` vs `-mac-` vs `-win-`)
+- `platform-tools` must be installed explicitly, or there is no `adb`
 
-Parse `flutter doctor` output for missing dependencies. Report each one clearly.
+Install platform **36** and matching build-tools, not 34. Play requires new apps and updates to target API 36 from 31 Aug 2026; scaffolding against 34 produces a project that fails at the last step of the pipeline.
 
-### Step 3: Install/Configure Android SDK (if missing)
+### Step 4 — Create the project
 
 ```bash
-# Download Android command-line tools
-ANDROID_SDK_ROOT="$HOME/Android/Sdk"
-mkdir -p "$ANDROID_SDK_ROOT"
-cd "$ANDROID_SDK_ROOT"
-curl -O https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-unzip commandlinetools-*.zip
-
-# Accept licenses
-yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses
-
-# Install required SDK packages
-"$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
-  "platforms;android-34" \
-  "build-tools;34.0.0"
-
-# Set env vars (if not already set)
-# Add to ~/.bashrc if missing
+flutter create --org "$ORG" --platforms "$PLATFORMS" \
+  ${DESCRIPTION:+--description "$DESCRIPTION"} "$PROJECT_NAME"
 ```
 
-**Detection:** Check if `echo $ANDROID_HOME` is already set. If not, prompt to set it.
-
-### Step 4: Create Flutter Project
+Then confirm the ID that was actually written — `flutter create` sanitises names, so what you asked for is not always what you got:
 
 ```bash
-flutter create \
-  --org "$ORG" \
-  --platforms "$PLATFORMS" \
-  "$PROJECT_NAME"
+grep applicationId "$PROJECT_NAME/android/app/build.gradle"*
 ```
 
-**Edge cases:**
-- Directory already exists → ask user: overwrite? (delete + recreate) / abort / use existing
-- `flutter create` fails → print stderr, suggest fixes (e.g., space in path, invalid characters)
+If the directory already exists, ask: overwrite, abort, or use in place. Never delete a non-empty directory without an explicit yes.
 
-### Step 5: Create Clean Architecture Scaffold
+### Step 5 — Pin the Android build configuration
 
-After `flutter create`, build a maintainable folder structure:
+`flutter create` leaves `targetSdk`, `compileSdk`, and `ndkVersion` implicit (`flutter.targetSdkVersion`), which means they silently follow the Flutter SDK version. `flutter-build` reports those as "cannot verify", and `flutter-store-compliance` cannot audit them at all.
 
-```
-lib/
-  main.dart
-  app.dart               # MaterialApp + theme + routing
-  config/
-    theme.dart           # ThemeData definition
-    routes.dart          # Route configuration
-  features/
-    example/             # Example feature (remove in real app)
-      screens/
-      widgets/
-      providers/
-  core/
-    constants/
-      app_colors.dart
-      app_strings.dart
-    utils/
-      validators.dart
-    widgets/
-      app_button.dart
-  l10n/                  # If localization is desired
-test/
-  widget_test.dart       # Default test updated
-```
+Set them explicitly in `android/app/build.gradle{,.kts}`:
 
-Update files:
+```groovy
+compileSdk 36
+ndkVersion "28.0.13004108"     // r28+; older NDKs misalign .so for 16 KB pages
 
-**lib/main.dart** — entry point clean:
-```dart
-import 'package:flutter/material.dart';
-import 'app.dart';
-
-void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
+defaultConfig {
+    targetSdk 36
+    minSdk 23
 }
 ```
 
-**lib/app.dart** — root widget with theme and routing:
-```dart
-import 'package:flutter/material.dart';
-import 'config/theme.dart';
-import 'config/routes.dart';
+Use whichever NDK r28+ version `sdkmanager --list | grep ndk` shows as installed rather than copying the string above. `minSdk` is an engineering choice — 23 is a reasonable default; higher trades reach for fewer compatibility branches.
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+### Step 6 — Scaffold
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '$PROJECT_NAME',
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
-      initialRoute: AppRoutes.home,
-      onGenerateRoute: AppRoutes.onGenerateRoute,
-    );
-  }
-}
-```
+Read `references/scaffold.md` for the folder layout and the file contents. Keep it minimal: entry point, app widget, theme, routes, and empty feature folders. No feature code, no state management choice, no dependency added that the user did not ask for — those decisions belong to whoever writes the app.
 
-**lib/config/theme.dart** — theme template:
-```dart
-import 'package:flutter/material.dart';
-
-class AppTheme {
-  static ThemeData get light => ThemeData(
-    useMaterial3: true,
-    colorSchemeSeed: Colors.blue,
-    brightness: Brightness.light,
-  );
-
-  static ThemeData get dark => ThemeData(
-    useMaterial3: true,
-    colorSchemeSeed: Colors.blue,
-    brightness: Brightness.dark,
-  );
-}
-```
-
-**lib/config/routes.dart** — route template:
-```dart
-import 'package:flutter/material.dart';
-
-class AppRoutes {
-  static const String home = '/';
-
-  static Route<dynamic> onGenerateRoute(RouteSettings settings) {
-    switch (settings.name) {
-      case home:
-        return MaterialPageRoute(builder: (_) => const Placeholder());
-      default:
-        return MaterialPageRoute(
-          builder: (_) => Scaffold(
-            body: Center(child: Text('No route: ${settings.name}')),
-          ),
-        );
-    }
-  }
-}
-```
-
-**Do NOT** generate any feature code — only scaffold + config.
-
-### Step 6: Git Init
+### Step 7 — Git
 
 ```bash
-git init
+cd "$PROJECT_NAME"
+git init -b main
 ```
 
-Check `.gitignore` was created by `flutter create` (it should be). Add these if missing:
+`flutter create` writes a `.gitignore` that covers Dart and build outputs but **not credentials**. Append:
 
 ```
-# Flutter
-.dart_tool/
-.packages
-build/
-
-# Android signing
-android/app/upload-keystore.jks
+# Signing and release credentials
+*.jks
+*.keystore
 android/key.properties
-
-# IDE
-.idea/
-.vscode/
-*.iml
-
-# OS
-.DS_Store
-Thumbs.db
+service-account.json
 ```
 
-### Step 7: Report
+This is the cheapest possible moment to prevent a committed keystore — `flutter-signing` and `flutter-publish` both check for one, but by then the exposure has already happened.
 
-```
-══════════════════════════════════════════
-  FLUTTER INIT — COMPLETE
-══════════════════════════════════════════
+Then make the first commit, so there is a clean baseline to diff against:
 
-  ✓ Flutter 3.x installed
-  ✓ Android SDK configured (API 34)
-  ✓ Project "$PROJECT_NAME" created at $PWD
-  ✓ Clean architecture scaffold applied
-  ✓ Git repo initialized
-
-  ⚠ iOS setup skipped (not on macOS)
-
-  Next steps:
-    cd $PROJECT_NAME
-    flutter run                    # run on connected device
-    # or use flutter-signing skill to configure keystore
+```bash
+git add -A && git commit -m "chore: initial Flutter scaffold"
 ```
 
-## What This Skill Does NOT Do
+### Step 8 — Verify and report
 
-- ❌ Install Android Studio GUI (only command-line tools)
-- ❌ Register Google Play Developer account ($25 manual step)
-- ❌ Configure signing keys (see `flutter-signing`)
-- ❌ Code any app features
-- ❌ Build APK/AAB (see `flutter-build`)
+```bash
+flutter analyze
+flutter doctor
+```
 
-## OS Support
+`flutter analyze` must be clean on a fresh scaffold. If it is not, the scaffold is wrong — fix it rather than reporting it as a known issue.
 
-| OS | Support Level |
-|----|:-------------:|
-| Linux (Ubuntu/Debian) | ✅ Full (snap + cmdline) |
-| macOS | ✅ Full (brew + Xcode check) |
-| Windows | ⚠️ Partial (winget or guided manual) |
+```
+FLUTTER INIT — OK
 
-## Edge Cases
+Project     task_flow at ./task_flow
+App ID      com.acme.task_flow   ← permanent once published
+Flutter     3.35.2 (stable)
+Android     compileSdk 36 · targetSdk 36 · minSdk 23 · NDK r28
+Tooling     JDK 17 · adb present · flutter doctor clean
+Git         initialised, first commit, credentials gitignored
 
-| Problem | Handling |
-|---------|----------|
-| Flutter already installed | Detect version, skip install, offer upgrade |
-| No sudo access | Fall back to manual tar install per user |
-| ANDROID_HOME not set | Auto-detect paths, prompt to add to shell rc |
-| Project dir exists | Ask: overwrite / abort / use existing |
-| No internet | Abort with clear message |
-| `flutter create` fails on iOS (no Xcode) | Still create project with `--platforms android` only |
-| Space in project path | Warn user spaces may cause issues; use `_` or `-` instead |
-| snap unavailable (WSL, VM) | Fall back to manual install |
+Next: flutter-signing → flutter-build
+```
 
-## Acceptance Criteria
+Report the application ID prominently. It is the one value from this step that cannot be changed later, and the user should see it before writing any code.
 
-- [ ] Project compiles without errors (`flutter analyze` passes)
-- [ ] Clean architecture scaffold in place (config/features/core folders)
-- [ ] Git repo initialized with proper `.gitignore`
-- [ ] User can run `flutter run` and see default app
-- [ ] All installed tool versions reported clearly
+## Reference files
+
+| File | Read when |
+|------|-----------|
+| `references/toolchain.md` | Steps 2–3 — installing Flutter and the Android SDK per OS |
+| `references/scaffold.md` | Step 6 — folder layout and scaffold file contents |
+
+## OS support
+
+| OS | Level |
+|----|-------|
+| Linux | Full — tarball install, SDK via cmdline-tools |
+| macOS | Full — Homebrew, plus Xcode check when iOS is in `platforms` |
+| Windows | Partial — guided; automate what winget covers, hand the rest to the user |
+
+iOS builds require macOS with Xcode. On any other OS, create the project with `--platforms android` and say why.
+
+## Scope
+
+Does: install the toolchain, create the project, pin the Android build configuration, scaffold, and initialise Git.
+
+Does not: install Android Studio; register a Play developer account ($25, manual); configure signing (`flutter-signing`); write features; build (`flutter-build`).
