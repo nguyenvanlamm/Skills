@@ -926,8 +926,11 @@ flutter analyze 2>&1
 /skill flutter-build \
   --dir "$PRODUCT_DIR/app/" \
   --type appbundle \
-  --obfuscate true
+  --obfuscate true \
+  --bump none
 ```
+
+First release, so no version bump. Keep `app/build/release/debug-info-<versionCode>/` — it is the only way to read crash reports from an obfuscated release.
 
 AAB saved to `$PRODUCT_DIR/app/build/release/app-release.aab`.
 
@@ -938,29 +941,30 @@ AAB saved to `$PRODUCT_DIR/app/build/release/app-release.aab`.
   --app_name "$APP_NAME" \
   --features "$FEATURES" \
   --category "$CATEGORY" \
-  --has_login $(grep -qi "auth\|login" "$PRODUCT_DIR/plan/prd.md" && echo true || echo false) \
-  --collects_data $(grep -qi "auth\|profile\|data" "$PRODUCT_DIR/plan/prd.md" && echo true || echo false) \
-  --has_ads $(grep -qi "ad\|ads\|quảng.cáo" "$PRODUCT_DIR/plan/prd.md" && echo true || echo false) \
+  --contact_email "$CONTACT_EMAIL" \
   --output "$PRODUCT_DIR/store-metadata/"
 ```
+
+Do **not** pass `has_login`/`collects_data`/`has_ads` here. The skill derives them from `pubspec.yaml` and `AndroidManifest.xml`; grepping the PRD for them is unreliable in both directions (`grep -qi "ad"` matches "add", "ready", "loading") and a wrong flag produces a listing that contradicts the app — which is a policy violation, not a cosmetic error.
+
+Screenshots must be captured from a running build. If no emulator or device is available in this environment, the skill emits placeholders and lists them in `store-listing.json` → `unresolved`; compliance will then fail, by design. Resolve them before publishing.
 
 ### Step 5d: Compliance Check
 
 ```bash
 /skill flutter-store-compliance \
   --features "$FEATURES" \
-  --has_login $(...) \
-  --collects_data $(...) \
-  --has_ads $(...) \
-  --has_inapp_purchase $(...) \
-  --target_children $(grep -qi "children\|kid\|child\|trẻ.em" "$PRODUCT_DIR/plan/prd.md" && echo true || echo false) \
-  --has_ugc $(grep -qi "user.content\|post\|comment\|bình.luận" "$PRODUCT_DIR/plan/prd.md" && echo true || echo false) \
-  --uses_sensitive_permissions $(...) \
   --dir "$PRODUCT_DIR/app/" \
   --store-dir "$PRODUCT_DIR/store-metadata/"
 ```
 
-If compliance `FAIL` → list issues, ask user to fix, re-run.
+The audit derives its own facts from the code and cross-checks them against the listing — passing declarations in would just give it the same unverified claims to agree with.
+
+Read the verdict from `store-metadata/compliance-report.json` → `overall`:
+
+- `FAIL` → list every failing check with its `fix`, resolve, re-run. Publish is blocked.
+- `WARN` → show the issues; the user decides whether to proceed.
+- `PASS` → continue.
 
 ### Step 5e: Publish Guide
 
@@ -970,7 +974,7 @@ If compliance `FAIL` → list issues, ask user to fix, re-run.
   --app_name "$APP_NAME" \
   --category "$CATEGORY" \
   --track "$TRACK" \
-  --whats_new "$PRODUCT_DIR/store-metadata/whats-new.txt" \
+  --whats_new "$PRODUCT_DIR/store-metadata/whats-new/en-US.txt" \
   --output "$PRODUCT_DIR/store-metadata/publish-guide.md"
 ```
 
@@ -1126,7 +1130,8 @@ features/search/
 - [ ] Feature code generated for every task in tasks.md
 - [ ] Backend API generated if PRD requires backend
 - [ ] Firebase Auth integrated if PRD requires login
-- [ ] Store metadata generated (icon, screenshots, desc, privacy policy)
-- [ ] Compliance check PASS or PARTIAL
+- [ ] Store metadata generated (icon, feature graphic, screenshots, desc, privacy policy)
+- [ ] Screenshots captured from a running build — no placeholders left in `store-listing.json` → `unresolved`
+- [ ] Compliance verdict `PASS` or `WARN` in `store-metadata/compliance-report.json` (`FAIL` blocks publish)
 - [ ] Publish guide generated with step-by-step instructions
 - [ ] Final report produced with all deliverables listed

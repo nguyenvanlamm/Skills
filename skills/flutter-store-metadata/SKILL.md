@@ -1,328 +1,183 @@
 ---
 name: flutter-store-metadata
-description: "Generate Google Play store listing assets: app icon (via logo-designer), screenshots, description, privacy policy, and store-listing.json. Use when user says 'store listing', 'metadata', 'store metadata', 'chuẩn bị store', 'tạo metadata', 'screenshots'. Run after flutter-build and before flutter-store-compliance."
+description: "Generate Google Play store listing assets: app icon, feature graphic, screenshots, description, privacy policy, and store-listing.json. Use when user says 'store listing', 'metadata', 'store metadata', 'chuẩn bị store', 'tạo metadata', 'screenshots'. Run after flutter-build and before flutter-store-compliance."
 license: MIT
+metadata:
+  version: 2.0.0
 ---
 
 # Flutter Store Metadata
 
-Step 8 of the Flutter → Google Play pipeline: prepare all assets and text needed for the Google Play Console store listing.
+Step 8 of the Flutter → Google Play pipeline: produce every asset and string the Play Console listing needs.
 
-## Prerequisites
+## Core principle
 
-- `prd.md` or feature list from user (for description generation)
-- `logo-designer` skill available for icon generation
+> **Generated ≠ submittable.** A gradient card with the app's name on it is not a screenshot, and a privacy policy asserting practices the developer does not follow is worse than none. Anything this skill invents rather than derives must be labelled as such, so the next skill can block on it.
+
+Two things are never guessed: **what the app actually does** (derive it from the code) and **what the app looks like** (capture it from a running build).
 
 ## Input
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `app_name` | ✅ | — | Display name on Google Play |
-| `short_description` | ❌ | Auto-generated | ≤80 chars |
-| `full_description` | ❌ | Auto-generated | ≤4000 chars |
-| `features` | ✅ | — | List of key features (from PRD or user) |
-| `category` | ✅ | — | Google Play category (e.g. `PRODUCTIVITY`, `SOCIAL`) |
-| `collects_data` | ❌ | `false` | Whether app collects user data |
-| `collects_personal_info` | ❌ | `false` | Whether app collects email/name/phone |
-| `has_login` | ❌ | `false` | Whether app requires login |
-| `has_ads` | ❌ | `false` | Whether app contains ads |
-| `has_inapp_purchase` | ❌ | `false` | Whether app has IAP |
-| `privacy_policy_url` | ❌ | — | Existing URL (if blank → generate policy) |
+| `app_name` | ✅ | — | Listing name, ≤ 30 characters |
+| `features` | ✅ | from PRD | Key features, for the description |
+| `category` | ✅ | — | Play category, e.g. `PRODUCTIVITY` |
+| `locales` | ❌ | `["en-US"]` | Listing locales |
+| `short_description` | ❌ | generated | ≤ 80 characters |
+| `full_description` | ❌ | generated | ≤ 4000 characters |
+| `privacy_policy_url` | ❌ | — | Existing URL; blank → generate the document |
+| `contact_email` | ❌ | ask | Public on the listing, required in the policy |
 | `target_audience` | ❌ | `general` | `general` or `children` |
 
-## Steps
+Data-collection flags are **not** inputs — they are derived in Step 1. Asking the user "does your app collect data?" and believing the answer is how listings end up contradicting the app.
 
-### Step 1: Read Project Context
+## Workflow
 
-```bash
-# Look for PRD to extract features
-[ -f prd.md ] && grep -i -A2 "feature\|tính năng" prd.md 2>/dev/null
-[ -f tasks.md ] && head -100 tasks.md 2>/dev/null
-[ -f README.md ] && head -30 README.md 2>/dev/null
-```
+### Step 1 — Derive the facts
 
-If `features` not provided in input, extract from these files or ask user.
-
-### Step 2: Generate App Icon
-
-Call the `logo-designer` skill to generate icons:
-
-```
-Input: $app_name
-```
-
-From its output, extract required Google Play icon sizes:
+Never take these from user input. Read the project:
 
 ```bash
-ICON_SRC="store-metadata/icon"
-
-# Create resize script
-mkdir -p android/app/src/main/res/mipmap-mdpi
-mkdir -p android/app/src/main/res/mipmap-hdpi
-mkdir -p android/app/src/main/res/mipmap-xhdpi
-mkdir -p android/app/src/main/res/mipmap-xxhdpi
-mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-mkdir -p android/app/src/main/res/mipmap-anydpi-v26
-
-# Generate required sizes (from logo-designer's icon-512.png)
-convert "$ICON_SRC/icon-512.png" -resize 48x48  android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-convert "$ICON_SRC/icon-512.png" -resize 72x72  android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-convert "$ICON_SRC/icon-512.png" -resize 96x96  android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-convert "$ICON_SRC/icon-512.png" -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-convert "$ICON_SRC/icon-512.png" -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+sed -n '/^dependencies:/,/^dev_dependencies:/p' pubspec.yaml
+grep -oE 'android:name="android\.permission\.[A-Z_]+"' android/app/src/main/AndroidManifest.xml
+grep -E 'android:label' android/app/src/main/AndroidManifest.xml
+grep "^version:" pubspec.yaml
 ```
 
-**If ImageMagick not available:** Use Dart script `flutter_launcher_icons`:
+| Fact | Evidence |
+|------|----------|
+| Has ads | `google_mobile_ads`, `applovin_max`, `unity_ads`, `facebook_audience_network` |
+| Has IAP | `in_app_purchase`, `purchases_flutter`, `flutter_inapp_purchase` |
+| Has login | `firebase_auth`, `google_sign_in`, `sign_in_with_apple`, `supabase_flutter` |
+| Collects data | `firebase_analytics`, `firebase_crashlytics`, `sentry_flutter`, `amplitude`, `posthog`, `mixpanel` |
+| Sensitive permissions | CAMERA, RECORD_AUDIO, ACCESS_FINE_LOCATION, ACCESS_BACKGROUND_LOCATION, READ_CONTACTS, SMS/CALL_LOG |
+| Network access | `INTERNET` permission, `http`/`dio` packages |
 
-Add to `pubspec.yaml`:
+Record each derived fact **with the evidence that produced it** — `flutter-store-compliance` compares against the same evidence, and a fact without a source cannot be cross-checked.
 
-```yaml
-dev_dependencies:
-  flutter_launcher_icons: "^0.14.1"
+Also check `app_name` against `android:label`. A listing name that differs from the in-app name is a misleading-metadata rejection; flag the mismatch and ask which is correct.
 
-flutter_launcher_icons:
-  android: true
-  adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "store-metadata/icon/icon-foreground.png"
-  image_path: "store-metadata/icon/icon-512.png"
-```
+If `features` was not given, read `prd.md`, `tasks.md`, then `README.md`. Ask rather than invent — descriptions of features the app lacks are the single most common deceptive-listing rejection.
+
+### Step 2 — Icon
+
+Read `references/icon-assets.md`. Use `flutter_launcher_icons`, not a manual `convert` resize: Android 8+ needs adaptive icons (foreground/background layers with a safe zone), Android 13+ wants a monochrome layer, and a plain square resized into `mipmap-*` gets cropped badly on modern launchers.
+
+Outputs: `store-metadata/icon/icon-512.png` (Play listing) plus the generated `mipmap-*` resources in the project.
+
+### Step 3 — Feature graphic
+
+**Required for every listing** — Play will not let the user publish the listing without it. 1024×500, JPEG or 24-bit PNG, **no alpha channel**. See `references/icon-assets.md` § Feature graphic.
+
+Output: `store-metadata/icon/feature-graphic.png`.
+
+### Step 4 — Screenshots
+
+Read `references/screenshots.md`. Order of preference:
+
+1. **Capture from the running app** (`adb exec-out screencap`) — the only kind Play accepts without risk.
+2. **Automate with `integration_test`** if the app has flows worth reproducing per release.
+3. **Placeholder** only when neither is possible — and then mark them, loudly, in `store-listing.json` and the report.
+
+Play's Deceptive Behavior policy requires store assets to reflect the real app. Generic marketing art in place of the UI is a documented rejection reason, so a placeholder is a **blocking issue to be resolved before submission**, not an asset.
+
+### Step 5 — Description
+
+Short (≤ 80 chars) and full (≤ 4000 chars). Count characters, not bytes:
 
 ```bash
-flutter pub get
-dart run flutter_launcher_icons
+wc -m < store-metadata/description/short_description.txt   # NOT wc -c
 ```
 
-### Step 3: Generate Screenshots
+`wc -c` counts bytes, so Vietnamese or emoji text fails the check while being well within Play's limit. Same for `app_name` ≤ 30.
 
-Create mockup screenshots based on app features:
+Structure for the full description: value proposition in the first two lines (that is all that shows before "read more"), then features, then a closing line. Every claim must map to a feature derived in Step 1. No keyword stuffing — it is a policy violation, not just bad taste.
 
-```
-store-metadata/screenshots/phone/
-  - 01-home.png              (1080x1920)
-  - 02-feature-main.png      (1080x1920)
-  - 03-feature-secondary.png (1080x1920)
-  - 04-settings.png          (1080x1920)
-```
+For serious keyword work, hand off to the `aso-marketing` skill rather than duplicating it here.
 
-For each feature, generate a simple HTML mockup → PNG:
-
-```bash
-# For each screenshot, create a clean UI mockup card
-# Using a simple generator or template:
-cat > /tmp/screenshot.html << 'EOF'
-<div style="
-  width: 1080px; height: 1920px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  display: flex; flex-direction: column;
-  justify-content: center; align-items: center;
-  font-family: 'Inter', sans-serif; color: white;
-">
-  <h1 style="font-size: 64px; margin-bottom: 40px;">FEATURE NAME</h1>
-  <p style="font-size: 32px; max-width: 800px; text-align: center;">
-    Brief description of this feature
-  </p>
-  <div style="
-    width: 300px; height: 300px;
-    background: rgba(255,255,255,0.2);
-    border-radius: 40px;
-    margin-top: 60px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 120px;
-  ">📱</div>
-</div>
-EOF
-```
-
-If no headless browser (puppeteer/playwright) available → generate placeholder:
+Write one file per locale:
 
 ```
-Screenshots: Placeholder screenshots created at store-metadata/screenshots/phone/
-NOTE: Replace with actual app screenshots before submitting to Google Play.
+store-metadata/description/<locale>/short_description.txt
+store-metadata/description/<locale>/full_description.txt
 ```
 
-Google Play requires:
-- Minimum 2 phone screenshots (recommend 4-8)
-- 1080x1920px or 1080x2340px
-- JPG or 24-bit PNG (no alpha)
-- ≤ 30% text overlay
+### Step 6 — Privacy policy
 
-### Step 4: Write Description
+Read `references/privacy-policy.md` before writing anything. Skip if `privacy_policy_url` was supplied.
 
-**Short Description** (≤ 80 characters):
+The policy is a legal document about the developer's actual practices. Generate it from Step 1's derived facts, never from a fixed template, and **never assert a practice that cannot be verified from the code** — "we perform regular security audits", "we encrypt all data at rest", "we do not sell your data" are claims about the developer, not the app.
 
-Generate from features:
+Output `store-metadata/privacy-policy/privacy-policy.md` + `.html`. Play requires a public HTTPS URL; a local file does not count, so tell the user where to host it.
 
-```
-Template: "[Action verb] your [noun] to [benefit]"
-Example: "Organize your daily tasks with smart reminders"
-```
-
-**Full Description** (≤ 4000 characters):
-
-Structure:
-```
-[Line 1-2: Value proposition + keywords]
-
-KEY FEATURES:
-✓ [Feature 1] — [short explanation]
-✓ [Feature 2] — [short explanation]
-✓ [Feature 3] — [short explanation]
-✓ [Feature 4] — [short explanation]
-
-WHY CHOOSE [APP NAME]?
-- [Benefit 1]
-- [Benefit 2]
-
-Download [APP NAME] today and [CTA].
-```
-
-SEO rules:
-- Include main keywords in first 2 lines
-- Use natural language (no keyword stuffing)
-- Mention platform-specific features (Material Design 3, etc.)
-
-### Step 5: Generate Privacy Policy
-
-Based on `collects_data`, `has_login`, etc., generate a complete privacy policy:
-
-Write to `store-metadata/privacy-policy/privacy-policy.md`:
-
-```markdown
-# Privacy Policy for $APP_NAME
-
-*Last updated: $(date +%Y-%m-%d)*
-
-## 1. Information We Collect
-
-We collect the following types of information:
-$(if has_login)
-- **Account Information**: Email address, username, and profile picture
-$(endif)
-$(if collects_personal_info)
-- **Personal Information**: Name, email address
-$(endif)
-- **Device Information**: Device model, OS version, unique device identifiers
-- **Usage Data**: App interactions, crash logs, and performance data
-
-## 2. How We Use Your Information
-
-We use the collected data for:
-- Providing and maintaining the app's core functionality
-- Improving user experience and app performance
-- Sending important notifications (with consent)
-- $(if has_ads)Displaying relevant advertisements$(endif)
-- Analytics to understand how users interact with the app
-
-## 3. Data Sharing
-
-We do not sell your personal information.
-$(if has_ads)
-We may share anonymized data with ad partners for advertising purposes.
-$(endif)
-We may disclose information if required by law.
-
-## 4. Data Security
-
-We implement industry-standard security measures including:
-- Encryption in transit (TLS/SSL)
-- $(if has_login)Secure authentication protocols$(endif)
-- Regular security audits
-
-## 5. Your Rights
-
-You have the right to:
-- Access your personal data
-- Request deletion of your data
-- Opt-out of data collection (where applicable)
-- Withdraw consent at any time
-
-## 6. Contact Us
-
-For privacy-related inquiries:
-- Email: [developer-email]
-- Address: [developer-address]
-
-## 7. Changes to This Policy
-
-We may update this policy periodically. Changes will be posted here.
-```
-
-Also generate HTML version:
-
-```bash
-pandoc store-metadata/privacy-policy/privacy-policy.md \
-  -o store-metadata/privacy-policy/privacy-policy.html
-```
-
-**Fallback if pandoc unavailable:** Copy markdown, note "Convert to HTML before publishing."
-
-**If `privacy_policy_url` provided:** Skip generation, note URL.
-
-### Step 6: Generate Store Listing JSON
-
-Write `store-metadata/store-listing.json`:
+### Step 7 — store-listing.json
 
 ```json
 {
-  "app_name": "$APP_NAME",
-  "short_description": "$SHORT_DESC",
-  "full_description": "$FULL_DESC",
-  "category": "$CATEGORY",
-  "has_ads": $HAS_ADS,
-  "has_inapp_purchase": $HAS_INAPP_PURCHASE,
-  "collects_data": $COLLECTS_DATA,
-  "privacy_policy_url": "$PRIVACY_POLICY_URL",
-  "screenshots": {
-    "phone": [
-      "store-metadata/screenshots/phone/01-home.png",
-      "store-metadata/screenshots/phone/02-feature-main.png",
-      "store-metadata/screenshots/phone/03-feature-secondary.png",
-      "store-metadata/screenshots/phone/04-settings.png"
-    ]
+  "app_name": "Task Flow",
+  "package": "com.acme.taskflow",
+  "category": "PRODUCTIVITY",
+  "default_locale": "en-US",
+  "locales": ["en-US", "vi-VN"],
+  "contact_email": "support@acme.com",
+  "privacy_policy_url": null,
+  "derived": {
+    "has_ads": false,
+    "has_iap": true,
+    "has_login": true,
+    "collects_data": true,
+    "sensitive_permissions": ["CAMERA"],
+    "evidence": {
+      "has_iap": "pubspec.yaml: in_app_purchase ^3.2.0",
+      "has_login": "pubspec.yaml: firebase_auth ^5.3.1",
+      "collects_data": "pubspec.yaml: firebase_analytics ^11.3.3",
+      "sensitive_permissions": "AndroidManifest.xml: android.permission.CAMERA"
+    }
   },
-  "icon": "store-metadata/icon/icon-512.png",
-  "feature_graphic": "store-metadata/icon/feature-graphic.png"
+  "assets": {
+    "icon": "store-metadata/icon/icon-512.png",
+    "feature_graphic": "store-metadata/icon/feature-graphic.png",
+    "screenshots": {
+      "phone": [
+        { "path": "store-metadata/screenshots/phone/01-home.png", "source": "captured", "placeholder": false }
+      ]
+    }
+  },
+  "unresolved": []
 }
 ```
 
-### Step 7: Report
+`source` is `captured`, `automated`, or `placeholder`. Every `placeholder: true` asset also gets an entry in `unresolved` — that array is what `flutter-store-compliance` blocks on.
+
+### Step 8 — Report
 
 ```
-══════════════════════════════════════════
-  FLUTTER STORE METADATA — COMPLETE
-══════════════════════════════════════════
+FLUTTER STORE METADATA — <READY | NEEDS WORK>
 
-  ✓ App icon generated (512px + all mipmap sizes)
-  ✓ Screenshots: 4 phone screenshots (1080x1920)
-  ✓ Short description: "${SHORT_DESC}" ($(echo $SHORT_DESC | wc -c)/80 chars)
-  ✓ Full description: $(echo $FULL_DESC | wc -c)/4000 chars
-  ✓ Privacy policy generated (store-metadata/privacy-policy/)
-  ✓ store-listing.json exported
+Derived    login ✓ (firebase_auth) · IAP ✓ (in_app_purchase) · analytics ✓ (firebase_analytics) · ads ✗
+Icon       icon-512.png + adaptive + monochrome
+Feature    feature-graphic.png 1024×500, no alpha
+Screens    4 phone — CAPTURED from device
+Copy       name 9/30 · short 74/80 · full 1820/4000  (en-US, vi-VN)
+Privacy    generated → needs hosting at a public HTTPS URL
 
-  Output directory:
-    store-metadata/
-    ├── icon/
-    ├── screenshots/phone/
-    ├── description/
-    ├── privacy-policy/
-    └── store-listing.json
-
-  Next steps:
-    flutter-store-compliance    # Check policies
-    flutter-publish            # Upload to Google Play
+Unresolved before submission:
+  - <each placeholder asset, each unverifiable claim, each mismatch>
 ```
 
-## What This Skill Does NOT Do
+Never report "COMPLETE" while `unresolved` is non-empty.
 
-- ❌ Upload to Google Play Console (see `flutter-publish`)
-- ❌ Take real app screenshots (only generates mockups)
-- ❌ Verify policy compliance (see `flutter-store-compliance`)
+## Reference files
 
-## Acceptance Criteria
+| File | Read when |
+|------|-----------|
+| `references/icon-assets.md` | Step 2–3 — icon and feature graphic |
+| `references/screenshots.md` | Step 4 — capture, automation, placeholder rules |
+| `references/privacy-policy.md` | Step 6 — deriving a policy that is true |
 
-- [ ] App icon generated at all required Android sizes
-- [ ] At least 2 phone screenshots created
-- [ ] Short description ≤ 80 characters
-- [ ] Full description ≤ 4000 characters
-- [ ] Privacy policy covers all data collection scenarios
-- [ ] `store-listing.json` produced with complete metadata
+## Scope
+
+Does: derive what the app does, generate listing assets and copy, and mark anything that is a stand-in.
+
+Does not: upload (`flutter-publish`); audit policy compliance (`flutter-store-compliance`); keyword/ASO strategy (`aso-marketing`); fabricate screenshots of a UI that does not exist.

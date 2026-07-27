@@ -1,300 +1,131 @@
 ---
 name: flutter-publish
-description: "Upload a Flutter Android App Bundle (AAB) to Google Play Console and guide the user through submission. Use when user says 'publish', 'upload', 'submit', 'đăng lên chplay', 'publish app', 'push to play store'. Run LAST after all other flutter-* skills pass."
+description: "Upload a Flutter Android App Bundle (AAB) to Google Play Console and guide the user through submission. Use when user says 'publish', 'upload', 'submit', 'đăng lên chplay', 'publish app', 'push to play store', or asks whether a build is ready to upload. Run LAST after all other flutter-* skills pass."
 license: MIT
+metadata:
+  version: 2.0.0
 ---
 
 # Flutter Publish
 
-Step 9-10 of the Flutter → Google Play pipeline: upload AAB to Google Play Console and prepare for submission.
+Final step of the Flutter → Google Play pipeline: verify the release is uploadable, get the AAB into Play Console, and drive the app to a live release.
 
-## Prerequisites
+## Core principle
 
-All prior skills must complete successfully:
+> **Fail locally, not at upload.** Every rule Play enforces at upload time can be checked here first. A rejected upload costs a rebuild and a burned version code; a rejected *review* costs days.
 
+Never claim an app is "published" or "submitted". This skill's output ends at *uploaded and ready for the user to submit* — final submission requires human action in Play Console, and review is Google's call.
+
+## Workflow
+
+Run in order. Each step names the file to read — read it when you reach that step, not before.
+
+**Step 1 — Determine release mode.** Ask, or infer from `store-metadata/publish-state.json`:
+
+| Mode | Condition | Consequence |
+|------|-----------|-------------|
+| **First release** | App does not exist in Play Console yet | Manual upload only. The Play Developer API cannot create an app or upload its first binary — this is a hard Google limitation, not a setup gap. |
+| **Update** | App exists, ≥1 binary previously uploaded | API upload available if a service account is configured. |
+
+**Step 2 — Run the gates.** Read `references/preflight.md`. It defines every blocking and warning check with the real command to run: compliance verdict, applicationId, target API level, 16 KB page alignment, version code, signing, debuggable flag, size. Do not skip a check because a sibling skill "should have" caught it — verify the AAB against `build/release/build-info.json` (Gate 0) instead of assuming the file in `build/` came from the last verified build.
+
+Report all gate results in one table before doing anything else. **Any BLOCK ⇒ stop and fix.** Do not offer to "proceed anyway" past a BLOCK — Play will reject it, so proceeding only wastes a version code.
+
+**Step 3 — Generate release notes.** Skip if `whats_new` was provided.
+
+```bash
+LAST_TAG=$(git tag --sort=-creatordate | head -1)
+if [ -n "$LAST_TAG" ]; then
+  git log "$LAST_TAG"..HEAD --oneline --no-merges --format="• %s"
+else
+  git log --oneline --no-merges -10 --format="• %s"
+fi
 ```
-flutter-init        → Project created
-flutter-signing     → Keystore + signing configured
-flutter-build       → AAB built
-flutter-store-metadata  → Store assets ready
-flutter-store-compliance → Compliance report PASS or PARTIAL (no FAIL)
+
+Rewrite the raw commits into user-facing language — *"• Fixed a crash when opening saved items"*, not *"• fix(list): null deref in ItemRepo"*. Drop refactors, CI, and dependency bumps entirely; a release note is for users, not the changelog.
+
+Write `store-metadata/whats-new/en-US.txt` (one file per locale, matching the locales in `store-listing.json`). **Max 500 characters per locale — verify with `wc -m`, not by eye.**
+
+**Step 4 — Upload.** Route by Step 1:
+
+- **Manual** (first release, or no service account): read `references/console-guide.md` and walk the user through it. Substitute real values from `store-metadata/store-listing.json` into the guide — never hand the user a template with `$APP_NAME` still in it.
+- **API** (update + service account present): read `references/api-upload.md`. Confirm the track and rollout percentage with the user before the call — an API upload to `production` at 100% is immediately live and cannot be undone, only rolled forward.
+
+Check for a service account before assuming manual:
+
+```bash
+ls service-account.json ~/.config/gplay/service-account.json 2>/dev/null
 ```
+
+**Step 5 — Declarations.** Read `references/console-guide.md` § 2 *App content declarations*. These are required before Play will let the user submit, and they are the most common cause of a submission being stuck. If `test_credentials` was provided, it goes in **App access** — an app behind a login with no test credentials gets rejected without review.
+
+**Step 6 — Testing track requirements.** Read `references/testing-track.md`. Personal accounts created after 13 Nov 2023 cannot reach production without closed testing: **12 testers opted in for 14 consecutive days**. Tell the user this *before* they build a production release plan around a date. Organization accounts are exempt.
+
+**Step 7 — Record and report.** Write `store-metadata/publish-state.json` so the next run knows what already shipped:
+
+```json
+{
+  "app_id": "com.example.myapp",
+  "last_uploaded": { "version_name": "1.0.0", "version_code": 1, "track": "internal", "at": "2026-07-27T10:00:00Z", "method": "manual" },
+  "play_console_app_created": true,
+  "closed_testing": { "started": null, "testers_opted_in": 0 }
+}
+```
+
+Then report using the Output section below.
 
 ## Input
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `track` | ❌ | Release track: `internal` (default), `closed`, `open`, `production` |
-| `aab_path` | ❌ | Path to AAB file (auto-detect if blank) |
-| `whats_new` | ❌ | Release notes (auto-generated if blank) |
-| `test_credentials` | ❌ | Test account credentials for internal/closed tracks |
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `track` | ❌ | `internal` | `internal`, `closed`, `open`, `production` |
+| `aab_path` | ❌ | auto-detect | Path to the AAB |
+| `whats_new` | ❌ | from git log | Release notes, ≤500 chars per locale |
+| `test_credentials` | ❌ | — | Login for reviewers; **required if the app is login-gated** |
+| `rollout_percentage` | ❌ | `100` | Staged rollout fraction; production only |
 
-## Steps
+Default to `internal` when the user does not say. Going straight to `production` on a first release is almost always a mistake — say so once, then follow their call.
 
-### Step 1: Pre-flight Compliance Gate
+## Output
 
-```bash
-# Check that flutter-store-compliance was run
-if [ ! -f store-metadata/compliance-report.md ]; then
-  echo "⚠️ Compliance report not found."
-  echo "Run flutter-store-compliance first."
-  echo "Proceed anyway?" 
-  ask_user || exit 1
-fi
+| Path | Content |
+|------|---------|
+| `store-metadata/whats-new/<locale>.txt` | Release notes per locale |
+| `store-metadata/publish-state.json` | What shipped, for the next run |
+| `store-metadata/upload-checklist.md` | The gate table + remaining manual steps |
 
-# Read compliance verdict
-COMPLIANCE_STATUS=$(grep "OVERALL:" store-metadata/compliance-report.md 2>/dev/null | grep -o "PASS\|PARTIAL\|FAIL")
-if [ "$COMPLIANCE_STATUS" = "FAIL" ]; then
-  echo "❌ Compliance FAILED. Fix issues before publishing."
-  echo "See store-metadata/compliance-report.md"
-  exit 1
-fi
-```
-
-**Gate logic:**
-- `FAIL` → **Block** publishing. Show compliance report.
-- `PARTIAL` → **Warn** but allow user to proceed.
-- `PASS` → Allow.
-
-### Step 2: Detect AAB
-
-```bash
-# Search for AAB
-AAB_FILES=$(find . -name "*.aab" -path "*/build/*" -type f 2>/dev/null)
-
-if [ -z "$AAB_FILES" ]; then
-  AAB_FILES=$(find build/release -name "*.aab" -type f 2>/dev/null)
-fi
-
-echo "AAB files found:"
-echo "$AAB_FILES"
-```
-
-If multiple AABs found → let user select.
-If none found → run `flutter-build` or ask user to build manually.
-
-### Step 3: Verify AAB
-
-```bash
-# Check AAB is valid and signed
-AAB_SIGNED=$(unzip -l "$AAB_PATH" 2>/dev/null | grep "META-INF" | wc -l)
-AAB_SIZE=$(ls -lh "$AAB_PATH" | awk '{print $5}')
-
-echo "Size: $AAB_SIZE"
-echo "Signed: $([ $AAB_SIGNED -gt 3 ] && echo 'Yes' || echo 'CHECK MANUALLY')"
-```
-
-**Checks:**
-- File extension `.aab` — **FAIL if not**
-- File size > 1 MB — **FAIL if smaller**
-- Contains signature files in `META-INF/` — **WARNING if unsigned**
-
-### Step 4: Generate Release Notes
-
-If `whats_new` not provided, generate from git history:
-
-```bash
-# Get recent commits since last tag
-LAST_TAG=$(git tag --sort=-creatordate | head -1)
-if [ -n "$LAST_TAG" ]; then
-  git log "$LAST_TAG"..HEAD --oneline --no-merges --format="• %s" 2>/dev/null
-else
-  git log --oneline --no-merges -10 --format="• %s" 2>/dev/null
-fi
-```
-
-Write to `store-metadata/whats-new.txt`:
+Final report format:
 
 ```
-• $FEATURE_1
-• $FEATURE_2
-• Bug fixes and performance improvements
+FLUTTER PUBLISH — <UPLOADED | READY FOR MANUAL UPLOAD | BLOCKED>
+
+Gates          <n> passed, <n> warnings, <n> blocking
+AAB            build/release/app-release.aab (24 MB, v1.0.0+1, signed)
+Track          internal
+Release notes  store-metadata/whats-new/en-US.txt (312 chars)
+
+Remaining manual steps:
+  1. <specific, ordered, with the Play Console path to click>
+  2. ...
+
+Blocking issues (if any):
+  ✗ <check> — <what to change, in which file>
 ```
 
-Max 500 characters. Include `en-US` as default locale. For multiple locales, create files:
+State what is actually done versus what the user still must do. If the AAB was uploaded via API but declarations are incomplete, the app is *not* ready to submit — say that plainly.
 
-```
-store-metadata/whats-new/
-├── en-US.txt
-├── vi-VN.txt
-```
+## Reference files
 
-### Step 5: Guide Manual Upload (Primary Method)
+| File | Read when |
+|------|-----------|
+| `references/preflight.md` | Step 2 — every gate, with commands |
+| `references/console-guide.md` | Step 4/5 — manual upload, store listing, App content declarations |
+| `references/testing-track.md` | Step 6 — 12-tester rule, production access application |
+| `references/api-upload.md` | Step 4 — fastlane/API upload, service account setup |
+| `references/troubleshooting.md` | An upload error or a rejection notice |
 
-Google Play no longer offers a simple upload API for personal developer accounts without service account setup. The primary method is manual via Play Console.
+## Scope
 
-Provide the user with a step-by-step guide:
+Does: gate the release, verify the AAB, produce release notes, upload via API where possible, and guide the Console work that cannot be automated.
 
-```
-══════════════════════════════════════════
-  UPLOAD TO GOOGLE PLAY CONSOLE
-══════════════════════════════════════════
-
-  Step 1: Open Google Play Console
-    → https://play.google.com/console/
-
-  Step 2: Create a new app (first time only)
-    → Click "Create app"
-    → Name: "$APP_NAME"
-    → Default language: English
-    → App or game: App
-    → Free or Paid: Choose
-
-  Step 3: Set up Store Listing
-    → Copy from store-metadata/store-listing.json
-    → Upload screenshots from store-metadata/screenshots/
-    → Icon auto-detected from build
-    → Category: $CATEGORY
-    → Tags: Optional
-
-  Step 4: Complete App content
-    → Privacy Policy: Use store-metadata/privacy-policy/
-    → Ads declaration: Yes/No
-    → Target audience: Set appropriately
-    → Content rating: Complete questionnaire
-    → Data safety: Import data-safety.csv
-
-  Step 5: Upload AAB
-    → Go to Production / Internal testing / Closed testing
-    → Click "Create new release"
-    → Upload file: $AAB_PATH
-    → Release notes: Copy from store-metadata/whats-new.txt
-
-  Step 6: Review & Submit
-    → Review pre-launch report
-    → Check for any warnings
-    → Submit for review
-
-  ⏱ Review time: Typically 1-3 days (could be up to 7 days)
-```
-
-### Step 6: Optional — Google Play Developer API Upload
-
-If user has a service account set up, offer automated upload:
-
-```bash
-# Check if service account JSON exists
-SERVICE_ACCOUNT=$(ls service-account.json ~/.google-play/service-account.json 2>/dev/null | head -1)
-if [ -n "$SERVICE_ACCOUNT" ]; then
-  echo "Service account found at $SERVICE_ACCOUNT"
-  echo "Automated upload available."
-  ask_user "Upload via API?" && do_api_upload
-fi
-```
-
-**API upload requirements:**
-- Google Play Developer API enabled in GCP project
-- Service account with "Release Manager" role in Play Console
-- `googleapiclient` Python lib or similar
-
-**Note:** Service account setup is a manual one-time process. Document it:
-
-```
-To set up automated uploads:
-1. Go to https://play.google.com/console/developers/account
-2. API Access → Create Service Account
-3. In Google Cloud Console, create key (JSON)
-4. Add service account email to Play Console with "Admin" role
-5. Save JSON key as service-account.json in project root
-```
-
-### Step 7: Internal/Closed Testing Guidance
-
-For new developer accounts (after Nov 2023), Google requires:
-
-> **New personal developer accounts** must complete app testing requirements:
-> - 20 testers for 14 consecutive days
-> - Closed testing track with opt-in URL
-> - Test feedback must be addressed
-
-Guide the user:
-
-```
-══════════════════════════════════════════
-  TESTING REQUIREMENTS (New Accounts)
-══════════════════════════════════════════
-
-  Google Play now requires new developer accounts to:
-  
-  1. Set up a CLOSED TESTING track
-  2. Add at least 20 testers
-  3. Run the test for 14 consecutive days
-  4. Address all feedback
-
-  To set up:
-  → Play Console → Testing → Closed testing
-  → Create new track
-  → Upload AAB
-  → Add tester emails (20+)
-  → Copy opt-in URL and share with testers
-  
-  After 14 days:
-  → Request production access
-  → Wait for review (up to 2 weeks)
-```
-
-### Step 8: Report
-
-```
-══════════════════════════════════════════
-  FLUTTER PUBLISH — COMPLETE
-══════════════════════════════════════════
-
-  ✓ Compliance gate: PASS
-  ✓ AAB verified: $AAB_PATH ($AAB_SIZE, signed)
-  ✓ Release notes generated: store-metadata/whats-new.txt
-
-  ┌────────────────────────────────────────┐
-  │                                        │
-  │   MANUAL STEPS REQUIRED                │
-  │                                        │
-  │   Open Google Play Console:            │
-  │   https://play.google.com/console/     │
-  │                                        │
-  │   1. Create app in Play Console        │
-  │   2. Fill Store Listing from           │
-  │      store-metadata/store-listing.json │
-  │   3. Upload $AAB_PATH                  │
-  │   4. Complete App content section      │
-  │   5. Submit for review                 │
-  │                                        │
-  └────────────────────────────────────────┘
-
-  ⚠️ Tester requirements:
-     If this is a NEW developer account, 
-     you MUST complete 14-day closed testing
-     before production release.
-
-  📄 Store assets: store-metadata/
-  📦 AAB file: $AAB_PATH
-  📝 Release notes: store-metadata/whats-new.txt
-  🔐 Compliance: store-metadata/compliance-report.md
-```
-
-## What This Skill Does NOT Do
-
-- ❌ Submit the app automatically (no service account by default)
-- ❌ Complete Content Rating questionnaire (must be done in Play Console UI)
-- ❌ Handle app rejections or appeals (see Google Play Help Center)
-- ❌ Replace the need for real human testing
-
-## Edge Cases
-
-| Problem | Handling |
-|---------|----------|
-| No AAB found | Prompt to run `flutter-build` first |
-| Compliance gate blocks | Show report, exit |
-| User has no Play Console account | Guide to register ($25) |
-| App already published (update) | Guide to "Create new release" on existing app |
-| iOS not supported | iOS publishing requires separate App Store process on macOS |
-| New account testing requirements | Guide through 14-day closed testing process |
-| App rejected after submission | Show common rejection reasons and how to fix |
-
-## Acceptance Criteria
-
-- [ ] Compliance gate checked before allowing publish
-- [ ] AAB file verified (exists, signed, reasonable size)
-- [ ] Release notes generated with git history
-- [ ] Step-by-step manual upload guide provided
-- [ ] Testing requirements explained for new accounts
-- [ ] All paths leading to publish documented and ready for user
+Does not: complete the Content Rating questionnaire, Data safety, or legal consents (API cannot touch these — Console UI only); submit for review on the user's behalf; appeal rejections; publish to iOS (separate App Store process, requires macOS).
