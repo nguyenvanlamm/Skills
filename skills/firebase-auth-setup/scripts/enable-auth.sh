@@ -1,103 +1,119 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# --- Parse args ---
 PROJECT_ID=""
 OUTPUT_DIR=""
+GOOGLE_CLIENT_ID="${GOOGLE_OAUTH_CLIENT_ID:-}"
+GOOGLE_CLIENT_SECRET="${GOOGLE_OAUTH_CLIENT_SECRET:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --project) PROJECT_ID="$2"; shift 2 ;;
     --output) OUTPUT_DIR="$2"; shift 2 ;;
+    --google-client-id) GOOGLE_CLIENT_ID="$2"; shift 2 ;;
+    --google-client-secret) GOOGLE_CLIENT_SECRET="$2"; shift 2 ;;
     *) echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
 
-if [ -z "$PROJECT_ID" ]; then echo "❌ --project required"; exit 1; fi
-if [ -z "$OUTPUT_DIR" ]; then echo "❌ --output required"; exit 1; fi
+[ -n "$PROJECT_ID" ] || { echo "❌ --project required"; exit 1; }
+[ -n "$OUTPUT_DIR" ] || { echo "❌ --output required"; exit 1; }
+command -v jq >/dev/null || { echo "❌ jq required"; exit 1; }
 
-echo "🔑 Enabling Authentication providers..."
+echo "🔑 Configuring Authentication providers..."
 
-# Enable Identity Toolkit API
-echo "  Enabling Identity Toolkit API..."
 gcloud services enable identitytoolkit.googleapis.com --project "$PROJECT_ID" --quiet
+gcloud services enable firebase.googleapis.com --project "$PROJECT_ID" --quiet 2>/dev/null || true
 echo "  ✅ Identity Toolkit API enabled"
 
-# Enable Firebase Management API (required for REST calls)
-gcloud services enable firebase.googleapis.com --project "$PROJECT_ID" --quiet 2>/dev/null || true
-
-# Get Google OAuth2 access token (required for REST API calls)
-echo "  Getting OAuth2 access token..."
-ACCESS_TOKEN=$(gcloud auth application-default print-access-token 2>/dev/null || \
-              gcloud auth print-access-token 2>/dev/null || true)
+ACCESS_TOKEN=$(gcloud auth print-access-token 2>/dev/null || true)
 if [ -z "$ACCESS_TOKEN" ]; then
-  echo "❌ Failed to get OAuth2 access token. Run: gcloud auth application-default login"
+  echo "❌ No OAuth2 access token. Run: gcloud auth login"
   exit 1
 fi
-echo "  ✅ OAuth2 access token obtained"
 
-# Firebase Management REST API base
-FIREBASE_API="https://identitytoolkit.googleapis.com/v2/projects/$PROJECT_ID"
+API="https://identitytoolkit.googleapis.com/v2/projects/$PROJECT_ID"
 
-# Enable Email/Password provider
-echo "  Enabling Email/Password provider..."
-EMAIL_PAYLOAD='{"signInProviders":{"email":true,"password":true}}'
-EMAIL_RESP=$(python3 -c "
-import urllib.request, json
-url = '${FIREBASE_API}/config?updateMask=signInProviders.email,signInProviders.password'
-req = urllib.request.Request(url, data=json.dumps($EMAIL_PAYLOAD).encode(), headers={
-    'Authorization': 'Bearer $ACCESS_TOKEN',
-    'Content-Type': 'application/json',
-}, method='PATCH')
-try:
-    resp = urllib.request.urlopen(req)
-    print(resp.status)
-    print(resp.read().decode())
-except urllib.error.HTTPError as e:
-    print(e.code)
-    print(e.read().decode())
-" 2>&1)
+# Pass the token through the environment, never on the command line or inside
+# an interpolated script: argv is world-readable via `ps`, and a token or
+# payload containing a quote would break an interpolated heredoc outright.
+export ACCESS_TOKEN
 
-EMAIL_STATUS=$(echo "$EMAIL_RESP" | head -1)
-EMAIL_BODY=$(echo "$EMAIL_RESP" | tail -n +2)
+call() {  # call <method> <url> [json-body] -> prints "<http_code>\n<body>"
+  local method="$1" url="$2" body="${3:-}"
+  if [ -n "$body" ]; then
+    curl -sS -w '\n%{http_code}' -X "$method" "$url" \
+      -H "Authorization: Bearer $ACCESS_TOKEN" \
+      -H "Content-Type: application/json" -d "$body"
+  else
+    curl -sS -w '\n%{http_code}' -X "$method" "$url" \
+      -H "Authorization: Bearer $ACCESS_TOKEN"
+  fi
+}
 
-if [ "$EMAIL_STATUS" != "200" ]; then
-  echo "❌ Failed to enable Email/Password provider (HTTP $EMAIL_STATUS)"
-  echo "   Response: $EMAIL_BODY"
-  echo "   Run: gcloud auth application-default login"
+split_code() { printf '%s' "${1##*$'\n'}"; }
+split_body() { printf '%s' "${1%$'\n'*}"; }
+
+# --- Email/Password -------------------------------------------------------
+# Identity Platform config shape: signIn.email.{enabled,passwordRequired}
+echo "  Enabling Email/Password..."
+RESP=$(call PATCH "$API/config?updateMask=signIn.email.enabled,signIn.email.passwordRequired" \
+  '{"signIn":{"email":{"enabled":true,"passwordRequired":true}}}')
+CODE=$(split_code "$RESP"); BODY=$(split_body "$RESP")
+if [ "$CODE" != "200" ]; then
+  echo "❌ Email/Password could not be enabled (HTTP $CODE)"
+  echo "   $(printf '%s' "$BODY" | jq -r '.error.message // .' 2>/dev/null | head -3)"
+  echo "   Most common cause: Identity Platform is not initialised for this project."
+  echo "   Open the Firebase Console → Authentication → Get started once, then re-run."
   exit 1
 fi
-echo "  ✅ Email/Password provider enabled"
+EMAIL_OK=true
+echo "  ✅ Email/Password enabled"
 
-# Enable Google provider
-echo "  Enabling Google sign-in provider..."
-GOOGLE_PAYLOAD='{"signInProviders":{"google":true}}'
-GOOGLE_RESP=$(python3 -c "
-import urllib.request, json
-url = '${FIREBASE_API}/config?updateMask=signInProviders.google'
-req = urllib.request.Request(url, data=json.dumps($GOOGLE_PAYLOAD).encode(), headers={
-    'Authorization': 'Bearer $ACCESS_TOKEN',
-    'Content-Type': 'application/json',
-}, method='PATCH')
-try:
-    resp = urllib.request.urlopen(req)
-    print(resp.status)
-    print(resp.read().decode())
-except urllib.error.HTTPError as e:
-    print(e.code)
-    print(e.read().decode())
-" 2>&1)
+# --- Google sign-in -------------------------------------------------------
+# Google is a *federated IdP*, not a config flag: it requires an OAuth 2.0
+# client ID and secret, which cannot be minted from this API. Without them the
+# provider cannot be enabled — say so instead of issuing a call that 400s.
+GOOGLE_OK=false
+if [ -n "$GOOGLE_CLIENT_ID" ] && [ -n "$GOOGLE_CLIENT_SECRET" ]; then
+  echo "  Enabling Google sign-in..."
+  BODY_JSON=$(jq -n --arg id "$GOOGLE_CLIENT_ID" --arg secret "$GOOGLE_CLIENT_SECRET" \
+    '{enabled:true, clientId:$id, clientSecret:$secret}')
+  RESP=$(call POST "$API/defaultSupportedIdpConfigs?idpId=google.com" "$BODY_JSON")
+  CODE=$(split_code "$RESP"); BODY=$(split_body "$RESP")
+  if [ "$CODE" = "409" ] || printf '%s' "$BODY" | grep -qi "already exists"; then
+    RESP=$(call PATCH "$API/defaultSupportedIdpConfigs/google.com?updateMask=enabled,clientId,clientSecret" "$BODY_JSON")
+    CODE=$(split_code "$RESP"); BODY=$(split_body "$RESP")
+  fi
+  if [ "$CODE" = "200" ]; then
+    GOOGLE_OK=true
+    echo "  ✅ Google sign-in enabled"
+  else
+    echo "  ⚠ Google sign-in failed (HTTP $CODE): $(printf '%s' "$BODY" | jq -r '.error.message // .' 2>/dev/null | head -2)"
+  fi
+else
+  cat <<'MSG'
+  ⏭  Google sign-in NOT enabled — no OAuth client supplied.
 
-GOOGLE_STATUS=$(echo "$GOOGLE_RESP" | head -1)
-GOOGLE_BODY=$(echo "$GOOGLE_RESP" | tail -n +2)
+     Google sign-in needs an OAuth 2.0 client ID and secret. Create one at
+     Google Cloud Console → APIs & Services → Credentials → OAuth client ID
+     (type: Web application), then re-run with:
 
-if [ "$GOOGLE_STATUS" != "200" ]; then
-  echo "❌ Failed to enable Google sign-in provider (HTTP $GOOGLE_STATUS)"
-  echo "   Response: $GOOGLE_BODY"
-  exit 1
+       --google-client-id <id> --google-client-secret <secret>
+
+     Or enable it in Firebase Console → Authentication → Sign-in method →
+     Google, which creates the client for you.
+MSG
 fi
-echo "  ✅ Google sign-in provider enabled"
 
-echo "✅ Auth providers configuration complete."
+# --- Record what is actually enabled --------------------------------------
+PROVIDERS=$(jq -n --argjson email "$EMAIL_OK" --argjson google "$GOOGLE_OK" \
+  '[ (if $email then "email" else empty end), (if $google then "google" else empty end) ]')
+
+OUT="$OUTPUT_DIR/firebase-output.json"
+if [ -f "$OUT" ]; then
+  TMP=$(mktemp)
+  jq --argjson p "$PROVIDERS" '.auth_providers = $p' "$OUT" > "$TMP" && mv "$TMP" "$OUT"
+fi
+
+echo "✅ Auth configuration complete — providers: $(printf '%s' "$PROVIDERS" | jq -r 'join(", ")')"

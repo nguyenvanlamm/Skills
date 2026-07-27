@@ -22,18 +22,21 @@ if [ -z "$SLUG" ]; then echo "❌ --slug required"; exit 1; fi
 if [ -z "$OUTPUT_DIR" ]; then OUTPUT_DIR="$PWD/firebase-output"; fi
 
 mkdir -p "$OUTPUT_DIR"
-CI_TOKEN_FILE="${FIREBASE_TOKEN_PATH:-$HOME/.config/firebase/ci-token}"
-CI_TOKEN="${FIREBASE_TOKEN:-}"
-if [ -z "$CI_TOKEN" ] && [ -f "$CI_TOKEN_FILE" ]; then
-  CI_TOKEN="$(cat "$CI_TOKEN_FILE" | tr -d ' \n\r')"
-fi
-
 echo "📦 Creating Firebase project..."
 
 # Generate a unique project name
 RAND_SUFFIX="$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 4 2>/dev/null || echo "$(date +%s | tail -c 5)")"
 PROJECT_NAME="${SLUG}-${RAND_SUFFIX}"
 PROJECT_ID="${PROJECT_NAME}"  # project ID = project name for firebase
+
+# GCP project IDs: 6-30 chars, lowercase letter first, then letters/digits/hyphens.
+# A slug that violates this fails with an opaque API error, so check it here.
+if ! printf '%s' "$PROJECT_ID" | grep -Eq '^[a-z][a-z0-9-]{5,29}$'; then
+  echo "❌ Invalid project id derived from --slug: '$PROJECT_ID'"
+  echo "   Needs 6-30 chars, start with a lowercase letter, only a-z 0-9 and '-'."
+  echo "   Use a shorter, lowercase --slug."
+  exit 1
+fi
 
 # Check if project already exists
 if firebase projects:list --json 2>/dev/null | jq -e --arg id "$PROJECT_ID" '.result[] | select(.projectId == $id)' &>/dev/null; then
@@ -82,7 +85,7 @@ cat > "$OUTPUT_DIR/firebase-output.json" <<EOF
   "project_id": "$PROJECT_ID",
   "project_number": "$PROJECT_NUMBER",
   "region": "$REGION",
-  "auth_providers": ["email", "google"]
+  "auth_providers": []
 }
 EOF
 
