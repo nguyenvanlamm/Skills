@@ -4,7 +4,7 @@ description: "Fetch top 15 trending topics from Exploding Topics, brainstorm 3 i
 license: MIT
 effort: medium
 metadata:
-  version: 2.0.0
+  version: 2.1.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -17,7 +17,7 @@ Analyze real-time trending topics from Exploding Topics and generate 3 novel bus
 - Python 3.x must be installed and available in the path.
 - Internet access (to fetch `explodingtopics.com/api/trends`).
 - No additional Python packages required (uses only stdlib — `urllib` + `json`).
-- **`idea-validator` skill** must be installed at `~/.config/opencode/skills/idea-validator/SKILL.md`. If missing, the skill will report the error and stop.
+- **`idea-validator` skill** must be available. Invoke it through the host's skill mechanism (in Claude Code: the `Skill` tool, or `/idea-validator`). Do not probe a hardcoded filesystem path — where skills live differs per host, and a path check that fails makes this skill refuse to run in an environment where the skill is in fact present.
 
 ## Workflow
 
@@ -43,7 +43,13 @@ python scripts/fetch_trends.py
 **Edge cases handled by the script:**
 - Network failure → JSON error + exit code 1
 - API returns empty → JSON error + exit code 1
-- Growth format: raw values (e.g., `32.33`) are multiplied by 100 for readability
+- Growth format → normalised, with the branch recorded in `growth_basis`
+
+**Two caveats to carry into the report, not to hide:**
+
+`explodingtopics.com/api/trends` is an **undocumented internal endpoint**, fetched with a browser User-Agent. It can change shape or start refusing requests at any time, and this skill has no other source. A failure here is not a bug to work around — stop and say the data is unavailable.
+
+The growth field has been seen both as a ratio (`0.3233`) and as a percentage (`3233`), so the script picks per value: `<= 100` is treated as a ratio and multiplied, above that is taken as already-percent. Each topic carries `growth_basis` saying which branch ran. **The two forms genuinely overlap** — a raw `32.33` could be either 32% or 3233%. When growth figures drive the ranking, check `growth_basis` against the topic's page before quoting a number as fact.
 
 ---
 
@@ -98,7 +104,7 @@ After brainstorming all 3, save each idea as a structured block for Step 5.
 
 For **each** of the 3 ideas produced in Step 4, run the `idea-validator` skill to get a structured evaluation and numeric score.
 
-**Prerequisite check:** Verify `~/.config/opencode/skills/idea-validator/SKILL.md` exists. If not, report error and stop.
+**Prerequisite check:** Confirm `idea-validator` is invokable by the host. If it is not available, stop and say so — do not substitute your own judgement for a validation step the report claims was performed.
 
 **Per-idea workflow:**
 
@@ -230,7 +236,7 @@ A run passes when **all** of the following are true:
 - **Only N < 15 topics available:** Use all available topics; note the limitation in the report
 - **All topics cluster into one need:** Still generate 3 distinct ideas targeting different sub-segments or angles within that need
 - **Growth values are zero/negative:** Include them but note they may be declining trends; prioritize positive-growth topics for idea generation
-- **idea-validator not installed:** Report error: "idea-validator skill required at ~/.config/opencode/skills/idea-validator/". Stop and do not proceed.
+- **idea-validator not available:** Report that the validation step cannot run, and stop. Scoring ideas yourself and labelling the result "validated" misrepresents where the numbers came from.
 - **idea-validator cannot parse ARGUMENTS:** Fall back to pasting the idea description manually when prompted by idea-validator's Phase 1
 - **idea-validator verdict is "Skip it" for all 3 ideas:** Still pick the highest-scoring one, but note the risk prominently in the final report
 - **Composite scores tie:** Apply tiebreakers in order: Verdict > Market Impact > Feasibility. If still tied, pick arbitrarily and note it.

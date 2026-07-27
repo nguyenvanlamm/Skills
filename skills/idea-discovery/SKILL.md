@@ -4,14 +4,25 @@ description: "Research market gaps across Google Play, Google Trends, Reddit, an
 license: MIT
 effort: max
 metadata:
-  version: 1.0.0
+  version: 2.0.0
   author: Luong NGUYEN <luongnv89@gmail.com>
   architecture: "Parallel research subagents (keyword-researcher + pain-point-miner) → synthesis agent (idea-synthesizer) → final idea.md output"
 ---
 
 # Idea Discovery
 
-Find untapped app opportunities by analyzing keyword gaps, trend data, user pain points, and competitive weaknesses — then synthesize into 1 concrete, validated app idea.
+Find untapped app opportunities by analyzing keyword gaps, trend data, user pain points, and competitive weaknesses — then synthesize into 1 concrete, evidence-backed app idea.
+
+## Core principle
+
+> **Every number in the output must come from a lookup performed in this session.** Result counts, ratings, review volumes, complaint frequencies, search interest — each one is either something you fetched and can link to, or it does not appear. "No data found" is a valid finding; an invented figure is not.
+
+The output of this skill reads like research. That is exactly why a plausible-sounding fabricated statistic is more damaging here than anywhere else: the user will build on it. Prior knowledge about a market is for **choosing what to search for**, never for filling in a cell in the opportunity matrix.
+
+Two things follow:
+
+- Every claim in `idea.md` carries a link or a named source next to it. A claim that cannot be sourced gets deleted, not softened.
+- The scores below are **structured judgement, not measurement**. Say so when presenting them. Summing five 1-10 opinions into "38/50" does not make it a measurement, and precision implied by a total out of 50 should not be read as accuracy.
 
 ## When to Use
 
@@ -80,6 +91,8 @@ If the user has access to AppBrain, Sensor Tower, or AppTweak:
 
 ### Phase 3: Gap Synthesis & Idea Selection
 
+Read `agents/idea-synthesizer.md` and run it with both research outputs as input. (The skill ships this agent; earlier versions listed it as a reference but then described doing the synthesis inline, so it never ran.)
+
 1. Collect outputs from both research agents
 2. Create an **opportunity matrix** with rows for each candidate idea:
    - Keyword demand (low/medium/high)
@@ -93,6 +106,8 @@ If the user has access to AppBrain, Sensor Tower, or AppTweak:
 **Tiebreaker rules:**
 - Prefer pain point intensity > keyword demand > trend direction
 - If still tied, prefer the more niche-focused idea
+
+**"Nothing worth building" is a permitted outcome.** If no candidate clears a weak bar — no real pain evidence, or every keyword is dominated by well-maintained apps — report that instead of promoting the least-bad option. A user who is told to stop has lost an hour; a user handed a manufactured opportunity loses weeks. Say what was searched, what came back, and what would need to be true for the answer to change.
 
 ### Phase 4: Write idea.md
 
@@ -151,7 +166,10 @@ After all phases, the skill produces:
 - [ ] Opportunity matrix scores are documented
 - [ ] Winner is selected with clear rationale
 - [ ] `idea.md` exists with all required sections
-- [ ] Every claim in `idea.md` cites a research source
+- [ ] Every claim in `idea.md` cites a research source, with a link where one exists
+- [ ] No figure appears that was not retrieved during this run
+- [ ] Cells with no data are labelled "no data", not estimated
+- [ ] Scores are presented as judgement, not as measurement
 
 ## Edge Cases
 
@@ -159,7 +177,9 @@ After all phases, the skill produces:
 - **Reddit/Google Trends returns nothing useful:** Document which queries were tried. Proceed with keyword data only.
 - **ASO tools unavailable:** Skip Phase 2 gracefully, note in output.
 - **User provides ARGUMENTS (e.g., "fitness"):** Scope all research to that category. Append "ANDROID" or "MOBILE APP" to search queries where needed.
-- **All candidates score low:** Pick the highest-scoring one but add a "Weak Signal — Proceed with Caution" banner in idea.md.
+- **All candidates score low:** Do not dress up the least-bad one. Report "no viable opportunity found in this scope", list what was searched, and suggest a narrower or different category. Write `idea.md` only if the user asks for the strongest candidate anyway — and then lead with the weak-signal warning.
+- **A source is unreachable (rate-limited, blocked, empty):** Name the source and the queries tried, and mark every dependent cell in the matrix as "no data". Never fill a gap with an estimate.
+- **`idea.md` already exists:** Ask before overwriting — it may be the output of an earlier run the user is still working from.
 
 ## Step Completion Reports
 
