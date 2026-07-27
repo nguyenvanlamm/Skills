@@ -71,10 +71,10 @@ echo ""
 # --- Determine GH_USER if not set ---
 if [ -z "$GH_USER" ]; then
   if [ -f "$SERVER_DIR/render.yaml" ]; then
-    GH_USER=$(grep -oP 'github\.com/\K[^/]+' "$SERVER_DIR/render.yaml" 2>/dev/null | head -1 || true)
+    GH_USER=$(sed -n 's|.*github\.com/\([^/]*\)/.*|\1|p' "$SERVER_DIR/render.yaml" 2>/dev/null | head -1 || true)
   fi
   if [ -z "$GH_USER" ]; then
-    GH_USER=$(gh auth status 2>&1 | grep -oP 'Logged in to github\.com as \K\S+' || true)
+    GH_USER=$(gh api user --jq .login 2>/dev/null || true)
   fi
   if [ -z "$GH_USER" ]; then
     echo "❌ Cannot determine GitHub user for Render deploy."
