@@ -79,7 +79,15 @@ Rate-limiting `tap()` to 40ms matters: an unthrottled rapid-tap queues dozens of
 
 ## Persistence
 
-`SharedPreferences` only, wrapped in `Prefs`: `highscore`, `level`, `soundOn`, `hapticsOn`, `gamesPlayed`. Load once at startup. No Room, no DataStore, no coroutine ceremony for five values.
+`SharedPreferences` only, wrapped in `Prefs`: `highscore`, `level`, `soundOn`, `hapticsOn`, `reduceMotion`, `gamesPlayed`. Load once at startup. No Room, no DataStore, no coroutine ceremony for six values.
+
+`reduceMotion` is not decoration. It is read by `AnimatedGameBackground`, `rememberShake`, `ParticleSystem`, and the screen-transition animation, and it is exposed in Settings next to sound and haptics. See the accessibility section of `design-system.md` for exactly what each one does when it is on.
+
+## The ambient background during play
+
+`AnimatedGameBackground` runs an infinite transition. That is correct on the six menu screens and wrong during a live run: it is a second continuously-recomposing source competing with the frame loop for the same 16ms.
+
+While `running` is true, freeze it — hold the last blob positions and stop the transition. The gradient stays on screen, so the palette never breaks, but the only thing animating during gameplay is the one `Canvas` that matters. Resume it when the run ends or Pause opens.
 
 ## Navigation
 

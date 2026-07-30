@@ -7,6 +7,7 @@ set -uo pipefail
 
 NO_BUILD=0
 [ "${1:-}" = "--no-build" ] && NO_BUILD=1
+HERE=$(cd "$(dirname "$0")" && pwd)   # the skill's scripts/ dir, not the project
 
 SRC=$(find app/src/main/java app/src/main/kotlin -type d -path '*/ui/theme' 2>/dev/null | head -1 | sed 's|/ui/theme$||')
 if [ -z "${SRC:-}" ] || [ ! -d "$SRC" ]; then
@@ -87,6 +88,14 @@ fi
 none A "A5 no unfinished code" \
      grep -rnE 'TODO\(|FIXME|NotImplementedError|throw +NotImplemented' "$SRC"
 
+# A6 — minSdk 26: FontVariation needs it, and the type scale is built on variable fonts
+MINSDK=$(grep -oE 'minSdk *= *[0-9]+' app/build.gradle.kts 2>/dev/null | head -1 | grep -oE '[0-9]+')
+if [ "${MINSDK:-0}" -ge 26 ] 2>/dev/null; then
+  ok A "A6 minSdk $MINSDK (variable-font weight axis available)"
+else
+  no A "A6 minSdk >= 26" "minSdk=${MINSDK:-unset} — below 26 Android ignores the wght axis and every bold score renders regular"
+fi
+
 echo "═══ B · LAYOUT ═══"
 
 nscreens=$(ls "$SCREENS"/*.kt 2>/dev/null | wc -l)
@@ -105,12 +114,26 @@ grep -qE '\b20\.dp|Spacing\.(gutter|screen)' "$COMPONENTS/ScreenScaffold.kt" 2>/
   && ok B "B2 20dp gutter centralised" \
   || no B "B2 20dp gutter centralised" "ScreenScaffold does not apply the 20dp screen gutter"
 
-if [ -f "$COMPONENTS/GameButton.kt" ] && grep -qE '(56|min).*dp|minHeight' "$COMPONENTS/GameButton.kt"; then
-  ok B "B3 touch targets ≥48dp in components"
+if [ -f "$COMPONENTS/GameButton.kt" ] && grep -qE 'heightIn *\( *min|minHeight' "$COMPONENTS/GameButton.kt"; then
+  ok B "B3 touch targets ≥48dp, and sized with heightIn(min=) so 200% font scale grows the row"
 else
-  no B "B3 touch targets ≥48dp in components" "GameButton has no 56dp/minHeight constraint"
+  no B "B3 touch targets ≥48dp in components" "GameButton needs heightIn(min = 56.dp); a fixed height() clips at large font scale"
 fi
-man "B4 layout survives 320dp width — verify in a preview or emulator"
+
+# B4 — icon-only controls are labelled for TalkBack
+if [ -f "$COMPONENTS/IconTapButton.kt" ]; then
+  grep -qE 'contentDescription' "$COMPONENTS/IconTapButton.kt" \
+    && ok B "B4 icon-only controls carry a contentDescription" \
+    || no B "B4 icon-only controls carry a contentDescription" "IconTapButton has no contentDescription — unusable with TalkBack"
+else
+  no B "B4 icon-only controls carry a contentDescription" "IconTapButton.kt missing"
+fi
+
+# B5 — no fixed height() on text-bearing containers (clips at 200% font scale)
+none B "B5 no fixed height() on text containers" \
+     grep -rnE '\.height\([0-9]+\.dp\)' "$SCREENS" "$COMPONENTS/GameButton.kt" "$COMPONENTS/HudChip.kt"
+
+man "B6 layout survives 320dp width AT 200% font scale — verify in a preview or emulator"
 
 echo "═══ C · DESIGN SYSTEM ═══"
 
@@ -126,9 +149,15 @@ none C "C3 zero raw Material buttons in screens" \
 none C "C3b zero inline text styling in screens" \
      grep -rnE 'fontSize *=|color *= *Color\(' "$SCREENS"
 
-PRESETS=$(grep -rhoE '\b(NeonPalette|SpacePalette|PaperPalette|CandyPalette|NEON|SPACE|PAPER|CANDY)\b' "$THEME/Theme.kt" "$SRC/MainActivity.kt" 2>/dev/null | sort -u | wc -l)
-[ "$PRESETS" -eq 1 ] && ok C "C4 exactly one palette preset wired" \
-                     || no C "C4 exactly one palette preset wired" "$PRESETS presets referenced — pick one"
+WIRED=$(grep -rhoE '\b(Neon|Space|Paper|Candy)Palette\b|\b(NEON|SPACE|PAPER|CANDY)\b' \
+        "$THEME/Theme.kt" "$SRC/MainActivity.kt" 2>/dev/null \
+        | sed -E 's/Palette$//' | tr '[:lower:]' '[:upper:]' | sort -u)
+PRESETS=$(echo "$WIRED" | grep -c .)
+if [ "$PRESETS" -eq 1 ]; then
+  PRESET="$WIRED"; ok C "C4 exactly one palette preset wired — $PRESET"
+else
+  PRESET=""; no C "C4 exactly one palette preset wired" "$PRESETS presets referenced — pick one"
+fi
 
 FONTS=$(grep -oE 'FontFamily\(' "$THEME/Type.kt" 2>/dev/null | wc -l)
 [ "$FONTS" -le 2 ] && ok C "C5 at most 2 font families ($FONTS)" \
@@ -136,6 +165,58 @@ FONTS=$(grep -oE 'FontFamily\(' "$THEME/Type.kt" 2>/dev/null | wc -l)
 
 TINY=$(grep -rnE '[0-9]+\.sp' "$THEME/Type.kt" 2>/dev/null | grep -oE '\b([0-9]|1[0-2])\.sp' | head -3)
 [ -z "$TINY" ] && ok C "C6 nothing under 13sp" || no C "C6 nothing under 13sp" "$TINY"
+
+# C7 + C8 — the palette gate: exact hex match, then measured WCAG contrast.
+# This is the check the old version of this skill was missing, and it is why two of the
+# four palettes shipped an unreadable text/background pair for as long as they did.
+if [ -z "$PRESET" ]; then
+  no C "C7 palette matches the locked spec" "cannot tell which preset is wired"
+  no C "C8 contrast ≥4.5:1 on every required pair" "cannot tell which preset is wired"
+elif [ ! -f "$THEME/Palette.kt" ]; then
+  no C "C7 palette matches the locked spec" "no Palette.kt"
+  no C "C8 contrast ≥4.5:1 on every required pair" "no Palette.kt"
+else
+  PGATE=$(bash "$HERE/check-contrast.sh" "$THEME/Palette.kt" "$PRESET" 2>&1)
+  echo "$PGATE" | grep -qE 'DRIFT|ABSENT|FATAL' \
+    && no C "C7 palette matches the locked spec" "$(echo "$PGATE" | grep -E 'DRIFT|ABSENT|FATAL' | head -3 | tr '\n' ' ')" \
+    || ok C "C7 palette matches the locked spec — $(echo "$PGATE" | grep -o '[0-9]*/[0-9]* tokens')"
+  echo "$PGATE" | grep -q 'below 4.5' \
+    && no C "C8 contrast ≥4.5:1 on every required pair" "$(echo "$PGATE" | grep 'below 4.5' | head -3 | sed 's/^ *//' | tr '\n' ' ')" \
+    || ok C "C8 contrast — $(echo "$PGATE" | grep -o '[0-9]*/[0-9]* pairs clear 4.5:1')"
+fi
+
+# C9 — the two fonts are real files on disk, and nothing fell back to Roboto
+FONTN=$(ls "$RES/font"/*.ttf "$RES/font"/*.otf 2>/dev/null | wc -l)
+if [ "$FONTN" -lt 2 ]; then
+  no C "C9 both fonts bundled in res/font" "$FONTN font files — run scripts/fetch-fonts.sh $PRESET. Do NOT fall back to FontFamily.Default"
+elif grep -q 'FontFamily\.Default' "$THEME/Type.kt" 2>/dev/null; then
+  no C "C9 both fonts bundled in res/font" "fonts exist but Type.kt still falls back to FontFamily.Default — the palette's personality is Roboto"
+elif ! grep -q 'FontVariation' "$THEME/Type.kt" 2>/dev/null; then
+  no C "C9 both fonts bundled in res/font" "variable fonts declared without FontVariation.Settings — every weight renders identically"
+else
+  ok C "C9 both fonts bundled ($FONTN files) and driven by FontVariation"
+fi
+
+# C10 — the component library is complete, not four-twelfths written
+MISSC=""
+for c in ScreenScaffold GameButton IconTapButton GlassPanel HudChip AnimatedCounter \
+         AnimatedGameBackground GameOverlay ProgressPill ParticleSystem GameText; do
+  grep -rqE "fun +$c\b|object +$c\b|class +$c\b" "$COMPONENTS" 2>/dev/null || MISSC="$MISSC $c"
+done
+grep -rq 'fun rememberShake' "$COMPONENTS" 2>/dev/null || MISSC="$MISSC rememberShake"
+[ -z "$MISSC" ] && ok C "C10 all 12 components present" \
+                || no C "C10 all 12 components present" "missing:$MISSC"
+
+# C11 — every type role declares an explicit lineHeight
+ROLES=$(grep -cE 'TextStyle\(' "$THEME/Type.kt" 2>/dev/null || echo 0)
+LHS=$(grep -cE 'lineHeight *=' "$THEME/Type.kt" 2>/dev/null || echo 0)
+[ "$ROLES" -gt 0 ] && [ "$LHS" -ge "$ROLES" ] \
+  && ok C "C11 explicit lineHeight on all $ROLES type roles" \
+  || no C "C11 explicit lineHeight on all type roles" "$LHS lineHeight for $ROLES TextStyle — the rest inherit Compose defaults"
+
+# C12 — depth is stroke + glow, never a Material drop shadow over a gradient
+none C "C12 no Material elevation over the gradient" \
+     grep -rnE 'shadowElevation|tonalElevation|\.shadow\(' "$SCREENS" "$COMPONENTS"
 
 echo "═══ D · JUICE ═══"
 
@@ -167,7 +248,16 @@ grep -rq 'rememberShake' "$SRC" 2>/dev/null \
 grep -rqE 'ParticleSystem|\.burst\(' "$SRC" 2>/dev/null \
   && ok D "D7 particles wired to reward" || no D "D7 particles wired to reward" ""
 
-man "D8 all 3 signature juice moments from the brief are actually built — name them"
+# D8 — reduceMotion actually reaches the three things that move on their own
+RM=0
+grep -rq 'reduceMotion' "$COMPONENTS/AnimatedGameBackground.kt" 2>/dev/null && RM=$((RM+1))
+grep -rq 'reduceMotion' "$COMPONENTS"/*hake*.kt "$COMPONENTS"/Shake.kt 2>/dev/null && RM=$((RM+1))
+grep -rq 'reduceMotion' "$COMPONENTS/ParticleSystem.kt" 2>/dev/null && RM=$((RM+1))
+[ "$RM" -eq 3 ] && ok D "D8 reduceMotion honoured by background, shake and particles" \
+                || no D "D8 reduceMotion honoured by background, shake and particles" \
+                      "$RM/3 wired — mandatory screen shake with no opt-out is a vestibular problem, not a style"
+
+man "D9 all 3 signature juice moments from the brief are actually built — name them"
 
 echo "═══ E · FEEL ═══"
 
@@ -184,7 +274,18 @@ none E "E3 no per-frame allocation in GameState" \
 none E "E4 GameState has no Compose dependency" \
      grep -n 'androidx.compose' "$SRC/game/GameState.kt"
 
-man "E5 playable in 3s · difficulty ramps smoothly · deaths are readable — judge from the smoke test"
+# E5 — the canvas has an art direction, and it lives in one file instead of scattered literals
+CFG="$SRC/game/GameConfig.kt"
+MISSA=""
+grep -qiE 'shape|SHAPE_FAMILY|ROUND|EDGE|BLOCK' "$CFG" 2>/dev/null || MISSA="$MISSA shape-family"
+grep -qiE 'stroke' "$CFG" 2>/dev/null                              || MISSA="$MISSA stroke-scale"
+grep -qiE 'particle|BURST' "$CFG" 2>/dev/null                      || MISSA="$MISSA particle-budget"
+grep -qiE 'PLAYER_|player' "$CFG" 2>/dev/null                      || MISSA="$MISSA entity-sizes"
+[ -z "$MISSA" ] && ok E "E5 canvas art direction defined in GameConfig" \
+                || no E "E5 canvas art direction defined in GameConfig" \
+                      "missing:$MISSA — without these the game screen is ungoverned and every run looks different"
+
+man "E6 playable in 3s · difficulty ramps smoothly · deaths are readable · one shape family · player is the highest-contrast object — judge from the smoke test"
 
 echo "═══ F · DONE ═══"
 
@@ -198,11 +299,16 @@ grep -rq 'BackHandler' "$SRC" 2>/dev/null \
 grep -rqi 'highscore' "$SRC/platform" 2>/dev/null \
   && ok F "F3 highscore persisted" || no F "F3 highscore persisted" ""
 
-if grep -rqi 'soundOn' "$SRC/platform" 2>/dev/null && grep -rqi 'hapticsOn' "$SRC/platform" 2>/dev/null; then
-  ok F "F4 sound + haptics toggles persisted"
-else
-  no F "F4 sound + haptics toggles persisted" "Prefs is missing soundOn or hapticsOn"
-fi
+MISSP=""
+for p in soundOn hapticsOn reduceMotion; do
+  grep -rqi "$p" "$SRC/platform" 2>/dev/null || MISSP="$MISSP $p"
+done
+[ -z "$MISSP" ] && ok F "F4 sound, haptics and reduceMotion toggles persisted" \
+                || no F "F4 sound, haptics and reduceMotion toggles persisted" "Prefs is missing:$MISSP"
+
+grep -rqi 'reduceMotion' "$SCREENS"/Settings*.kt 2>/dev/null \
+  && ok F "F4b reduceMotion is reachable from Settings" \
+  || no F "F4b reduceMotion is reachable from Settings" "a pref the player cannot find is not an accessibility feature"
 
 grep -rqiE 'newHighscore|isNewBest|newBest|isRecord' "$SRC" 2>/dev/null \
   && ok F "F5 highscore run is visibly distinguished" \

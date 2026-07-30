@@ -5,7 +5,7 @@
 | Setting | Value | Why |
 |---------|-------|-----|
 | `compileSdk` / `targetSdk` | **36** | From **31 Aug 2026** Google Play refuses new submissions and updates targeting below API 36 (extensions available to 1 Nov 2026). Generating a game at 35 today ships it unpublishable. |
-| `minSdk` | 24 | Covers ~99% of active devices and lets AGP skip v1 APK signing. |
+| `minSdk` | **26** | `FontVariation.Settings` needs API 26, and the whole type scale rides on variable fonts. On 24–25 Android ignores the `wght` axis, so every "bold" score renders at regular weight and the typography quietly vanishes. The two dropped API levels are worth well under half a percent of active devices. |
 | JVM target | 17 | AGP 8's floor. JDK 21 also builds fine. |
 | Orientation | portrait, locked | The virtual 1000×1778 world assumes it. |
 | Display | edge-to-edge | Mandatory on API 35+; opting out is deprecated. |
@@ -63,7 +63,7 @@ android {
     compileSdk = 36
     defaultConfig {
         applicationId = "com.yourname.yourgame"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"
@@ -131,7 +131,9 @@ Read the real error before editing anything: `grep -nE "^e: |error:|FAILURE|Caus
 |---------|---------------|
 | `Unresolved reference: <Composable or token>` | The #1 failure in generated Compose projects. Missing import, not missing code. Write **every** import explicitly — `androidx.compose.foundation.layout.*` does not cover `Canvas`, `animateFloatAsState`, `withFrameNanos`, or `graphicsLayer`. |
 | `Unresolved reference: R` | The `R` import is missing, or an earlier resource error killed generation. Fix the resource error first; `R` failures are usually a symptom. |
-| `resource raw/x not found` / `font/y not found` | Something references an asset that was never created. Create the file or stub the call. Never leave a dangling `R.*`. |
+| `resource raw/x not found` / `font/y not found` | Something references an asset that was never created. For fonts run `scripts/fetch-fonts.sh <PRESET>`; for sounds stub the call. Never leave a dangling `R.*`, and never "fix" a missing font by falling back to `FontFamily.Default`. |
+| `Unresolved reference: FontVariation` | Compose UI too old, or `minSdk` below 26. Both are required for the variable-font weight axis the type scale depends on. |
+| `Invalid file name: must contain only [a-z0-9_.]` | An `res/font/` file was saved with capitals or a hyphen. aapt rejects it — rename to `space_grotesk.ttf`, not `SpaceGrotesk.ttf`. |
 | `Compose Compiler not found` / plugin errors | `org.jetbrains.kotlin.plugin.compose` is missing, or its version does not equal the Kotlin version. |
 | `Minimum supported Gradle version is X` | `./gradlew wrapper --gradle-version X` then rebuild. |
 | `Unsupported class file major version` | JDK mismatch. AGP 8 needs JDK 17+; check `java -version` and `JAVA_HOME`. |
