@@ -321,7 +321,58 @@ class NineSlicePanel extends StatelessWidget {
 
 ## Theme
 
-Everything visual flows through `ThemeData`. A colour or a `TextStyle` written inside a screen is a bug, not a shortcut — it will not follow dark mode, and it will not follow the next revamp.
+Everything visual flows through `ThemeData` (Material) or `CupertinoThemeData` (Cupertino). A colour or a `TextStyle` written inside a screen is a bug, not a shortcut — it will not follow dark mode, and it will not follow the next revamp.
+
+### Cupertino and mixed apps
+
+`scan_project.py` reports `ui_framework`: `material` | `cupertino` | `mixed`. Do **not** bolt a Material 3 `ColorScheme.fromSeed` onto a pure `CupertinoApp` and call it done — the widgets will fight the theme.
+
+| `ui_framework` | Theme path |
+|---|---|
+| `material` | `AppTheme.light/dark` as below; `MaterialApp(theme:, darkTheme:, themeMode:)` |
+| `cupertino` | Keep `CupertinoApp`. Build `CupertinoThemeData` (light + dark via `brightness`). Map seed to `primaryColor` + `CupertinoDynamicColor` for label/system backgrounds. Use `CupertinoButton`, `CupertinoNavigationBar`, `CupertinoListSection` — not `AppCard`/`FilledButton` unless you intentionally introduce Material. |
+| `mixed` | Root is usually `MaterialApp` with `cupertinoOverrideTheme:` and/or local `CupertinoTheme`. Put shared colours in one place (`AppColors`) and feed both `ColorScheme` and `CupertinoThemeData`. |
+
+```dart
+// Pure Cupertino — lib/theme/app_theme.dart (sketch)
+import 'package:flutter/cupertino.dart';
+
+class AppTheme {
+  AppTheme._();
+
+  static const seed = Color(0xFF4F46E5);
+
+  static CupertinoThemeData cupertino(Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    return CupertinoThemeData(
+      brightness: brightness,
+      primaryColor: seed,
+      scaffoldBackgroundColor: isDark
+          ? CupertinoColors.systemBackground.darkColor
+          : CupertinoColors.systemBackground.color,
+      textTheme: CupertinoTextThemeData(
+        primaryColor: seed,
+        textStyle: TextStyle(
+          fontFamily: 'Satoshi',
+          fontSize: 16,
+          color: isDark
+              ? CupertinoColors.label.darkColor
+              : CupertinoColors.label.color,
+        ),
+      ),
+    );
+  }
+}
+
+// CupertinoApp(
+//   theme: AppTheme.cupertino(Brightness.light),
+//   // For dark: wrap with CupertinoTheme or drive from platform brightness.
+// )
+```
+
+Bundled fonts still go in pubspec; set `fontFamily` on `CupertinoTextThemeData` / per-style overrides. Icons: prefer one set (`lucide_icons` or keep `CupertinoIcons` if the direction is stock iOS). Never embed SF Symbols in a multi-platform build (`licensing.md` trap 3).
+
+Empty/loading patterns still apply: a Cupertino empty state is the same layout as `EmptyState` without Material `FilledButton` — use `CupertinoButton.filled`.
 
 ```dart
 // lib/theme/app_colors.dart
@@ -431,6 +482,8 @@ Text('Saved', style: TextStyle(color: semantic.success));
 ```
 
 `ColorScheme.fromSeed` is not decoration — it derives tonal palettes whose on-colour pairs already meet contrast. Overriding individual slots by hand is how the 3:1 body text gets in. If a slot is wrong, change the seed, or supply a full scheme from the Material Theme Builder.
+
+For Material apps, also theme the pieces users actually see: `appBarTheme`, `navigationBarTheme`, `inputDecorationTheme`, `floatingActionButtonTheme` — not only `filledButtonTheme` and `cardTheme`. Incomplete component themes are why one screen looks revamped and the next still looks stock.
 
 ## Typography
 

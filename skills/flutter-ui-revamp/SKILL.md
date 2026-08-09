@@ -3,7 +3,7 @@ name: flutter-ui-revamp
 description: Revamp the UI of an existing Flutter app or game with free assets — audit the codebase, lock a design direction, download licence-verified icons/fonts/illustrations/animations/game packs, optimize them, then refactor the real screens so the app actually looks different, builds, and ships with a credits file and a before/after report. Use when the user wants to refresh, replace or upgrade a Flutter interface — swap an icon set, change the font app-wide, replace illustrations, add a Rive/Lottie loader, drop in a game UI pack, wire sound effects, or rebuild the colour theme — or says things like "make my app look better", "my app looks ugly, revamp it", "swap in a new icon set", "add a loading animation", "make the game UI look nicer". Don't use for building a Flutter app from scratch (flutter-init), store listing art (flutter-store-metadata), or non-Flutter codebases.
 license: MIT
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # Flutter UI Revamp
@@ -51,10 +51,10 @@ cd <project> && git status --porcelain && git rev-parse --short HEAD
 | Clean | Record the base commit, then branch. |
 
 ```bash
-git switch -c ui-revamp/$(date +%Y-%m-%d)
+git switch -c ui-revamp/$(date +%Y-%m-%d-%H%M)
 ```
 
-Tell the user the base commit hash and the rollback command now, not at the end — `git reset --hard <sha>` is worth more before the work than after it. **Never modify code while the tree is dirty:** the diff is the only record of what this skill did, and mixed with the user's uncommitted work it stops being reviewable.
+If that branch name already exists, append the short HEAD hash. Tell the user the base commit hash and the rollback command now, not at the end — `git reset --hard <sha>` is worth more before the work than after it. **Never modify code while the tree is dirty:** the diff is the only record of what this skill did, and mixed with the user's uncommitted work it stops being reviewable.
 
 ### Step 1 — Audit
 
@@ -62,12 +62,14 @@ Tell the user the base commit hash and the rollback command now, not at the end 
 python3 <skill>/scripts/scan_project.py --project .
 ```
 
-Read `.claude/revamp/audit.md`. Then read enough of `lib/` to know what you are looking at — the entry point, the main screens, whatever `audit.json → derived` flagged. Four questions decide the whole plan:
+Read `.revamp/audit.md`. Then read enough of `lib/` to know what you are looking at — the entry point, the main screens, whatever `audit.json → derived` flagged. Four questions decide the whole plan:
 
 1. **Standard app or Flame game?** (`derived.app_type`) — it selects `sources-ui.md` or `sources-game.md`.
-2. **Material, Cupertino or mixed?** A Cupertino app does not get a Material 3 seed scheme bolted on.
+2. **Material, Cupertino or mixed?** (`derived.ui_framework`) — a Cupertino app does not get a Material 3 seed scheme bolted on; use the Cupertino path in `integration-flutter.md § Theme`.
 3. **State management?** Not to change it — to know what not to touch.
 4. **Is there already a design system?** Extending `lib/theme/` beats replacing it.
+
+If `scope` is unset and `dart_files >= 12`, use the audit's **Suggested screen priority** table (from `lib.priority_screens`) and propose the top 3–5 screens to the user before Step 6. Do not silently revamp every file in a large app.
 
 Summarise for the user in one block: what the app is, and the specific weaknesses with **numbers from the audit** — "17 hardcoded colours across 6 files, no dark theme, 1 pubspec asset pointing at a missing directory". Never "the UI looks dated"; that is an opinion, and the audit produced facts.
 
@@ -75,7 +77,7 @@ Summarise for the user in one block: what the app is, and the specific weaknesse
 
 Nothing gets downloaded until this is written down. Assets chosen before a direction are assets chosen by taste, and they will not agree with each other.
 
-If `style` and `seed` were not given, propose **two or three** concrete options — not a menu of everything. Each option names its icon set, font pairing, illustration style and radius character, so the user chooses a look rather than fills a form. Then write `.claude/revamp/design-direction.md`:
+Read `references/style-recipes.md`. If `style` and `seed` were not given, propose **two or three** recipes that fit the audit — not a menu of everything. Each option is a full recipe (icons, fonts, radius, illustration, motion), so the user chooses a look rather than fills a form. Then write `.revamp/design-direction.md` from the chosen recipe:
 
 ```markdown
 # Design direction — locked <date>
@@ -90,6 +92,8 @@ Spacing      4 / 8 / 16 / 24 / 32 / 48
 Radius       8 / 12 / 18 / pill
 Dark mode    required, ColorScheme.fromSeed both brightnesses
 Out of scope business logic, state management, API, models, navigation structure
+             (exception: About/Credits screen when attribution-required assets are used)
+Kept         (any `keep:` inputs)
 ```
 
 Get explicit agreement. This file is what Step 6 is checked against — a change of mind at Step 6 costs the whole step.
@@ -122,20 +126,29 @@ python3 <skill>/scripts/optimize_flutter.py --project . --dir assets --apply --r
 
 ### Step 5 — Build the design system
 
-Read `references/integration-flutter.md § Theme` and § Typography. Create:
+Read `references/integration-flutter.md § Theme` (including **Cupertino and mixed apps**) and § Typography. Branch on `derived.ui_framework`:
+
+| Framework | Create |
+|---|---|
+| `material` / `mixed` | `ColorScheme.fromSeed` + `ThemeData` below; mixed also sets `cupertinoOverrideTheme` / shared `AppColors` |
+| `cupertino` | `CupertinoThemeData` light/dark, bundled fonts on `CupertinoTextThemeData` — **not** a Material-only `AppTheme` |
+
+Material (and mixed root) files:
 
 | File | Contains |
 |---|---|
 | `lib/theme/app_colors.dart` | `ColorScheme.fromSeed` light + dark, `ThemeExtension` for success/warning |
 | `lib/theme/app_typography.dart` | `TextTheme` built from the new font |
 | `lib/theme/app_spacing.dart` | `AppSpacing` + `AppRadius` tokens |
-| `lib/theme/app_theme.dart` | Assembled light/dark `ThemeData` |
+| `lib/theme/app_theme.dart` | Assembled light/dark `ThemeData` (appBar, navBar, inputDecoration too) |
 | `lib/widgets/app_button.dart` | Ripple + haptics + 48dp minimum |
 | `lib/widgets/app_card.dart` | `Material` + `InkWell`, themed surface |
 | `lib/widgets/empty_state.dart` | Illustration + title + message + action |
 | `lib/widgets/loading_view.dart` | Rive/Lottie loader |
+| `lib/widgets/app_skeleton.dart` | When audit has list/grid loaders — shimmer placeholder (§11 patterns) |
+| `lib/widgets/nine_slice_panel.dart` | Flame / game UI only — from integration § 9-slice |
 
-Wire it in:
+Wire Material apps:
 
 ```dart
 MaterialApp(
@@ -146,7 +159,7 @@ MaterialApp(
 );
 ```
 
-Then **build once, here**, while the surface area is eight small files:
+Then **build once, here**, while the surface area is still small:
 
 ```bash
 flutter analyze && flutter run -d <device> --debug   # or: flutter build apk --debug
@@ -161,11 +174,12 @@ The step everything else exists to serve. Read `references/refactor-patterns.md`
 Icons first, because they are mechanical:
 
 ```bash
+python3 <skill>/scripts/generate_icon_map.py --project . --audit .revamp/audit.json --set lucide --out icons.json
 python3 <skill>/scripts/apply_icons.py --project . --map icons.json          # dry run
 python3 <skill>/scripts/apply_icons.py --project . --map icons.json --apply
 ```
 
-**Show the user the diff from the dry run before applying.** The script skips matches inside comments and strings, reports every unmapped icon, and flags the const hazard — a callable replacement like `PhosphorIcons.house()` cannot sit inside `const Icon(...)`, and it will fail across every touched file at once. Prefer const constants in the mapping; `--fix-const` is the fallback.
+Use `--set phosphor` when the locked direction says Phosphor. **Show the user the diff from the dry run before applying.** The script skips matches inside comments and strings, reports every unmapped icon, and flags the const hazard — a callable replacement like `PhosphorIcons.house()` cannot sit inside `const Icon(...)`, and it will fail across every touched file at once. Prefer const constants in the mapping; `--fix-const` is the fallback.
 
 Then, **one screen at a time**:
 
@@ -195,10 +209,11 @@ Then the checks a build cannot make. Each needs evidence, not a tick:
 | Check | How |
 |---|---|
 | Dark mode | Run in both brightnesses. Look for illustrations with baked white backgrounds, invisible text, and `Colors.white` survivors. |
-| Text overflow | New font metrics differ from Roboto. Check the longest label on the narrowest screen; test at 200% text scale. |
+| Text overflow | New font metrics differ from Roboto. Check the longest label on the narrowest screen; test at text scale **1.0, 1.3, and 2.0**. |
+| Reduce motion | With animations disabled (OS setting or `MediaQuery.disableAnimations`), loaders/Rive must not be required for meaning — provide a static fallback where needed. |
 | Contrast | Body text ≥ 4.5:1, large text ≥ 3:1. Derived-from-seed schemes usually pass; hand-edited slots usually do not. |
 | Touch targets | ≥ 48×48 dp on every tappable. |
-| Assets declared | Re-run `scan_project.py` — `ORPHAN_ASSETS` and `MISSING_ASSETS` must both be clear. |
+| Assets declared | Re-run `scan_project.py` — `ORPHAN_ASSETS` and `MISSING_ASSETS` must both be clear. Density folders (`2.0x/`, `3.0x/`) are **not** orphans when the 1.0x sibling is declared. |
 | Bundle delta | `flutter build apk --release --analyze-size`, before vs after. |
 
 If a device or emulator is attached, run the app and read a screenshot of two screens. It is the only check that proves the font actually loaded rather than silently falling back to Roboto — which is the failure that passes every mechanical gate and defeats the entire point of the work.
@@ -217,7 +232,7 @@ showLicensePage(
 
 Register bundled font licences with `LicenseRegistry` so that page tells the truth (`integration-flutter.md § Typography`). Any CC BY asset needs a visible credit line, not just the file.
 
-Write `.claude/revamp/report.md`:
+Write `.revamp/report.md`:
 
 ```markdown
 # UI revamp — <app> — <date>
@@ -248,15 +263,15 @@ git commit -m "refactor(home): theme tokens, empty state, Rive loader"
 
 ## Hard rules
 
-**Scope** — never modify business logic, state management, API calls, models or navigation structure; presentation layer only. Never refactor the whole project in one pass. Never bulk-replace without a dry run whose diff the user has seen.
+**Scope** — never modify business logic, state management, API calls, or models; presentation layer only. Do not restructure navigation **except** when licensing requires a visible About/Credits screen (or the user asked for motion/transitions on existing routes). Never refactor the whole project in one pass. Never bulk-replace without a dry run whose diff the user has seen.
 
-**Licensing** — state every licence before proposing the asset, read from the source page. "Free" never implies commercially usable; prefer CC0 / MIT / OFL. Attribution-required assets need a place on screen, decided before download. No third-party logos, IP or copyrighted characters, whatever the stated licence.
+**Licensing** — state every licence before proposing the asset, read from the source page. "Free" never implies commercially usable; prefer CC0 / MIT / OFL. Attribution-required assets need a place on screen, decided before download. No third-party logos, IP or copyrighted characters, whatever the stated licence. `fetch_asset.py` refuses GPL / CC-BY-NC / ARR unless `--force` (user must approve).
 
-**Consistency** — one icon set, one illustration style, at most two font families. Warn loudly when mixing would occur: Lucide beside Heroicons, flat illustrations beside 3D renders, a Kenney panel beside a CraftPix button. Vector over raster, WebP over PNG, a cohesive pack over assembled loose files. Rive for interactive animation, Lottie for linear.
+**Consistency** — one icon set, one illustration style, at most two font families. Pick a full recipe from `style-recipes.md`; do not mix recipes. Vector over raster, WebP over PNG, a cohesive pack over assembled loose files. Rive for interactive animation, Lottie for linear.
 
-**Theming** — every colour and text style flows through `ThemeData`; a new widget with a hardcoded colour is a bug in the revamp itself. Check dark mode explicitly: an illustration with a baked white background shows a slab, so find a transparent version or recolour it.
+**Theming** — every colour and text style flows through `ThemeData` or `CupertinoThemeData`; a new widget with a hardcoded colour is a bug in the revamp itself. Check dark mode explicitly: an illustration with a baked white background shows a slab, so find a transparent version or recolour it.
 
-**Budget and accessibility** — assets under 30 MB, else cut or defer. Text contrast ≥ 4.5:1 (large text ≥ 3:1). Touch targets ≥ 48×48 dp. `semanticLabel` on meaningful icons, `excludeFromSemantics` on decorative ones.
+**Budget and accessibility** — assets under 30 MB, else cut or defer. Text contrast ≥ 4.5:1 (large text ≥ 3:1). Touch targets ≥ 48×48 dp. Label icon-only controls via `semanticLabel` or `IconButton.tooltip`; `excludeFromSemantics` on decorative art. Verify text scale 2.0 and reduce-motion fallbacks at Step 7.
 
 **Games** — power-of-two atlases with 1–2 px transparent padding against texture bleeding. Every panel needs a measured 9-slice inset spec, not a guessed one. Preload sprites and audio in `onLoad`, never mid-gameplay.
 
@@ -273,8 +288,8 @@ assets/
   audio/sfx/  audio/music/
   CREDITS.md
 lib/theme/         app_colors · app_typography · app_spacing · app_theme
-lib/widgets/       app_button · app_card · empty_state · loading_view
-.claude/revamp/    audit.md · audit.json · design-direction.md · report.md
+lib/widgets/       app_button · app_card · empty_state · loading_view · app_skeleton
+.revamp/           audit.md · audit.json · design-direction.md · report.md
 ```
 
 `CREDITS.md` is a table: Asset | Type | Files | Author | License | Credit required (Y/N) | Source | Downloaded. `fetch_asset.py` writes the rows.
@@ -476,20 +491,22 @@ Plus: grid spinner → six skeleton cards, empty cart → `EmptyState` with an u
 
 | File | Read when |
 |---|---|
+| `references/style-recipes.md` | Step 2 — locked pairings per style (icons, fonts, radius, motion) |
 | `references/sources-ui.md` | Step 3 — icons, illustrations, fonts, animation, colour tools for an app |
 | `references/sources-game.md` | Step 3 — sprite packs, tilesets, audio, sprite hygiene for a Flame game |
-| `references/licensing.md` | Step 3, before any download — licence table and the seven traps |
-| `references/integration-flutter.md` | Steps 4–5, and whenever a build fails — pubspec, buckets, SVG, Rive, 9-slice, theme, Flame, bundle size |
+| `references/licensing.md` | Step 3, before any download — licence table and the traps |
+| `references/integration-flutter.md` | Steps 4–5 — pubspec, buckets, SVG, Rive, 9-slice, Material/Cupertino theme, Flame, bundle size |
 | `references/refactor-patterns.md` | Step 6 — every BEFORE→AFTER transformation and the icon mapping table |
 
 | Script | Run at |
 |---|---|
-| `scripts/scan_project.py` | Step 1 and again at Step 7 — writes `.claude/revamp/audit.{json,md}` |
-| `scripts/fetch_asset.py` | Step 4 — download, normalise filenames, write the CREDITS row |
+| `scripts/scan_project.py` | Step 1 and again at Step 7 — writes `.revamp/audit.{json,md}` |
+| `scripts/fetch_asset.py` | Step 4 — download, normalise filenames, write the CREDITS row; denylists GPL/NC |
 | `scripts/optimize_flutter.py` | Step 4 — density buckets, WebP, svgo, OGG, size report, pubspec snippet |
+| `scripts/generate_icon_map.py` | Step 6 — audit.json → `icons.json` for Lucide or Phosphor |
 | `scripts/apply_icons.py` | Step 6 — bulk icon swap; dry run by default, const-hazard detection |
 
-Every script defaults to a dry run and writes only with `--apply`.
+`fetch_asset`, `optimize_flutter`, and `apply_icons` default to a dry run and write only with `--apply`. `scan_project` and `generate_icon_map` always write their output files (read-only w.r.t. app source).
 
 ## Scope
 

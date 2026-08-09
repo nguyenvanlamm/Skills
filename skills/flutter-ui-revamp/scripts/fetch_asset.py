@@ -34,6 +34,18 @@ NO_CREDIT_NEEDED = {"CC0", "CC0-1.0", "PUBLIC DOMAIN", "UNLICENSE"}
 SKIP_NAMES = {"__macosx", ".ds_store", "thumbs.db"}
 LICENSE_HINTS = ("license", "licence", "readme", "copying", "credits")
 
+# Licences this skill will not ship without an explicit --force override.
+# Matched as substrings against a normalised upper-case licence string.
+LICENSE_DENY_SUBSTRINGS = (
+    "GPL",          # GPL, LGPL, AGPL — viral over closed-source apps
+    "AGPL",
+    "CC-BY-NC",     # non-commercial
+    "CC BY-NC",
+    "BY-NC",
+    "ALL RIGHTS RESERVED",
+    "ARR",
+)
+
 MAX_BYTES = 200 * 1024 * 1024  # a UI pack is a few MB; 200 MB means a wrong URL
 
 
@@ -112,6 +124,22 @@ def plan_zip(data: bytes, dest: Path, flatten: bool, only: str | None
     return plan, notices
 
 
+def licence_blocked(license_str: str) -> str | None:
+    """Return a reason if the licence is in the denylist, else None."""
+    norm = license_str.strip().upper().replace("_", "-")
+    # CC0 must not match the bare "GPL" substring check via false paths — it doesn't.
+    if norm in NO_CREDIT_NEEDED or norm.startswith("CC0"):
+        return None
+    for needle in LICENSE_DENY_SUBSTRINGS:
+        if needle.upper() in norm:
+            return (
+                f"licence {license_str!r} matches denylist ({needle}). "
+                f"This skill rejects GPL/AGPL/CC-BY-NC and all-rights-reserved "
+                f"assets. Pass --force only with a written reason from the user."
+            )
+    return None
+
+
 def credits_row(args, files: List[Path], project: Path) -> str:
     lic = args.license.strip()
     needs = "Y" if lic.upper().replace("_", "-") not in NO_CREDIT_NEEDED else "N"
@@ -166,6 +194,8 @@ def main() -> int:
     ap.add_argument("--flatten", action="store_true",
                     help="Drop archive directory structure and dump files into --dest")
     ap.add_argument("--apply", action="store_true", help="Write to disk (default: dry run)")
+    ap.add_argument("--force", action="store_true",
+                    help="Allow a denylisted licence (GPL / CC-BY-NC / ARR). Requires user sign-off.")
     args = ap.parse_args()
 
     project = Path(args.project).resolve()
@@ -173,6 +203,13 @@ def main() -> int:
     if project not in dest.parents and dest != project:
         log(f"FATAL: --dest must stay inside the project ({dest} does not).")
         return 2
+
+    blocked = licence_blocked(args.license)
+    if blocked and not args.force:
+        log(f"FATAL: {blocked}")
+        return 2
+    if blocked and args.force:
+        log(f"WARN: --force overriding denylist: {blocked}")
 
     log(f"GET {args.url}")
     try:

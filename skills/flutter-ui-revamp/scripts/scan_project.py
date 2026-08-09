@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Audit an existing Flutter project before a UI revamp.
 
-Produces `.claude/revamp/audit.json` (machine-readable, consumed by the other
-scripts) and `.claude/revamp/audit.md` (for the human and for the agent to read
+Produces `.revamp/audit.json` (machine-readable, consumed by the other
+scripts) and `.revamp/audit.md` (for the human and for the agent to read
 back). Nothing is modified — this script only reads.
 
-    python3 scan_project.py [--project .] [--out .claude/revamp] [--top 25]
+    python3 scan_project.py [--project .] [--out .revamp] [--top 25]
 
 Every number in the revamp report should trace back to this file. A weakness the
 agent asserts without a line here is a guess.
@@ -234,9 +234,31 @@ def scan_lib(project: Path, lib: Path) -> Dict[str, Any]:
             ("semanticLabel", "semantic_label"), ("Skeleton", "skeleton"),
             ("Shimmer", "shimmer"), ("RiveAnimation", "rive"), ("Lottie.", "lottie"),
             ("SvgPicture", "svg"), ("GoogleFonts.", "google_fonts"),
+            # IconButton.tooltip feeds the semantics tree — count it as a11y signal.
+            ("tooltip:", "tooltip"),
         ):
             if token in code:
                 signals[key] += 1
+
+    # Rank screens by presentation-layer density for large-app prioritization.
+    ranked = sorted(
+        (
+            {
+                "file": f,
+                "score": (
+                    c.get("icons", 0) * 2
+                    + c.get("colors", 0) * 3
+                    + c.get("textstyles", 0) * 2
+                    + c.get("padding_sites", 0)
+                ),
+                **c,
+            }
+            for f, c in per_file.items()
+            if not f.startswith("lib/theme/") and "/theme/" not in f
+            and not f.startswith("lib/widgets/") and "/widgets/" not in f
+        ),
+        key=lambda x: -x["score"],
+    )
 
     return {
         "dart_files": len(dart_files),
@@ -252,23 +274,48 @@ def scan_lib(project: Path, lib: Path) -> Dict[str, Any]:
         "asset_refs": {k: sorted(v) for k, v in sorted(asset_refs.items())},
         "signals": dict(signals),
         "per_file": per_file,
+        "priority_screens": ranked[:15],
     }
 
 
 # ── assets/ scan ─────────────────────────────────────────────────────────────
 
+# Flutter resolution-aware density folders. A file under …/2.0x/foo.webp is a
+# variant of …/foo.webp — it ships with the main asset and needs no pubspec line.
+DENSITY_DIRS = frozenset({"1.0x", "1.5x", "2.0x", "3.0x", "4.0x"})
+
+
+def _strip_density_segment(rel: str) -> str | None:
+    """If rel sits in a density folder, return the logical 1.0x path; else None."""
+    parts = rel.split("/")
+    for i, p in enumerate(parts):
+        if p in DENSITY_DIRS and i + 1 < len(parts):
+            return "/".join(parts[:i] + parts[i + 1:])
+    return None
+
+
 def _declared_match(rel: str, declared: List[str]) -> bool:
-    for d in declared:
-        d = d.strip()
-        if not d:
-            continue
-        if d.endswith("/"):
-            # A directory entry covers its immediate children only — Flutter
-            # does not recurse. This is the single most common orphan cause.
-            if rel.startswith(d) and "/" not in rel[len(d):]:
+    """True if Flutter's asset bundle would include this file.
+
+    Directory entries cover immediate children only (Flutter does not recurse).
+    Density-bucket variants (2.0x/, 3.0x/, …) are included automatically when
+    their 1.0x sibling is declared — they must not be reported as orphans.
+    """
+    candidates = [rel]
+    logical = _strip_density_segment(rel)
+    if logical is not None:
+        candidates.append(logical)
+
+    for candidate in candidates:
+        for d in declared:
+            d = d.strip()
+            if not d:
+                continue
+            if d.endswith("/"):
+                if candidate.startswith(d) and "/" not in candidate[len(d):]:
+                    return True
+            elif candidate == d:
                 return True
-        elif rel == d:
-            return True
     return False
 
 
@@ -371,8 +418,14 @@ def derive(pubspec: Dict[str, Any], lib: Dict[str, Any], assets: Dict[str, Any])
         add("low", "NO_HERO", "No Hero transitions — screen changes are hard cuts.")
     if not sig.get("haptics"):
         add("low", "NO_HAPTICS", "No HapticFeedback calls — buttons have no physical response.")
-    if not sig.get("semantic_label") and lib.get("icon_total", 0) > 0:
-        add("med", "NO_SEMANTICS", "No semanticLabel on icons — screen readers announce nothing.")
+    # IconButton.tooltip also feeds the semantics tree (see refactor-patterns §1).
+    has_a11y_labels = bool(
+        sig.get("semantic_label") or sig.get("tooltip") or sig.get("semantics")
+    )
+    if not has_a11y_labels and lib.get("icon_total", 0) > 0:
+        add("med", "NO_SEMANTICS",
+            "No semanticLabel, IconButton.tooltip, or Semantics() — "
+            "icon-only controls may be silent to screen readers.")
     if not any(p in deps for p in ("rive", "lottie", "flutter_animate")):
         add("low", "NO_ANIMATION", "No animation package (rive / lottie / flutter_animate).")
     if assets.get("orphans"):
@@ -533,6 +586,19 @@ def render_md(a: Dict[str, Any], top: int) -> str:
             w(f"- `{r}` — referenced by {', '.join(refs[r][:2])}")
         w("")
 
+    priority = lib.get("priority_screens") or []
+    if priority and lib.get("dart_files", 0) >= 12:
+        w("## Suggested screen priority (by presentation density)")
+        w("")
+        w("When `scope` is unset and the app is large, start with these files:")
+        w("")
+        w("| File | Score | Icons | Colors | TextStyles |")
+        w("|---|---:|---:|---:|---:|")
+        for row in priority[:8]:
+            w(f"| `{row['file']}` | {row['score']} | {row.get('icons', 0)} | "
+              f"{row.get('colors', 0)} | {row.get('textstyles', 0)} |")
+        w("")
+
     w("## Next")
     w("")
     w("Step 2 of the skill: lock the design direction before downloading anything.")
@@ -544,7 +610,8 @@ def render_md(a: Dict[str, Any], top: int) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Audit a Flutter project before a UI revamp.")
     ap.add_argument("--project", default=".", help="Flutter project root (default: .)")
-    ap.add_argument("--out", default=".claude/revamp", help="Output dir, relative to --project")
+    ap.add_argument("--out", default=".revamp",
+                    help="Output dir, relative to --project (default: .revamp)")
     ap.add_argument("--top", type=int, default=25, help="Rows per table in audit.md")
     args = ap.parse_args()
 

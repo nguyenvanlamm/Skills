@@ -10,7 +10,7 @@ Licence column is the licence as published at the time of writing. **Re-read it 
 
 | Set | URL | Licence | Formats | Flutter package | API |
 |---|---|---|---|---|---|
-| **Lucide** | lucide.dev | ISC | SVG, font, PNG | `lucide_icons` | yes (unpkg / jsDelivr per-icon SVG) |
+| **Lucide** | lucide.dev | ISC | SVG, font, PNG | `lucide_icons` (const `IconData`; preferred for bulk swap) | yes (unpkg / jsDelivr per-icon SVG) |
 | **Phosphor** | phosphoricons.com | MIT | SVG, font | `phosphor_flutter` | via GitHub raw |
 | **Tabler** | tabler.io/icons | MIT | SVG, font, PNG | none official — build a font | via GitHub raw |
 | **Material Symbols** | fonts.google.com/icons | Apache-2.0 | SVG, variable font | built in (`Icons.*`) | Google Fonts API |
@@ -20,7 +20,7 @@ Licence column is the licence as published at the time of writing. **Re-read it 
 
 Notes that decide the choice:
 
-- **Lucide** — 1.5px stroke, geometric, 1400+ icons. The safe default for a minimal/modern direction. `lucide_icons` exposes const `IconData`, so `const Icon(LucideIcons.house)` stays const. That matters: see the const hazard in `refactor-patterns.md`.
+- **Lucide** — 1.5px stroke, geometric, 1400+ icons. The safe default for a minimal/modern direction. Prefer the **`lucide_icons`** package for revamps: it exposes const `IconData`, so `const Icon(LucideIcons.house)` stays const (see const hazard in `refactor-patterns.md`). Upstream Lucide renamed `home` → `house` — map `Icons.home` to `LucideIcons.house` and verify against the resolved package version after `flutter pub add`. (`lucide_flutter` exists on pub with a different API surface; do not mix both packages in one app.)
 - **Phosphor** — six weights (thin → fill) from one family, which is why it wins for playful and for apps that need a filled/outlined tab-bar pair. In `phosphor_flutter` v2 the ergonomic API is a call — `PhosphorIcons.house()` — which is **not const**. Use the const constants (`PhosphorIconsRegular.house`) in bulk replacements.
 - **Iconify** is not an icon set, it is 200 000 icons across ~150 sets with ~15 different licences. Excellent for finding one missing glyph, dangerous as a primary source: you inherit whichever licence that specific set carries.
 - **Material Symbols** ships with Flutter. If the design direction is "clean Material 3", the honest answer is often *keep the icons* and spend the effort on colour, type and motion.

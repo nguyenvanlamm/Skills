@@ -71,7 +71,7 @@ Verify each constant against the package version you actually installed. Icon se
 
 | Material | Lucide (`lucide_icons`) | Phosphor const (`phosphor_flutter`) |
 |---|---|---|
-| `Icons.home` | `LucideIcons.home` | `PhosphorIconsRegular.house` |
+| `Icons.home` | `LucideIcons.house` | `PhosphorIconsRegular.house` |
 | `Icons.search` | `LucideIcons.search` | `PhosphorIconsRegular.magnifyingGlass` |
 | `Icons.settings` | `LucideIcons.settings` | `PhosphorIconsRegular.gear` |
 | `Icons.person` | `LucideIcons.user` | `PhosphorIconsRegular.user` |
@@ -115,14 +115,22 @@ Save the chosen mapping as JSON and feed it to `apply_icons.py`:
 {
   "import": "package:lucide_icons/lucide_icons.dart",
   "map": {
-    "Icons.home": "LucideIcons.home",
+    "Icons.home": "LucideIcons.house",
     "Icons.search": "LucideIcons.search",
     "Icons.arrow_back": "LucideIcons.arrowLeft"
   }
 }
 ```
 
+Prefer generating the map from the audit rather than hand-typing it:
+
+```bash
+python3 <skill>/scripts/generate_icon_map.py --project . --audit .revamp/audit.json --set lucide --out icons.json
+```
+
 Icons with no good equivalent stay Material — the script lists them as UNMAPPED. One deliberate exception beats a forced glyph that means the wrong thing.
+
+**Verify constants against the installed package version** before `--apply`. Lucide upstream renamed `home` → `house`; this table uses `house`. If `lucide_icons` on pub lags and still exposes `home` only, check the package API and adjust the map — do not guess.
 
 ---
 
