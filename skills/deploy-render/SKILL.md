@@ -4,7 +4,7 @@ description: "Tự động deploy FastAPI server lên Render.com — sửa code 
 license: MIT
 effort: high
 metadata:
-  version: 2.0.0
+  version: 2.1.0
   author: "Nguyen Van Lam"
 ---
 
@@ -49,9 +49,13 @@ Cần `curl` và `jq`. Script kiểm tra và dừng ngay nếu thiếu.
 | `--server-dir` | ✅ | — | Thư mục server |
 | `--slug` | ✅ | — | Tên product; service là `<slug>-server`, db là `<slug>-db` |
 | `--gh-user` | ❌ | `gh api user` | GitHub account |
+| `--public` | ❌ | private | Tạo repo GitHub public |
 | `--no-db` | ❌ | false | Bỏ qua PostgreSQL, giữ SQLite |
-| `--region` | ❌ | `oregon` | Region Render |
-| `--health-path` | ❌ | `/docs` | Đường dẫn dùng để verify |
+| `--region` | ❌ | `oregon` (hoặc `RENDER_REGION`) | Region Render — áp cho **cả** service và database trong `render.yaml` |
+| `--health-path` | ❌ | `/docs` (hoặc `RENDER_HEALTH_PATH`) | Route dùng để verify **và** ghi vào `healthCheckPath` của `render.yaml`. Server không có `/docs` (đã tắt Swagger) → truyền `/api/v1/health` |
+| `--output` | ❌ | `--server-dir` | Nơi ghi `deploy-output.json` |
+
+`deploy.sh` kiểm tra trước khi làm gì: `curl`/`jq`/`git`/`gh`, `main.py` tồn tại, slug hợp lệ (`a-z0-9-`), API key có mặt. Bản cũ nhận `--region`/`--health-path` ở `render-client.sh` nhưng `deploy.sh` không truyền xuống — giá trị người dùng đưa bị bỏ qua im lặng.
 
 ## Chạy
 
@@ -62,10 +66,16 @@ bash scripts/deploy.sh --server-dir <path> --slug <slug> [--no-db]
 | Script | Việc |
 |--------|------|
 | `prepare-server.sh` | PostgreSQL driver, Dockerfile, `render.yaml`, `.env.production` |
-| `push-to-github.sh` | `git init` nếu cần, gitignore file env, tạo repo, push đúng branch |
-| `render-client.sh` | Tạo/tìm database + service, deploy, poll, verify, ghi output |
+| `push-to-github.sh` | `git init` nếu cần, gitignore + gỡ file secret khỏi index, **commit trước rồi tạo repo**, push đúng branch, ghi branch thật vào `render.yaml` |
+| `render-client.sh` | Tạo/tìm database + service, deploy, poll, verify (3 lần), ghi output |
 
 Với `--no-db`: giữ `database.py` dùng SQLite, không thêm `psycopg2-binary`, `render.yaml` không có database, không set `DATABASE_URL`.
+
+**`database.py` của bạn được giữ nguyên** nếu nó đã đọc `os.getenv("DATABASE_URL")`. Chỉ khi file hardcode URL, script mới ghi đè — và giữ bản gốc ở `database.py.bak`, giữ đúng kiểu `Base` (`DeclarativeBase` hay `declarative_base()`) mà project đang dùng. Bản cũ kiểm tra bằng `grep DATABASE_URL`, khớp cả `SQLALCHEMY_DATABASE_URL = "sqlite:///…"` nên bỏ qua file hardcode và production chạy SQLite trong container — dữ liệu mất mỗi lần deploy.
+
+**Tạo bảng** do `entrypoint.sh` làm (`Base.metadata.create_all`) trước khi start gunicorn. Không còn chèn `@app.on_event("startup")` (đã deprecated) vào `main.py`.
+
+**Container**: `python:3.12-slim` + `postgresql-client` (bản cũ gọi `pg_isready` mà không cài nó — vòng chờ DB luôn thất bại sau 60 giây rồi mới start), gunicorn `WEB_CONCURRENCY` mặc định 2 (4 worker vượt 512 MB của free tier).
 
 ## Điểm yếu đã biết: Blueprint API
 
@@ -102,14 +112,20 @@ Chỉ dùng `url` ở downstream (ví dụ `deploy-netlify --api-url`) khi `veri
 
 | Tình huống | Xử lý |
 |-----------|-------|
-| Thiếu `RENDER_API_KEY` | Dừng, hướng dẫn lấy key |
-| Thiếu `curl`/`jq` | Dừng ngay, nêu tên lệnh |
+| Thiếu `RENDER_API_KEY` | Dừng **trước bước 1**, hướng dẫn lấy key |
+| Thiếu `curl`/`jq`/`git`/`gh` | Dừng ngay, nêu tên lệnh |
+| Không có `main.py` | Dừng — Dockerfile start `main:app` |
+| `database.py` đã đọc `DATABASE_URL` | Giữ nguyên |
+| `database.py` hardcode URL | Ghi đè, giữ `.bak`, giữ kiểu `Base` |
+| Repo chưa có commit | Commit trước, tạo repo sau (bản cũ `gh repo create --push` trên repo rỗng → fail) |
+| File `.env` / service account đang được track | Gỡ khỏi index, cảnh báo rotate |
+| Branch không phải `main` | Push branch hiện tại **và** ghi branch đó vào `render.yaml` |
 | HTTP 429 hoặc 5xx | Retry 30s, tối đa 3 lần, rồi dừng kèm response |
 | Database đã tồn tại | Dùng lại, `database_status: existing` |
 | Blueprint sync không ra service | Tìm theo tên; không thấy thì dừng kèm hướng dẫn Dashboard |
 | Build fail | In message + link log Dashboard, exit 2 |
 | Poll quá 15 phút | `status: timeout`, exit 2 |
-| Deploy `live` nhưng HTTP ≠ 200 | `verified: false`, exit 2 |
+| Deploy `live` nhưng HTTP ≠ 200 sau 3 lần | `verified: false`, exit 2, gợi ý `--health-path` khác nếu route không tồn tại |
 | Không lấy được URL | Để rỗng, không đoán |
 | Chưa `git init` | Tự init `-b main` |
 | Branch không phải `main` | Push đúng branch hiện tại |

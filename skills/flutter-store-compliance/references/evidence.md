@@ -4,9 +4,11 @@ Run this first. Every finding must cite a row from the table it produces.
 
 ## Sources
 
+The derived facts come from `flutter-store-metadata/scripts/derive-facts.sh` (run by `check-assets.sh`); its JSON is the evidence table's first half. What follows is for reading the pieces the script does not interpret.
+
 ```bash
-# Dependencies
-sed -n '/^dependencies:/,/^dev_dependencies:/p' pubspec.yaml
+# Dependencies (direct, non-dev — the script already excludes dev_dependencies)
+bash ../flutter-store-metadata/scripts/derive-facts.sh --project . | jq '.dependencies, .unknown_sdks'
 
 # Permissions (all manifests, not just main — plugins and flavors add their own)
 grep -rhoE 'android:name="android\.permission\.[A-Z_]+"' android/app/src/main/

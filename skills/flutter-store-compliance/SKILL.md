@@ -3,7 +3,7 @@ name: flutter-store-compliance
 description: "Audit a Flutter project against Google Play Developer Program Policies before submission. Covers 8 policy areas: restricted content, IP, privacy & data, store listing, monetization, functionality, SDKs, and Families. Use when user says 'compliance', 'policy check', 'kiểm tra policy', 'review trước khi submit', 'pre-launch check'. Run before flutter-publish."
 license: MIT
 metadata:
-  version: 2.0.0
+  version: 2.1.0
 ---
 
 # Flutter Store Compliance
@@ -44,28 +44,30 @@ If the user supplies declarations (`has_ads`, `collects_data`, …), treat them 
 
 ## Workflow
 
-### Step 1 — Gather evidence
+### Step 1 — Gather evidence and run the mechanical checks
 
-Read `references/evidence.md`. It defines what to read (pubspec, manifest, gradle, `store-listing.json`, `build-info.json`, the privacy policy) and how each signal maps to a derived fact.
+```bash
+bash <skill-dir>/scripts/check-assets.sh --project . --store-dir store-metadata --out store-metadata/checks-mechanical.json
+```
 
-Produce an evidence table before running any check. Every later finding must cite a row from it — a verdict without evidence is an opinion and must not be reported as an audit result.
+The script re-derives the facts from code (via `flutter-store-metadata/scripts/derive-facts.sh`, installed beside this skill — it warns if absent) and measures everything that can be measured: icon and feature-graphic dimensions and alpha, screenshot count/size/aspect/alpha, `placeholder`/`unresolved` entries, name and description lengths in **characters**, privacy-policy URL reachability and `UNRESOLVED` markers, `derived` ↔ code diff, `app_name` ↔ `android:label`, restricted permissions, unknown SDKs, an account-deletion route when login exists, `build-info.json` presence and target API against today's date.
 
-### Step 2 — Run the checks
+Its output rows are already in `compliance-report.json` shape. **Copy them; do not re-derive them.** Then read `references/evidence.md` for the facts the script cannot see (which SDK collects what, permission usage in code) and build the evidence table for the judgement checks.
 
-Read `references/checks.md`. Eight groups: restricted content, IP, privacy & data, store listing, monetization, functionality, SDKs, Families. Each check there states its evidence, its verdict rule, and the fix.
+### Step 2 — Run the judgement checks
 
-Prefer evidence already produced upstream over recomputing it: `build/release/build-info.json` (from `flutter-build` v2) carries targetSdk, signing, version code, and the 16 KB result. Re-derive only what is missing, and never rebuild the app just to inspect it.
+Read `references/checks.md`. The groups the script does not cover need reading, not measuring: restricted content (app function), IP (asset licences, brand imitation), description claims vs real features, monetization routing (digital goods outside Play Billing), Families. Each check there states its evidence, verdict rule and fix.
+
+Never rebuild the app to inspect it; `build/release/build-info.json` and `verify.json` from `flutter-build` carry targetSdk, signing and the 16 KB result.
 
 ### Step 3 — Cross-check
 
-The highest-value part of the audit, and the part a per-group checklist misses. Compare, pairwise:
+Mechanical pairs are done by the script (`crosscheck.*` rows). The remaining pairs are yours:
 
 ```
-code (SDKs, permissions)  ↔  store-listing.json "derived"
-code                      ↔  privacy policy contents
-privacy policy            ↔  Data Safety declaration
-listing app_name          ↔  android:label
-description claims        ↔  features that exist
+code (SDKs, permissions)  ↔  privacy policy contents        (does the policy name every collector?)
+privacy policy            ↔  Data Safety answers            (Step 4)
+description claims        ↔  features that exist in lib/
 screenshots               ↔  the real UI
 ```
 
@@ -138,6 +140,10 @@ The third section matters: it is honest about the audit's boundary. A check that
 | `references/evidence.md` | Step 1 — what to read and what each signal means |
 | `references/checks.md` | Step 2 — the eight groups, verdict rules, fixes |
 | `references/data-safety.md` | Step 4 — declaration answers and the CSV caveat |
+
+| Script | Run at |
+|--------|--------|
+| `scripts/check-assets.sh` | Step 1 — every measurable check + code↔listing cross-check, in report row shape |
 
 ## Integration
 

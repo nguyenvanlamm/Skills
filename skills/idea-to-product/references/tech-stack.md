@@ -5,14 +5,29 @@
 ### Entry Point (`main.py` — server root)
 
 ```python
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Product API", version="0.1.0")
+from database import Base, engine
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    Base.metadata.create_all(bind=engine)   # MVP: create tables on boot; swap for Alembic when schema stabilises
+    yield
+
+
+app = FastAPI(title="Product API", version="0.1.0", lifespan=lifespan)
+
+# Comma-separated; production client URL is appended after deploy (idea-to-product Phase 4f).
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -23,15 +38,23 @@ async def health():
     return {"status": "ok"}
 ```
 
+`lifespan` thay cho `@app.on_event("startup")` — decorator đó đã deprecated trong FastAPI. `deploy-render` nhận diện `create_all` ở đây và không chèn thêm startup hook.
+
 ### Database (`database.py` — server root)
 
 ```python
+import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./app.db"
+# SQLite for local dev; Render injects a PostgreSQL DATABASE_URL in production.
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")
+if DATABASE_URL.startswith("postgres://"):            # legacy scheme some hosts still emit
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 class Base(DeclarativeBase):
@@ -45,6 +68,8 @@ def get_db():
         db.close()
 ```
 
+Viết đúng dạng này từ đầu: `deploy-render` kiểm tra `os.getenv("DATABASE_URL"` và **giữ nguyên file** khi thấy; thiếu thì nó phải ghi đè, và mọi tuỳ biến trong `database.py` mất theo.
+
 ### Models (`models.py` — server root)
 
 ```python
@@ -53,7 +78,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from database import Base
 
-# Define models per architecture.md
+# Define models per tad.md
 ```
 
 ### Requirements (`requirements.txt` — server root)

@@ -12,15 +12,9 @@ command -v bundletool || ls ~/bundletool.jar
 
 If missing, install (`brew install bundletool`, or download `bundletool-all-*.jar` from https://github.com/google/bundletool/releases and use `java -jar bundletool.jar …`). If it cannot be installed, fall back to reading `android/app/build.gradle{,.kts}` and `pubspec.yaml` and **mark those results as unverified** — the gradle files describe what *should* have been built, not what is in the AAB.
 
-Define once:
+`scripts/preflight.sh` runs everything below and writes `store-metadata/preflight.json`. The commands in this file document what each gate does and how to fix it; run them individually only when debugging a single gate.
 
-```bash
-AAB="${aab_path:-$(find build/release . -name '*.aab' -path '*build*' -type f 2>/dev/null | head -1)}"
-BT() { command -v bundletool >/dev/null && bundletool "$@" || java -jar ~/bundletool.jar "$@"; }
-MF() { BT dump manifest --bundle="$AAB" --xpath="$1" 2>/dev/null; }
-```
-
-If multiple AABs are found, list them with size and mtime and let the user pick. Never silently take the first.
+Artifact selection: `--aab <path>`, else the single `.aab` under `build/`, else `build/release/app-release.aab` when present, else **stop and list** the candidates with size and mtime. Never silently take the first.
 
 ## Gate 0 — Provenance — WARN
 
@@ -165,11 +159,12 @@ Report the finding without printing any of the file contents.
 Play blocks submission (not upload) on missing assets. Check what `flutter-store-metadata` produced:
 
 ```bash
-ls store-metadata/icon/icon-512.png store-metadata/icon/feature-graphic.png 2>&1
-ls store-metadata/screenshots/phone/*.png 2>/dev/null | wc -l   # need ≥ 2, 8 recommended
-wc -m store-metadata/description/short_description.txt           # ≤ 80
-wc -m store-metadata/description/full_description.txt            # ≤ 4000
-ls store-metadata/privacy-policy/ 2>&1                           # required for every app
+ls store-metadata/icon/icon-512.png store-metadata/icon/feature-graphic.* 2>&1
+ls store-metadata/screenshots/phone/* 2>/dev/null | wc -l                 # need ≥ 2, 8 max
+wc -m store-metadata/description/<locale>/short_description.txt           # ≤ 80, one dir per locale
+wc -m store-metadata/description/<locale>/full_description.txt            # ≤ 4000
+ls store-metadata/privacy-policy/ 2>&1                                    # required for every app
+python3 -c "import json;print(json.load(open('store-metadata/store-listing.json'))['unresolved'])"   # must be []
 ```
 
 Report each missing item as a **WARN** with the exact file that must exist — the user will be blocked in Console otherwise, just later.

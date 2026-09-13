@@ -4,1157 +4,414 @@ description: "End-to-end Flutter app builder: from idea to Google Play. Automate
 license: MIT
 effort: max
 metadata:
-  version: 2.0.0
+  version: 2.1.0
   author: "Nguyen Van Lam"
 ---
 
 # Idea to Play Store
 
-5-phase orchestrator that takes an idea and produces a published Flutter app on Google Play.
+5-phase orchestrator that takes an idea and produces a Flutter app uploaded to Google Play, ready for the user to submit.
 
-**Stack:** Flutter (Dart) + FastAPI (Python, optional) + Firebase Auth + PostgreSQL.
+**Stack:** Flutter (Dart, Riverpod, go_router) + Firebase Auth (optional) + FastAPI backend (optional, deployed to Render with PostgreSQL).
 
-## When to Use
+## Core principle
 
-Trigger when the user asks to:
-- Build a Flutter app from an idea or trend
-- "Turn idea into published app"
-- Create a Flutter MVP with backend + Google Play submission
-- "App từ ý tưởng đến CH Play"
+> **The orchestrator owns the gates and the state; the sibling skills own the work.** This file never re-implements a check a sibling already performs (compliance, preflight, signing verification). It decides *when* each runs, feeds it the right inputs, reads its machine-readable output, and stops when a gate says stop. A phase report is a copy of what the siblings produced — not a summary written from memory.
 
-Do **not** use for:
-- Single-phase work (invoke the sibling skill directly)
-- Web apps (use `idea-to-product`)
-- Existing projects that only need one phase
+Two things follow:
+
+- **Irreversible decisions get a gate.** `applicationId` (permanent after first publish), the upload keystore, the Play track, anything pushed to GitHub or Render. Approval for one is not approval for the next.
+- **Nothing is deleted without a fresh, explicit yes.** An "Abort" at a gate stops the run and leaves `$PRODUCT_DIR` on disk with its state file, so the user can resume or delete it themselves. The old behaviour (`rm -rf $PRODUCT_DIR` on abort) threw away an hour of research and any Firebase project id with it.
+
+## How sibling skills are invoked
+
+Commands written as `/skill --flag value` describe **intent**, not a CLI. Invoke each skill through the host's mechanism (skill tool, `/name`, …) and pass the values in the prompt. Contracts below are read from each skill's own SKILL.md — planning files must keep their default names and live in one directory:
+
+| Skill | Reads | Writes |
+|-------|-------|--------|
+| `trend-ideas` (2.2+) | — | `trend-report.md`, `ideas/…`, **`idea.md` + `validate.md`** of the winner |
+| `idea-validator` | `idea.md` in a dir | `validate.md` beside it |
+| `brand-name-checker` | a name | risk level + Proceed/Modify/Abandon |
+| `prd-generator` | `idea.md` + `validate.md` in a dir | `prd.md` |
+| `tad-generator` | `prd.md` | `tad.md` |
+| `tasks-generator` | `prd.md` (+ `tad.md`) | `tasks.md` |
+| `flutter-init` | `project_name`, `org`, `platforms` | project dir, `applicationId` |
+| `firebase-auth-setup` | `--slug`, optional `--project-id` | `firebase-output.json` with **`auth_providers`** |
+| `flutter-build` | project | `build/release/app-release.aab`, `build/release/build-info.json` |
+| `flutter-store-metadata` | project + `app_name`, `features`, `category`, `contact_email` | `store-metadata/store-listing.json` (with `unresolved[]`) |
+| `flutter-store-compliance` | project + `store-metadata/` | `store-metadata/compliance-report.json → overall` |
+| `flutter-publish` | AAB, `track`, `whats_new` | `publish-state.json`, `upload-checklist.md` |
+
+Check availability per phase by attempting the invocation — never by probing a filesystem path. If a phase's skill is missing, stop **before** the phase starts and name it.
 
 ## Prerequisites
 
-### Required Skills
+| Skill | Phase |
+|-------|-------|
+| `trend-ideas`, `idea-validator`, `brand-name-checker`, `prd-generator`, `tad-generator`, `tasks-generator` | 1 |
+| `logo-designer`, `frontend-design` | 2 |
+| `flutter-init`, `firebase-auth-setup` (opt), `deploy-render` (opt), `devops-pipeline` | 3 |
+| `code-review`, `test-coverage` | 4 |
+| `flutter-signing`, `flutter-build`, `flutter-store-metadata`, `flutter-store-compliance`, `flutter-publish`, `release-manager`, `aso-marketing` (opt) | 5 |
 
-| Skill | Version | Phase | Source |
-|-------|---------|-------|--------|
-| `trend-ideas` | 1.0+ | 1 | global |
-| `idea-validator` | 1.0+ | 1 | global |
-| `brand-name-checker` | 1.0+ | 1 | skills repo |
-| `prd-generator` | 1.0+ | 2 | global |
-| `tad-generator` | 1.0+ | 2 | global |
-| `tasks-generator` | 1.0+ | 2 | global |
-| `logo-designer` | 1.0+ | 2 | global |
-| `frontend-design` | 1.0+ | 2 | global |
-| `flutter-init` | 2.0+ | 3 | skills repo |
-| `firebase-auth-setup` | 2.0+ | 3 (opt) | global |
-| `devops-pipeline` | 1.0+ | 3 | global |
-| `code-review` | 1.0+ | 4 | global |
-| `test-coverage` | 1.0+ | 4 | global |
-| `flutter-signing` | 2.0+ | 5 | skills repo |
-| `flutter-build` | 2.0+ | 5 | skills repo |
-| `flutter-store-metadata` | 2.0+ | 5 | skills repo |
-| `flutter-store-compliance` | 2.0+ | 5 | skills repo |
-| `flutter-publish` | 2.0+ | 5 | skills repo |
-| `release-manager` | 1.0+ | 5 | global |
-| `aso-marketing` | 1.0+ | 5 | global |
-| ~~`social-poster`~~ | — | — | **không tồn tại** — xem Step 5h |
-| `deploy-render` | 2.0+ | 3 (opt) | global |
+Runtime: Flutter SDK 3.22+ and Android SDK (installed by `flutter-init` if missing), JDK 17, Git configured; Python 3.10+ only if a backend is generated; `gcloud` + `firebase-tools` only if Firebase Auth is used. Linux or macOS. This pipeline targets **Android only** — iOS needs macOS + Xcode and a separate App Store flow, so `flutter-init` is called with `--platforms android`.
 
-### Runtime Requirements
+## State
 
-- **Flutter SDK 3.x+** (auto-installed by `flutter-init`)
-- **Python 3.10+** (if backend needed)
-- **Node.js 18+** (for Firebase tools)
-- **Git** configured
-- **Android Studio / Android SDK** (auto-configured by `flutter-init`)
-- **macOS** (if iOS build needed; Linux for Android-only)
+`$PRODUCT_DIR/.idea-play-store-state.json` is written after every step and read at start:
 
-## Setup: Product Directory
-
-### Step 0.1: Resolve Working Directory
-
-1. Check if `$PRODUCT_DIR` is set → use it
-2. Check `~/.config/idea-to-play-store-dir.txt` → read saved path
-3. Ask user once, save to config file
-4. Default: `~/workspace/products`
-
-### Step 0.2: Create Project Folder
-
-```bash
-DATE=$(date +%Y_%m_%d)
-# Dùng ${DATE}_${SLUG}, không phải $DATE_$SLUG: '_' là ký tự hợp lệ trong tên
-# biến, nên "$DATE_$SLUG" được đọc thành biến "$DATE_" (rỗng) nối "$SLUG" —
-# mọi project sẽ nằm ở thư mục chỉ có tên slug, mất phần ngày tháng.
-mkdir -p "$PRODUCT_DIR/${DATE}_${SLUG}"
-export PRODUCT_DIR="$PRODUCT_DIR/${DATE}_${SLUG}"
+```json
+{
+  "slug": "task_flow", "app_name": "Task Flow", "org": "com.acme", "application_id": "com.acme.task_flow",
+  "needs_auth": true, "needs_backend": false, "auth_providers": ["email"],
+  "phase": 3, "step": "3b", "gates": { "1": "approved", "2": "approved" },
+  "updated_at": "2026-09-13T10:00:00Z"
+}
 ```
 
-### Step 0.3: Create Sub-directories
+On start: if the file exists, offer **resume from `step`** or start over (start over does not delete anything — it uses a new dated directory). Every phase report reads its numbers from this file and the siblings' outputs.
 
-```
-$PRODUCT_DIR/
-├── app/               # Flutter project (always)
-├── backend/           # FastAPI (if needs_backend)
-├── plan/              # PRD, TAD, Tasks
-├── assets/            # Logo, UI mockups
-└── store-metadata/    # Store listing assets
-```
+## Setup
 
-### Step 0.4: Init Git
-
-```bash
-cd "$PRODUCT_DIR"
-git init
-```
+1. **Resolve root**: `$PRODUCT_DIR` env → `~/.config/idea-to-play-store-dir.txt` → ask once and save → default `~/workspace/products`.
+2. **Create project folder**:
+   ```bash
+   DATE=$(date +%Y_%m_%d)
+   # ${DATE}_${SLUG}, not $DATE_$SLUG — '_' is a valid identifier char, so "$DATE_$SLUG" reads the empty variable "$DATE_".
+   mkdir -p "$PRODUCT_DIR/${DATE}_${SLUG}"/{plan,assets,store-metadata}
+   export PRODUCT_DIR="$PRODUCT_DIR/${DATE}_${SLUG}"
+   ```
+   `app/` is created by `flutter-init`; `backend/` only if needed.
+3. **Ask for `org`** (reverse-domain the user controls, e.g. `com.acme`). There is no default: it becomes `applicationId = <org>.<slug>`, permanent after first publish, and `flutter-build`/`flutter-publish` block `com.example.*`. Explain the permanence once.
+4. `git init -b main` in `$PRODUCT_DIR`. First commit after Phase 1 produces files.
+5. Write the state file.
 
 ## Workflow
 
 ```
-Phase 1 — Idea & Plan      → trend-ideas → idea-validator
-                             → brand-name-checker → prd-generator
-                             → tad-generator → tasks-generator
-                             GATE: user approves PRD + tasks
-
-Phase 2 — Brand & Design   → logo-designer → frontend-design
-                             GATE: user approves logo + UI
-
-Phase 3 — Setup & Backend  → flutter-init → [firebase-auth-setup]
-                             → [backend-gen → deploy-render]
-                             → devops-pipeline
-
-Phase 4 — Build            → [feature-gen (parallel)] → build-runner
-                             → flutter analyze → code-review
-                             → test-coverage
-                             GATE: user approves running app
-
-                             GATE: user approves entering Phase 5
-
-Phase 5 — Store & Publish  → flutter-signing → flutter-build
-                             → flutter-store-metadata
-                             → flutter-store-compliance
-                             → flutter-publish
-                             → [aso-marketing]
-                             → release-manager
+Phase 1 — Idea & Plan      trend-ideas (or idea-validator on the user's idea)
+                           → brand-name-checker → prd-generator → tad-generator → tasks-generator
+                           GATE ⛔ plan
+Phase 2 — Brand & Design   logo-designer → frontend-design (mobile mockups)
+                           GATE ⛔ brand
+Phase 3 — Setup & Backend  flutter-init → [firebase-auth-setup] → [backend + deploy-render] → devops-pipeline
+Phase 4 — Build            feature generation → flutter analyze → flutter test → code-review → test-coverage
+                           GATE ⛔ running app
+                           GATE ⛔ entering Phase 5 (outward-facing)
+Phase 5 — Store & Publish  flutter-signing → flutter-build → flutter-store-metadata
+                           → flutter-store-compliance (FAIL blocks) → flutter-publish → [aso-marketing] → release-manager
 ```
-
-**Gate trước Phase 5.** Đây là phase hướng ra ngoài: tạo khoá ký vĩnh viễn cho app, chốt `applicationId` không đổi được sau lần publish đầu, đẩy AAB lên Play Console, và có thể đăng bài mạng xã hội. Trước khi bắt đầu, nói rõ với user:
-
-- `applicationId` sẽ là gì — **vĩnh viễn sau lần publish đầu**
-- Keystore sẽ được tạo ở đâu, và user phải tự backup (xem `flutter-signing`)
-- Track nào sẽ nhận bản build (mặc định `internal`, không phải `production`)
-- Tài khoản cá nhân mới còn cần 12 tester × 14 ngày trước khi lên production được
-
-Chờ đồng ý rồi mới chạy. Đồng ý cho `internal` không phải đồng ý cho `production`.
 
 ---
 
 ## Phase 1: Idea & Plan (Gate ⛔)
 
-### Step 1a: Generate Ideas
+All files in `$PRODUCT_DIR/plan/`. Pass that directory to each skill; do not pass file contents.
 
-```bash
-/skill trend-ideas --output "$PRODUCT_DIR/plan/trend-report.md"
-```
-
-Parse output for winning idea (name + description + score).
-
-### Step 1b: Validate Idea
-
-```bash
-/skill idea-validator "$PRODUCT_DIR/plan/trend-report.md" \
-  --output "$PRODUCT_DIR/plan/validate.md"
-```
-
-Extract: app name, description, features, target audience.
-
-### Step 1c: Check Brand Name
-
-```bash
-/skill brand-name-checker --name "$APP_NAME" \
-  --output "$PRODUCT_DIR/plan/brand-check.md"
-```
-
-If `Abandon` verdict → suggest alternatives, ask user.
-
-### Step 1d: Generate PRD
-
-```bash
-/skill prd-generator "$PRODUCT_DIR/plan/validate.md" \
-  --output "$PRODUCT_DIR/plan/prd.md"
-```
-
-### Step 1e: Generate Architecture (TAD)
-
-```bash
-/skill tad-generator "$PRODUCT_DIR/plan/prd.md" \
-  --output "$PRODUCT_DIR/plan/tad.md"
-```
-
-### Step 1f: Generate Tasks
-
-```bash
-/skill tasks-generator "$PRODUCT_DIR/plan/prd.md" \
-  --arch "$PRODUCT_DIR/plan/tad.md" \
-  --output "$PRODUCT_DIR/plan/tasks.md"
-```
-
-### Phase 1 Gate
+**1a — Idea.** If the user already has an idea: write `plan/idea.md` from their description and invoke `idea-validator` on `plan/` → `validate.md`. Otherwise:
 
 ```
-◆ Phase 1 — Idea & Plan (COMPLETE)
+/trend-ideas --output "$PRODUCT_DIR/plan/trend-report.md" --output-dir "$PRODUCT_DIR/plan"
+```
+
+which leaves `plan/idea.md` + `plan/validate.md` for the winner. **Do not run `idea-validator` again** — trend-ideas already did, and a second run produces a second, possibly different, score.
+
+Extract `APP_NAME`, one-line description, features, audience into the state file.
+
+**1b — Brand name.** `/brand-name-checker --name "$APP_NAME"` → `plan/brand-check.md`. `Abandon` → propose 3 alternatives, re-check the user's pick before continuing. `Modify` → surface the reason at the gate.
+
+**1c — PRD.** `/prd-generator` on `plan/` → `prd.md`. Add this orchestrator's constraints to the prompt: Flutter Android app, Riverpod + go_router, Firebase Auth if login, FastAPI on Render if a server is needed.
+
+**1d — TAD.** `/tad-generator` on `plan/` → `tad.md` (keep the name; `tasks-generator` looks for it).
+
+**1e — Tasks.** `/tasks-generator` on `plan/` → `tasks.md`.
+
+**1f — Derive flags** from `prd.md`, and record them in the state file:
+
+| Flag | Set when the PRD |
+|------|------------------|
+| `needs_auth` | has register / login / account / user profile features |
+| `needs_backend` | needs data shared between users or devices, server-side logic, or sync. Local-only apps (SQLite/shared_preferences) do **not** |
+
+Read the PRD's feature list for this; do not `grep -qi "api\|sync"` — "sync" appears in "asynchronous" and "api" in "capital".
+
+### Gate 1
+
+```
+◆ Phase 1 — Idea & Plan
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Trend ideas:     √ $N ideas generated
-  Validation:      √ $APP_NAME — $SCORE/100
-  Brand check:     √ $RISK level
-  PRD:             √ $N features documented
-  Architecture:    √ $STACK selected
-  Tasks:           √ $N tasks created
+  Idea:            $APP_NAME — $SCORE/100 ($VERDICT)          ← from validate.md
+  Brand check:     $RISK · $RECOMMENDATION                     ← from brand-check.md
+  PRD / TAD:       $N features · stack $STACK
+  Tasks:           $N tasks
+  Flags:           needs_auth=$B  needs_backend=$B
+  App ID (planned) $ORG.$SLUG  ← permanent once published
 
-  ⛔ User: Do you approve this plan?
-     Options: Approve / Revise / Abort
+  ⛔ Approve / Revise / Abort
 ```
 
-**Gate logic:**
-- Approved → advance to Phase 2
-- Revise → ask user what to change, regenerate affected docs
-- Abort → delete `$PRODUCT_DIR`, exit
+Revise → ask what to change, regenerate only the affected doc(s) and everything downstream of it. Abort → stop, keep the directory, say where the state file is.
 
 ---
 
 ## Phase 2: Brand & Design (Gate ⛔)
 
-### Step 2a: Generate Logo
+**2a** `/logo-designer --name "$APP_NAME"` → `assets/logo/` (7 SVG variants + showcase). `flutter-store-metadata` later turns the primary mark into the 512 px icon, adaptive layers and feature graphic — do not resize anything here.
 
-Read app name from PRD. Call:
+**2b** `/frontend-design --prd plan/prd.md --platform mobile` → `assets/ui-mockups/`. Mockups are the visual reference for Phase 4; they are not shipped.
 
-```bash
-/skill logo-designer --name "$APP_NAME" \
-  --output "$PRODUCT_DIR/assets/logo/"
-```
-
-Copy icon assets to `$PRODUCT_DIR/assets/logo/`.
-
-### Step 2b: Design UI Mockups
-
-```bash
-/skill frontend-design \
-  --prd "$PRODUCT_DIR/plan/prd.md" \
-  --platform mobile \
-  --output "$PRODUCT_DIR/assets/ui-mockups/"
-```
-
-This generates mobile UI mockups (HTML + CSS or Figma links).
-
-### Phase 2 Gate
+### Gate 2
 
 ```
-◆ Phase 2 — Brand & Design (COMPLETE)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Logo:       √ 7 variants created
-  UI Design:  √ $N screens mocked up
-
-  ⛔ User: Do you approve the brand & design?
-     Options: Approve / Revise
+◆ Phase 2 — Brand & Design
+  Logo:       $N variants at assets/logo/
+  UI design:  $N screens at assets/ui-mockups/
+  ⛔ Approve / Revise
 ```
 
 ---
 
 ## Phase 3: Setup & Backend
 
-### Step 3a: Initialize Flutter Project
-
-Read app_name + org from PRD.
-
-```bash
-/skill flutter-init \
-  --project_name "$SLUG" \
-  --org "$ORG" \
-  --platforms "android,ios" \
-  --dir "$PRODUCT_DIR/app/"
-```
-
-This creates the Flutter project under `$PRODUCT_DIR/app/`.
-
-### Step 3b: Firebase Auth Setup (Optional)
-
-Check PRD for `auth` / `login` / `register` keywords:
-
-```bash
-grep -qi "auth\|login\|register\|sign.in\|đăng.nhập" "$PRODUCT_DIR/plan/prd.md"
-```
-
-If auth needed:
-
-```bash
-/skill firebase-auth-setup \
-  --project "$SLUG" \
-  --app-type flutter \
-  --output "$PRODUCT_DIR/app/lib/core/network/"
-```
-
-This:
-- Creates Firebase project
-- Enables Email/Password + Google Auth
-- Generates `google-services.json` into `android/app/`
-- Generates `firebase_options.dart`
-
-### Step 3c: Generate Backend (Optional)
-
-Check PRD for backend needs:
-
-```bash
-grep -qi "api\|server\|sync\|cloud\|user.data" "$PRODUCT_DIR/plan/prd.md"
-```
-
-If backend needed, generate FastAPI project:
+**3a — Flutter project.**
 
 ```
-$PRODUCT_DIR/backend/
-├── main.py                # FastAPI entry + CORS + Firebase verify
-├── database.py            # SQLAlchemy + PostgreSQL (or SQLite local)
-├── requirements.txt       # fastapi, uvicorn, firebase-admin, sqlalchemy, psycopg2
-├── Dockerfile
-├── render.yaml
-├── app/
-│   ├── __init__.py
-│   ├── config.py          # Firebase creds, DB URL
-│   ├── models/
-│   │   ├── __init__.py
-│   │   └── user.py        # User model
-│   ├── routes/
-│   │   ├── __init__.py
-│   │   ├── auth.py         # POST /api/auth/verify — verify Firebase token
-│   │   └── users.py        # GET/PUT /api/users/me
-│   ├── schemas/
-│   │   ├── __init__.py
-│   │   └── user.py
-│   ├── services/
-│   │   ├── __init__.py
-│   │   └── auth_service.py  # Firebase Admin verification
-│   └── middleware/
-│       ├── __init__.py
-│       └── firebase_auth.py  # Dependency: get_current_user
-└── .env.example
+/flutter-init --project_name "$SLUG" --org "$ORG" --platforms android --dir "$PRODUCT_DIR/app"
 ```
 
-**Key backend code (main.py):**
+Read back the `applicationId` it reports (flutter create sanitises names) and store it as `application_id`. `flutter-init` v2 pins compileSdk/targetSdk 36 and NDK r28+, adds credentials to `.gitignore`, and makes the first commit.
 
-```python
-import firebase_admin
-from firebase_admin import credentials, auth
-from fastapi import FastAPI, Depends, HTTPException, Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.middleware.cors import CORSMiddleware
-
-cred = credentials.Certificate("service-account.json")
-firebase_admin.initialize_app(cred)
-
-app = FastAPI(title="$APP_NAME API")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
-security = HTTPBearer(auto_error=False)
-
-async def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
-    try:
-        decoded = auth.verify_id_token(credentials.credentials)
-        return decoded
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-@app.get("/api/health")
-async def health():
-    return {"status": "ok"}
-
-@app.get("/api/users/me")
-async def get_me(user: dict = Depends(verify_token)):
-    return {"uid": user["uid"], "email": user.get("email"), "name": user.get("name")}
-```
-
-After generating, if user wants to deploy:
-
-```bash
-/skill deploy-render \
-  --server-dir "$PRODUCT_DIR/backend/" \
-  --slug "$SLUG-backend" \
-  --db postgres
-```
-
-### Step 3d: DevOps Pipeline
-
-```bash
-/skill devops-pipeline --dir "$PRODUCT_DIR/app/"
-```
-
-### Phase 3 Report
+**3b — Firebase Auth** (only if `needs_auth`).
 
 ```
-◆ Phase 3 — Setup & Backend (COMPLETE)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Flutter project:   √ $SLUG created at app/
-  Firebase Auth:     √ Email/Google enabled
-  Backend API:       √ FastAPI at backend/ ($N routes)
-  DevOps:            √ Pre-commit hooks + CI
+/firebase-auth-setup --slug "$SLUG" --output "$PRODUCT_DIR/firebase-config"   [--project-id <existing>]
 ```
 
-No gate — proceed to Phase 4.
+Then read `firebase-config/firebase-output.json`:
+
+- `auth_providers` → store in state. **Generate Google sign-in UI only if it contains `"google"`.** By default the skill enables `email` only — Google needs an OAuth client the API cannot mint. A Google button on a provider that is not enabled fails on the first tap.
+- Android app registration (`google-services.json`, `firebase_options.dart`) is **not** produced by `firebase-auth-setup` (it creates a Web app). Run `flutterfire configure --project=<project_id> --platforms=android` inside `app/` — it needs `firebase-tools` logged in, which the setup skill already verified. The Android app's SHA-1 for Google sign-in comes from `flutter-signing` in Phase 5; add it in Firebase Console then, not now.
+- `firebase-config/` goes in `.gitignore` (service account key).
+
+**3c — Backend** (only if `needs_backend`). Read `references/backend-template.md` and generate `$PRODUCT_DIR/backend/`. Verify locally: `uvicorn main:app --port 8000` → `GET /api/health` 200. Then, if the user wants it live now:
+
+```
+/deploy-render --server-dir "$PRODUCT_DIR/backend" --slug "$SLUG" --health-path /api/health
+```
+
+(`--no-db` if the backend is stateless.) Use `deploy-output.json → url` **only when `verified: true`**; store it as `api_base_url`. Warn once: Render's free PostgreSQL is deleted 30 days after creation.
+
+**3d — DevOps.** `/devops-pipeline --dir "$PRODUCT_DIR/app"` (pre-commit + lean CI). Also on `backend/` if it exists.
+
+```
+◆ Phase 3 — Setup & Backend
+  Flutter project:   $APPLICATION_ID at app/  (compileSdk 36 · NDK r28)
+  Firebase Auth:     providers=$AUTH_PROVIDERS  |  N/A
+  Backend:           $API_BASE_URL (verified)  |  local only  |  N/A
+  DevOps:            pre-commit + CI on app/ [+ backend/]
+```
+
+No gate.
 
 ---
 
 ## Phase 4: Build (Gate ⛔)
 
-This is the core code generation phase. It parses `tasks.md` and generates full Flutter code for each feature.
+**4a — Parse `tasks.md` into features.** Classify each task by what it *does*, reading the task text (not by keyword grep):
 
-### Step 4a: Parse Tasks into Feature Definitions
+| Task is about… | Type | Files (see `references/feature-templates.md`) |
+|----------------|------|------|
+| creating / listing / editing a domain object | `crud` | model · provider · service · list/detail/form screens · card |
+| login / register / sign-in | `auth` | provider · login · register (only if `needs_auth`) |
+| search / filter | `search` | screen |
+| profile / account | `profile` | provider · screen |
+| settings / preferences | `settings` | screen |
+| onboarding, map, camera, charts, webview, notifications | that type | screen + whatever plugin it needs, added to pubspec explicitly |
 
-Read `$PRODUCT_DIR/plan/tasks.md`. Extract each task and classify:
+For `crud`, extract the fields (name, type, required, enum values) from the task description into a small JSON block per feature. Ambiguous → look at `tad.md`'s schema, then ask; do not invent fields.
 
-**Task classification rules:**
+**4b — Generate features.** One feature at a time, from the templates in `references/feature-templates.md`; `flutter analyze` after each. Where the host has a subagent tool, features are independent and can be generated in parallel — but analyze **once per feature** either way. There is no `feature-gen-*` agent shipped with this skill; the templates are the spec.
 
-| Task contains... | Feature type |
-|-----------------|--------------|
-| "CRUD", "list", "manage", "quản lý" + noun | `crud` |
-| "login", "register", "sign in", "đăng nhập" | `auth` |
-| "search", "tìm kiếm", "filter" | `search` |
-| "profile", "account", "tài khoản" | `profile` |
-| "settings", "cài đặt", "preferences" | `settings` |
-| "onboarding", "intro", "giới thiệu" | `onboarding` |
-| "map", "location", "bản đồ" | `map` |
-| "camera", "photo", "scan" | `camera` |
-| "chart", "report", "thống kê" | `charts` |
-| "webview", "browser", "web" | `webview` |
-| "notification", "push", "thông báo" | `notifications` |
+Rules the templates encode: Riverpod for state, `go_router` for navigation, `dio` + Firebase ID-token interceptor only when `needs_backend`, `firebase_auth` only when `needs_auth`, Google sign-in only when `auth_providers` has `google`. Every generated screen gets an empty state and an error state; `// ...` placeholders from the template must not survive into committed code.
 
-**Extract fields from task description:**
+**4c — App shell.** `lib/config/routes.dart` (go_router, one route per screen generated), `lib/app.dart`, `lib/main.dart` (with `Firebase.initializeApp` when `needs_auth`), `lib/core/network/api_client.dart` when `needs_backend`. Update `pubspec.yaml` with exactly the packages the code imports; `flutter pub get`.
 
-Use regex to find structured data:
-
-```
-Task: "User can create todos with title, description, due date, priority"
-→ Feature: todos (type: crud)
-→ Fields: title (string, required), description (string), due_date (date), priority (enum: low/medium/high)
-```
-
-```bash
-# Extract feature name (first noun after "manage/crud/list")
-FEATURE_NAME=$(echo "$TASK" | grep -oiP "(manage|list|crud)\s+\K\w+" || echo "untitled")
-```
-
-### Step 4b: Feature Code Generation (Parallel Subagents)
-
-Spawn one subagent per feature (parallel):
-
-```
-/agent feature-gen-crud \
-  --name "$FEATURE_NAME" \
-  --fields "$FIELDS_JSON" \
-  --auth "$NEEDS_AUTH" \
-  --api "$HAS_API" \
-  --dir "$PRODUCT_DIR/app/"
-```
-
-Each feature-gen subagent produces:
-
-**For `crud` type (most common):**
-
-`lib/features/todos/models/todo.dart`:
-```dart
-class Todo {
-  final int? id;
-  final String title;
-  final String? description;
-  final DateTime? dueDate;
-  final String priority;
-  final bool completed;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
-
-  Todo({
-    this.id,
-    required this.title,
-    this.description,
-    this.dueDate,
-    this.priority = 'medium',
-    this.completed = false,
-    this.createdAt,
-    this.updatedAt,
-  });
-
-  factory Todo.fromJson(Map<String, dynamic> json) => Todo(
-    id: json['id'] as int?,
-    title: json['title'] as String,
-    description: json['description'] as String?,
-    dueDate: json['due_date'] != null ? DateTime.parse(json['due_date']) : null,
-    priority: json['priority'] as String? ?? 'medium',
-    completed: json['completed'] as bool? ?? false,
-    createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
-    updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
-  );
-
-  Map<String, dynamic> toJson() => {
-    if (id != null) 'id': id,
-    'title': title,
-    if (description != null) 'description': description,
-    if (dueDate != null) 'due_date': dueDate!.toIso8601String(),
-    'priority': priority,
-    'completed': completed,
-  };
-
-  Todo copyWith({...});
-}
-```
-
-`lib/features/todos/providers/todo_provider.dart`:
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/todo.dart';
-import '../services/todo_service.dart';
-
-enum TodoFilter { all, active, completed }
-
-final todoFilterProvider = StateProvider<TodoFilter>((ref) => TodoFilter.all);
-
-final todoListProvider = StateNotifierProvider<TodoListNotifier, AsyncValue<List<Todo>>>((ref) {
-  return TodoListNotifier(ref.read(todoServiceProvider));
-});
-
-class TodoListNotifier extends StateNotifier<AsyncValue<List<Todo>>> {
-  final TodoService _service;
-
-  TodoListNotifier(this._service) : super(const AsyncValue.loading()) {
-    fetchAll();
-  }
-
-  Future<void> fetchAll() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _service.fetchAll());
-  }
-
-  Future<void> create(Todo todo) async {
-    await _service.create(todo);
-    await fetchAll();
-  }
-
-  Future<void> update(int id, Todo todo) async {
-    await _service.update(id, todo);
-    await fetchAll();
-  }
-
-  Future<void> delete(int id) async {
-    await _service.delete(id);
-    await fetchAll();
-  }
-}
-```
-
-`lib/features/todos/services/todo_service.dart`:
-```dart
-// Local (no backend)
-class TodoService {
-  final List<Todo> _localStore = [];
-
-  Future<List<Todo>> fetchAll() async => _localStore;
-  Future<Todo> create(Todo todo) async { _localStore.add(todo); return todo; }
-  Future<void> update(int id, Todo todo) async { /* find and replace */ }
-  Future<void> delete(int id) async { _localStore.removeWhere((t) => t.id == id); }
-}
-```
-
-Or with API:
-
-```dart
-// Remote (with backend)
-class TodoService {
-  final ApiClient _api;
-
-  TodoService(this._api);
-
-  Future<List<Todo>> fetchAll() async {
-    final res = await _api.get('/api/todos');
-    return (res.data as List).map((j) => Todo.fromJson(j)).toList();
-  }
-
-  Future<Todo> create(Todo todo) async {
-    final res = await _api.post('/api/todos', data: todo.toJson());
-    return Todo.fromJson(res.data);
-  }
-
-  Future<void> update(int id, Todo todo) async {
-    await _api.put('/api/todos/$id', data: todo.toJson());
-  }
-
-  Future<void> delete(int id) async {
-    await _api.delete('/api/todos/$id');
-  }
-}
-```
-
-`lib/features/todos/screens/todo_list_screen.dart`:
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/todo_provider.dart';
-import '../widgets/todo_card.dart';
-import 'todo_form_screen.dart';
-
-class TodoListScreen extends ConsumerWidget {
-  const TodoListScreen({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final todosAsync = ref.watch(todoListProvider);
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Todos')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(
-          builder: (_) => const TodoFormScreen(),
-        )),
-        child: const Icon(Icons.add),
-      ),
-      body: todosAsync.when(
-        data: (todos) => todos.isEmpty
-          ? const Center(child: Text('No todos yet'))
-          : ListView.builder(
-              itemCount: todos.length,
-              itemBuilder: (_, i) => TodoCard(todo: todos[i]),
-            ),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-      ),
-    );
-  }
-}
-```
-
-`lib/features/todos/screens/todo_form_screen.dart`:
-```dart
-// Auto-generated form with fields from FieldDefinition
-// title → TextFormField with validation
-// description → TextFormField (multiline)
-// dueDate → DatePicker
-// priority → DropdownButtonFormField
-// Submit → calls provider.create() or provider.update()
-```
-
-`lib/features/todos/screens/todo_detail_screen.dart`:
-```dart
-// Shows all fields read-only
-// Edit button → navigate to form with existing data
-// Delete button → confirm dialog → provider.delete()
-// Back button → pop
-```
-
-`lib/features/todos/widgets/todo_card.dart`:
-```dart
-// Card showing title, priority badge, due date
-// Checkbox for completed status
-// onTap → navigate to detail
-```
-
-**For `auth` type:**
-
-`lib/features/auth/providers/auth_provider.dart`:
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
-final authProvider = StateNotifierProvider<AuthNotifier, AsyncValue<User?>>((ref) {
-  return AuthNotifier();
-});
-
-class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
-  final _auth = FirebaseAuth.instance;
-
-  AuthNotifier() : super(const AsyncValue.data(null)) {
-    _auth.authStateChanges().listen((user) {
-      state = AsyncValue.data(user);
-    });
-  }
-
-  Future<void> login(String email, String password) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final cred = await _auth.signInWithEmailAndPassword(email: email, password: password);
-      return cred.user;
-    });
-  }
-
-  Future<void> register(String email, String password) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final cred = await _auth.createUserWithEmailAndPassword(email: email, password: password);
-      return cred.user;
-    });
-  }
-
-  Future<void> loginWithGoogle() async {
-    // Google Sign-In implementation
-  }
-
-  Future<void> logout() async {
-    await _auth.signOut();
-    state = const AsyncValue.data(null);
-  }
-}
-```
-
-`lib/features/auth/screens/login_screen.dart`:
-```dart
-class LoginScreen extends ConsumerWidget {
-  // Email field, password field
-  // Login button → authProvider.login()
-  // "Don't have account?" → navigate to register
-  // Google Sign-In button
-}
-```
-
-`lib/features/auth/screens/register_screen.dart`:
-```dart
-// Email, password, confirm password
-// Register button → authProvider.register()
-// Back to login link
-```
-
-**For `settings` type:**
-
-`lib/features/settings/screens/settings_screen.dart`:
-```dart
-// Theme toggle (light/dark/system)
-// Notifications on/off
-// App version
-// Logout button (if auth)
-// Delete account
-```
-
-**For `profile` type:**
-
-`lib/features/profile/screens/profile_screen.dart`:
-```dart
-// Avatar, name, email, phone
-// Edit button → edit profile screen
-```
-
-### Step 4c: Generate App Shell (auto_route)
-
-After all features complete, generate routing:
-
-`lib/config/routes.dart`:
-```dart
-import 'package:go_router/go_router.dart';
-
-final appRouter = GoRouter(
-  initialLocation: '/',
-  routes: [
-    GoRoute(path: '/', builder: (_, __) => const HomeScreen()),
-    GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-    GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
-    GoRoute(path: '/todos', builder: (_, __) => const TodoListScreen()),
-    GoRoute(path: '/todos/new', builder: (_, __) => const TodoFormScreen()),
-    GoRoute(path: '/todos/:id', builder: (_, state) => TodoDetailScreen(id: state.pathParameters['id']!)),
-    GoRoute(path: '/todos/:id/edit', builder: (_, state) => TodoFormScreen(id: state.pathParameters['id']!)),
-    GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
-    GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
-  ],
-);
-```
-
-### Step 4d: Generate Main App Shell
-
-`lib/app.dart`:
-```dart
-import 'package:flutter/material.dart';
-import 'config/routes.dart';
-import 'config/theme.dart';
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: '$APP_NAME',
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
-      routerConfig: appRouter,
-      debugShowCheckedModeBanner: false,
-    );
-  }
-}
-```
-
-`lib/main.dart`:
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'app.dart';
-
-void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: MyApp()));
-}
-```
-
-### Step 4e: Generate Core Infrastructure
-
-`lib/core/network/api_client.dart` (if backend):
-```dart
-import 'package:dio/dio.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
-class ApiClient {
-  late final Dio _dio;
-
-  ApiClient({required String baseUrl}) {
-    _dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {'Content-Type': 'application/json'},
-    ));
-    _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) async {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          final token = await user.getIdToken();
-          options.headers['Authorization'] = 'Bearer $token';
-        }
-        handler.next(options);
-      },
-    ));
-  }
-
-  Future<Response> get(String path, {Map<String, dynamic>? params}) => _dio.get(path, queryParameters: params);
-  Future<Response> post(String path, {dynamic data}) => _dio.post(path, data: data);
-  Future<Response> put(String path, {dynamic data}) => _dio.put(path, data: data);
-  Future<Response> delete(String path) => _dio.delete(path);
-}
-```
-
-### Step 4f: Configure Dependencies
-
-Update `pubspec.yaml` with all needed packages:
-
-```yaml
-dependencies:
-  flutter:
-    sdk: flutter
-  flutter_riverpod: ^2.5.0
-  go_router: ^14.0.0
-  dio: ^5.4.0
-  json_annotation: ^4.8.0
-  intl: ^0.19.0
-  shimmer: ^3.0.0
-  flutter_secure_storage: ^9.0.0
-  # Conditionally added:
-  firebase_core: ^3.0.0
-  firebase_auth: ^5.0.0
-  google_sign_in: ^6.0.0
-
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  build_runner: ^2.4.0
-  json_serializable: ^6.7.0
-  flutter_lints: ^4.0.0
-```
-
-### Step 4g: Run Build Runner
+**4d — Verify.**
 
 ```bash
 cd "$PRODUCT_DIR/app"
-dart run build_runner build --delete-conflicting-outputs 2>&1
+[ -d lib/generated ] || ! grep -rq "part '.*\.g\.dart'" lib || dart run build_runner build --delete-conflicting-outputs
+flutter analyze
+flutter test
 ```
 
-If errors → fix imports, retry.
+Errors → fix and re-run, up to 3 rounds. Still failing → stop and show the analyzer output; do not proceed to review on a red tree.
 
-### Step 4h: Verify with flutter analyze
-
-```bash
-cd "$PRODUCT_DIR/app"
-flutter analyze 2>&1
-```
-
-**Auto-fix common errors:**
-- Missing import → add
-- Invalid constructor → fix syntax
-- Undefined class → check naming
-- Unused import → remove
-
-### Step 4i: Code Review & Tests
-
-```bash
-/skill code-review "$PRODUCT_DIR/app/" \
-  --output "$PRODUCT_DIR/plan/code-review.md"
-
-/skill test-coverage "$PRODUCT_DIR/app/" \
-  --framework flutter_test \
-  --output "$PRODUCT_DIR/plan/test-coverage.md"
-```
-
-### Phase 4 Gate
+**4e — Review and tests.**
 
 ```
-◆ Phase 4 — Build (COMPLETE)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Features generated: √ $N features
-  Routes registered:  √ $N routes
-  flutter analyze:    √ 0 errors, 0 warnings
-  Code review:        √ $FINDINGS findings
-  Test coverage:      √ $PERCENT%
-
-  ┌─────────────────────────────────────────────┐
-  │  $PRODUCT_DIR/app/                          │
-  │                                             │
-  │  lib/                                       │
-  │  ├── main.dart                              │
-  │  ├── app.dart                               │
-  │  ├── config/ (theme + routes)               │
-  │  ├── core/ (network, constants, widgets)    │
-  │  └── features/                              │
-  │      ├── auth/          (2 screens)         │
-  │      ├── todos/         (3 screens)         │
-  │      ├── profile/       (1 screen)          │
-  │      └── settings/      (1 screen)          │
-  └─────────────────────────────────────────────┘
-
-  ⛔ User: Do you approve the built app?
-     Options: Approve / Retry / Manual fix
+/code-review "$PRODUCT_DIR/app"                      → plan/code-review.md   (apply critical fixes)
+/test-coverage "$PRODUCT_DIR/app" --framework flutter_test → plan/test-coverage.md
 ```
 
-**Gate logic:**
-- Approved → continue to Phase 5
-- Retry → fix reported issues and re-run analyze
-- Manual fix → pause orchestrator, let user edit, resume
+**4f — Run it.** `flutter run` on a device/emulator if one is attached; otherwise `flutter build apk --debug` proves it links. The gate needs something the user can see — a screenshot via `adb exec-out screencap -p` when a device exists.
+
+### Gate 4
+
+```
+◆ Phase 4 — Build
+  Features:          $N ($TYPES)
+  Routes:            $N
+  flutter analyze:   0 errors · $N infos
+  flutter test:      $N passed
+  Code review:       $N findings, $N fixed
+  Tests added:       $N (coverage $P%)
+  Runs on:           <device/emulator + screenshot path>  |  debug APK built, no device
+
+  ⛔ Approve / Retry / Manual fix
+```
+
+### Gate 5-entry ⛔ — before anything outward-facing
+
+Tell the user, in this order, and wait:
+
+- `applicationId` = `$APPLICATION_ID` — **permanent after the first publish**
+- A keystore will be generated at `app/android/app/upload-keystore.jks`; backing it up is theirs to do (`flutter-signing` says what to store where)
+- The build goes to track **`internal`** unless they say otherwise; `production` on a first release is almost always wrong
+- Personal Play accounts created after 13 Nov 2023 need a 12-tester × 14-day closed test before production
+
+Approval for `internal` is not approval for `production`.
 
 ---
 
 ## Phase 5: Store & Publish
 
-### Step 5a: Configure Signing
+Each step reads the previous step's machine output. Do not summarise them from memory.
 
-```bash
-/skill flutter-signing \
-  --dir "$PRODUCT_DIR/app/"
-```
+**5a — Signing.** `/flutter-signing --dir "$PRODUCT_DIR/app"`. Record the SHA-1/SHA-256 it reports; if `auth_providers` has `google`, the SHA-1 must be added to the Firebase Android app before Google sign-in works on a release build — say so.
 
-### Step 5b: Build Release AAB
-
-```bash
-/skill flutter-build \
-  --dir "$PRODUCT_DIR/app/" \
-  --type appbundle \
-  --obfuscate true \
-  --bump none
-```
-
-First release, so no version bump. Keep `app/build/release/debug-info-<versionCode>/` — it is the only way to read crash reports from an obfuscated release.
-
-AAB saved to `$PRODUCT_DIR/app/build/release/app-release.aab`.
-
-### Step 5c: Generate Store Assets
-
-```bash
-/skill flutter-store-metadata \
-  --app_name "$APP_NAME" \
-  --features "$FEATURES" \
-  --category "$CATEGORY" \
-  --contact_email "$CONTACT_EMAIL" \
-  --output "$PRODUCT_DIR/store-metadata/"
-```
-
-Do **not** pass `has_login`/`collects_data`/`has_ads` here. The skill derives them from `pubspec.yaml` and `AndroidManifest.xml`; grepping the PRD for them is unreliable in both directions (`grep -qi "ad"` matches "add", "ready", "loading") and a wrong flag produces a listing that contradicts the app — which is a policy violation, not a cosmetic error.
-
-Screenshots must be captured from a running build. If no emulator or device is available in this environment, the skill emits placeholders and lists them in `store-listing.json` → `unresolved`; compliance will then fail, by design. Resolve them before publishing.
-
-### Step 5d: Compliance Check
-
-```bash
-/skill flutter-store-compliance \
-  --features "$FEATURES" \
-  --dir "$PRODUCT_DIR/app/" \
-  --store-dir "$PRODUCT_DIR/store-metadata/"
-```
-
-The audit derives its own facts from the code and cross-checks them against the listing — passing declarations in would just give it the same unverified claims to agree with.
-
-Read the verdict from `store-metadata/compliance-report.json` → `overall`:
-
-- `FAIL` → list every failing check with its `fix`, resolve, re-run. Publish is blocked.
-- `WARN` → show the issues; the user decides whether to proceed.
-- `PASS` → continue.
-
-### Step 5e: Publish Guide
-
-```bash
-/skill flutter-publish \
-  --aab_path "$(find $PRODUCT_DIR/app/build -name '*.aab' -type f | head -1)" \
-  --app_name "$APP_NAME" \
-  --category "$CATEGORY" \
-  --track "$TRACK" \
-  --whats_new "$PRODUCT_DIR/store-metadata/whats-new/en-US.txt" \
-  --output "$PRODUCT_DIR/store-metadata/publish-guide.md"
-```
-
-### Step 5f: ASO Optimization (Optional)
-
-```bash
-/skill aso-marketing \
-  --app-name "$APP_NAME" \
-  --description "$(cat $PRODUCT_DIR/store-metadata/description/full_description.txt)" \
-  --features "$FEATURES" \
-  --output "$PRODUCT_DIR/store-metadata/aso-report.md"
-```
-
-### Step 5g: Release Management
-
-```bash
-cd "$PRODUCT_DIR"
-git add -A
-git commit -m "feat: $APP_NAME initial release"
-git tag v1.0.0
-/skill release-manager --version 1.0.0 --skip-questions
-```
-
-### Step 5h: Social Post (Optional)
-
-**Không có skill `social-poster`** — bản trước gọi một skill không tồn tại, nên bước này luôn hỏng ở giữa Phase 5.
-
-Đăng bài quảng bá là việc thủ công. Soạn sẵn nội dung cho user tự đăng:
+**5b — Build.**
 
 ```
-<APP_NAME> đã lên Google Play.
+/flutter-build --dir "$PRODUCT_DIR/app" --build_type appbundle --bump none --obfuscate true
+```
 
+First release → no bump. Keep `app/build/release/debug-info-<versionCode>/` — the only way to read crash reports from an obfuscated release. Output: `build/release/app-release.aab` + `build-info.json`.
+
+**5c — Store assets.**
+
+```
+/flutter-store-metadata --app_name "$APP_NAME" --features "$FEATURES" --category "$CATEGORY" --contact_email "$CONTACT_EMAIL"
+```
+
+Do **not** pass `has_login` / `collects_data` / `has_ads` — the skill derives them from `pubspec.yaml` and the manifest; a wrong flag produces a listing that contradicts the app, which is a policy violation. Screenshots must come from a running build; with no device the skill emits placeholders and lists them in `store-listing.json → unresolved`, and compliance then fails **by design**. Resolve before 5d.
+
+**5d — Compliance.** `/flutter-store-compliance --dir "$PRODUCT_DIR/app"` then read `store-metadata/compliance-report.json → overall`:
+
+| overall | Do |
+|---------|----|
+| `FAIL` | List every FAIL check with its `fix`; resolve; re-run. **Publish is blocked.** |
+| `WARN` | Show the items; the user decides |
+| `PASS` | Continue |
+
+**5e — Publish.**
+
+```
+/flutter-publish --aab_path "$PRODUCT_DIR/app/build/release/app-release.aab" --track "$TRACK" \
+                 --whats_new "$PRODUCT_DIR/app/store-metadata/whats-new/en-US.txt"
+```
+
+A first release is always a **manual Console upload** — the Play API cannot create an app. The skill produces `upload-checklist.md` with real values substituted and writes `pending_upload` to `publish-state.json`; `last_uploaded` is written only after the user confirms the upload landed.
+
+**5f — ASO (optional).** `/aso-marketing` on the listing text → `store-metadata/aso-report.md`. Its keyword plan is gated by its own approval step.
+
+**5g — Release.** Commit everything in `$PRODUCT_DIR` (state file, plan, app, store-metadata — never `firebase-config/` or the keystore), then `/release-manager --version 1.0.0` on `app/`. Tagging is outward-facing only if a remote exists; if none does, say the tag is local.
+
+**5h — Announcement copy.** There is no `social-poster` skill; posting is manual. Draft:
+
+```
+<APP_NAME> is on Google Play.
 <SHORT_DESC>
-
-https://play.google.com/store/apps/details?id=<PACKAGE_NAME>
+https://play.google.com/store/apps/details?id=<APPLICATION_ID>
 ```
 
-`social-brand-sync` trong repo này **không** đăng bài — nó chỉ đồng bộ avatar, ảnh bìa và tên hiển thị. Đừng dùng thay thế.
-
-Và lưu ý: link store chỉ hoạt động sau khi app được duyệt và phát hành. Đăng bài trước khi review xong là link 404.
-
-### Phase 5 Report
+`social-brand-sync` syncs avatars and covers; it does **not** post. And the store link 404s until Google approves the release — say that next to the draft.
 
 ```
-◆ Phase 5 — Store & Publish (COMPLETE)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Signing:         √ Keystore created
-  Build:           √ AAB generated ($(ls -lh store-metadata/*.aab))
-  Store listing:   √ Icon, screenshots, description
-  Compliance:      √ PASS ($PASS_COUNT/$TOTAL areas)
-  Publish guide:   √ Step-by-step instructions
-  ASO report:      √ Keywords optimized
-
-  📦 $PRODUCT_DIR/store-metadata/ contains everything needed
-  🔐 Compliance status: $COMPLIANCE
+◆ Phase 5 — Store & Publish
+  Signing:      upload-keystore.jks · SHA-1 $SHA1 · backup: NOT done for you
+  Build:        app-release.aab $SIZE · v$VERSION+$CODE · targetSdk $T · 16 KB ✓   ← build-info.json
+  Listing:      icon ✓ · feature graphic ✓ · $N screenshots ($SOURCE) · unresolved: $N
+  Compliance:   $OVERALL ($PASS pass / $WARN warn / $FAIL fail)            ← compliance-report.json
+  Publish:      READY FOR MANUAL UPLOAD · track $TRACK · upload-checklist.md
+  ASO:          aso-report.md | skipped
 ```
 
 ---
 
-## Final Report
+## Final report
 
 ```
 ═══════════════════════════════════════════════════
-  FINAL REPORT: $APP_NAME
+  IDEA TO PLAY STORE — $APP_NAME
 ═══════════════════════════════════════════════════
+  Phase 1  Idea & Plan        ✓  $SCORE/100 · brand $RISK
+  Phase 2  Brand & Design     ✓  approved
+  Phase 3  Setup & Backend    ✓  $APPLICATION_ID · auth=$AUTH_PROVIDERS · backend=$API_BASE_URL|none
+  Phase 4  Build              ✓  $N features · analyze clean · $N tests
+  Phase 5  Store & Publish    $STATUS  (compliance $OVERALL · track $TRACK)
 
-  Phase 1  Idea & Plan        √ pass  (idea validated $SCORE/100)
-  Phase 2  Brand & Design     √ pass  (logo + UI approved)
-  Phase 3  Setup & Backend    √ pass  (Flutter + backend ready)
-  Phase 4  Build              √ pass  ($N features, $N screens, 0 errors)
-  Phase 5  Store & Publish    √ pass  (ready to submit)
+  Project:        $PRODUCT_DIR
+  AAB:            app/build/release/app-release.aab (v1.0.0+1)
+  Debug symbols:  app/build/release/debug-info-1/   ← keep
+  Store assets:   app/store-metadata/
+  State:          .idea-play-store-state.json
 
-  Project path:   $PRODUCT_DIR/
-  App source:     $PRODUCT_DIR/app/
-  Backend API:    $PRODUCT_DIR/backend/ $(if deployed: → $RENDER_URL)
-  Store assets:   $PRODUCT_DIR/store-metadata/
-  Plans:          $PRODUCT_DIR/plan/
-
-  Package name:   $ORG.$SLUG
-  Version:        1.0.0
-
-  Next steps:
-  1. Open Play Console: https://play.google.com/console/
-  2. Create new app
-  3. Upload AAB from $AAB_PATH
-  4. Fill store listing from $PRODUCT_DIR/store-metadata/
-  5. Submit for review
-
-  ⏱ Google Play review time: 1-7 days
+  You still have to:
+  1. Back up the keystore + key.properties to a password manager
+  2. Upload the AAB in Play Console — app/store-metadata/upload-checklist.md
+  3. Host privacy-policy.html at a public HTTPS URL and paste it in App content
+  4. Fill Data safety from store-metadata/data-safety.md; complete Content rating
+  5. [if Google sign-in] add SHA-1 $SHA1 to the Firebase Android app
+  6. [if personal account] run the 12-tester closed test before applying for production
+  7. [if Render DB] upgrade or export before the free PostgreSQL expires (30 days)
 ```
 
----
+`$STATUS` is `READY FOR MANUAL UPLOAD` unless `flutter-publish` reported `UPLOADED`. Never write "published" — submission and review are the user's and Google's.
 
-## Feature Template Reference
-
-### Feature: `crud`
-Files generated: 6
-```
-features/<name>/
-├── models/<name>.dart          # Data class + fromJson/toJson/copyWith
-├── providers/<name>_provider.dart  # StateNotifier with CRUD operations
-├── screens/<name>_list_screen.dart  # List + FAB + pull-to-refresh
-├── screens/<name>_detail_screen.dart  # Read-only detail view
-├── screens/<name>_form_screen.dart    # Create/edit form with validation
-├── widgets/<name>_card.dart           # List item card widget
-└── services/<name>_service.dart       # API calls or local storage
-```
-
-### Feature: `auth`
-Files generated: 4
-```
-features/auth/
-├── models/user.dart
-├── providers/auth_provider.dart
-├── screens/login_screen.dart
-└── screens/register_screen.dart
-```
-
-### Feature: `settings`
-Files generated: 1
-```
-features/settings/
-└── screens/settings_screen.dart
-```
-
-### Feature: `profile`
-Files generated: 2
-```
-features/profile/
-├── providers/profile_provider.dart
-└── screens/profile_screen.dart
-```
-
-### Feature: `search`
-Files generated: 1
-```
-features/search/
-└── screens/search_screen.dart
-```
-
----
-
-## Edge Cases
+## Edge cases
 
 | Situation | Handling |
 |-----------|----------|
-| No trend ideas found | Fallback: ask user for direct idea input |
-| Brand name returns Abandon | Suggest 3 alternatives, re-check |
-| User disapproves at Phase 1 gate | Ask what to change, revise specific doc |
-| Flutter install fails | Print error, try manual install path |
-| Firebase project creation fails | Guide to create manually in Firebase Console |
-| Backend deploy fails | Suggest Render manual deploy, continue without backend |
-| `flutter analyze` has errors | Auto-fix (add imports, fix syntax), retry up to 3 times |
-| Build runner conflicts | `clean` then rebuild |
-| Compliance FAIL | Print specific items, block Phase 5, ask user to fix |
-| User cancels mid-pipeline | Save state to `$PRODUCT_DIR/.idea-play-store-state` for resume |
+| No trend ideas / fetch fails | Ask for an idea directly → 1a "user already has an idea" branch |
+| Brand name `Abandon` | 3 alternatives, re-check the user's choice |
+| Gate: Revise | Regenerate only the affected doc and its downstream |
+| Gate: Abort | Stop. Keep the directory and state file. Tell the user the path. |
+| Resume | State file present → offer resume from `step` |
+| `flutter-init` toolchain install fails | Surface its report; do not hand-roll an SDK install here |
+| Firebase project quota exhausted | Ask for an existing project → `--project-id` |
+| `flutterfire configure` missing | `dart pub global activate flutterfire_cli`; if it still fails, stop — a wrong `firebase_options.dart` fails at runtime, not at build |
+| Backend deploy `verified: false` | Continue with the app pointing at localhost for now; record backend as unverified in the report; do not write the URL into the app |
+| `flutter analyze` errors after 3 rounds | Stop at 4d with the output. Do not review or build a red tree |
+| Compliance `FAIL` | Blocked. Fix, re-run 5d |
+| Screenshots are placeholders | Compliance FAILs by design; capture from a device or emulator, re-run 5c |
+| User wants `production` on first release | Say why `internal` first; if they insist, `flutter-publish` still applies its own gates |
 
-## Acceptance Criteria
+## Acceptance criteria
 
-- [ ] All 5 phases complete without critical errors
-- [ ] Flutter app compiles with `flutter analyze` clean
-- [ ] Feature code generated for every task in tasks.md
-- [ ] Backend API generated if PRD requires backend
-- [ ] Firebase Auth integrated if PRD requires login
-- [ ] Store metadata generated (icon, feature graphic, screenshots, desc, privacy policy)
-- [ ] Screenshots captured from a running build — no placeholders left in `store-listing.json` → `unresolved`
-- [ ] Compliance verdict `PASS` or `WARN` in `store-metadata/compliance-report.json` (`FAIL` blocks publish)
-- [ ] Publish guide generated with step-by-step instructions
-- [ ] Final report produced with all deliverables listed
+- [ ] `plan/` has `idea.md`, `validate.md`, `brand-check.md`, `prd.md`, `tad.md`, `tasks.md`
+- [ ] State file present, `application_id` recorded and not `com.example.*`
+- [ ] Every task in `tasks.md` maps to generated feature code; `flutter analyze` clean; `flutter test` green
+- [ ] Firebase Auth integrated iff `needs_auth`; Google UI iff `auth_providers` has `google`
+- [ ] Backend generated iff `needs_backend`; its URL used only when `verified: true`
+- [ ] `build-info.json` exists; `store-listing.json → unresolved` is empty
+- [ ] `compliance-report.json → overall` is `PASS` or `WARN`
+- [ ] `upload-checklist.md` produced; `publish-state.json` has `pending_upload` (or `last_uploaded` after user confirmation)
+- [ ] Final report lists every remaining manual step; nothing is described as "published"
+
+## Reference files
+
+| File | Read when |
+|------|-----------|
+| `references/feature-templates.md` | Phase 4b–4c — per-type Dart templates, routing, app shell, api client, pubspec |
+| `references/backend-template.md` | Phase 3c — FastAPI layout and `main.py` with Firebase token verification |

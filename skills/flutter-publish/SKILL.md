@@ -3,7 +3,7 @@ name: flutter-publish
 description: "Upload a Flutter Android App Bundle (AAB) to Google Play Console and guide the user through submission. Use when user says 'publish', 'upload', 'submit', 'đăng lên chplay', 'publish app', 'push to play store', or asks whether a build is ready to upload. Run LAST after all other flutter-* skills pass."
 license: MIT
 metadata:
-  version: 2.1.0
+  version: 2.2.0
 ---
 
 # Flutter Publish
@@ -38,9 +38,15 @@ Then establish two things that decide whether the requested track is even reacha
 
 If the user asked for `production` and either answer blocks it, say so **before** running the gates — otherwise the whole preflight runs for a track Play will not accept.
 
-**Step 2 — Run the gates.** Read `references/preflight.md`. It defines every blocking and warning check with the real command to run: compliance verdict, applicationId, target API level, 16 KB page alignment, version code, signing, debuggable flag, size, committed credentials. Do not skip a check because a sibling skill "should have" caught it — verify the AAB against `build/release/build-info.json` (Gate 0) instead of assuming the file in `build/` came from the last verified build.
+**Step 2 — Run the gates.**
 
-Report all gate results in one table before doing anything else. **Any BLOCK ⇒ stop and fix.** Do not offer to "proceed anyway" past a BLOCK — Play will reject it, so proceeding only wastes a version code.
+```bash
+bash <skill-dir>/scripts/preflight.sh --project . [--aab <path>] --out store-metadata/preflight.json
+```
+
+One script runs every gate in `references/preflight.md` and emits one JSON table: provenance vs `build-info.json` (Gate 0), compliance verdict from `compliance-report.json` (1), the artifact itself through `flutter-build/scripts/verify-artifact.sh` — applicationId, target API, 16 KB alignment, signing, debuggable, size (2–4, 6–8) — version code vs `publish-state.json` including `pending_upload` (5), committed credentials in the index **and** history (9), store assets per locale + `unresolved` (10). With several AABs it prefers `build/release/app-release.aab` and otherwise lists them and stops — it never silently takes the first. `UNVERIFIED` (a missing tool) is never a pass. Read `references/preflight.md` for what each gate means and how to fix it; do not re-run the commands by hand.
+
+Report the table from `preflight.json` before doing anything else. **Any BLOCK ⇒ stop and fix.** Do not offer to "proceed anyway" past a BLOCK — Play will reject it, so proceeding only wastes a version code.
 
 **Step 3 — Generate release notes.** Skip if `whats_new` was provided.
 
@@ -163,6 +169,10 @@ When the run ends with `pending_upload` in the state file, tell the user that co
 | `references/testing-track.md` | Step 6 — 12-tester rule, production access application |
 | `references/api-upload.md` | Step 4 — fastlane/API upload, service account setup |
 | `references/troubleshooting.md` | An upload error or a rejection notice |
+
+| Script | Run at |
+|--------|--------|
+| `scripts/preflight.sh` | Step 2 — all gates → `store-metadata/preflight.json`; exit 1 on BLOCK. Calls `flutter-build/scripts/verify-artifact.sh` |
 
 ## Scope
 

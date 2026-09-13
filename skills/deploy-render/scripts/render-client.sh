@@ -7,11 +7,13 @@ OUTPUT_DIR=""
 NO_DB=false
 REGION="${RENDER_REGION:-oregon}"
 HEALTH_PATH="${RENDER_HEALTH_PATH:-/docs}"
+BRANCH="main"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --slug) SLUG="$2"; shift 2 ;;
     --gh-user) GH_USER="$2"; shift 2 ;;
+    --branch) BRANCH="$2"; shift 2 ;;
     --output) OUTPUT_DIR="$2"; shift 2 ;;
     --region) REGION="$2"; shift 2 ;;
     --health-path) HEALTH_PATH="$2"; shift 2 ;;
@@ -100,7 +102,7 @@ if [ "$NO_DB" = false ]; then
     echo "     ✅ Reusing $DB_ID"
   else
     DB_RESP=$(api POST "/postgres" \
-      "{\"name\":\"${SLUG}-db\",\"plan\":\"free\",\"region\":\"$REGION\",\"version\":\"16\"}") || {
+      "$(jq -n --arg n "${SLUG}-db" --arg r "$REGION" '{name:$n, plan:"free", region:$r, version:"16"}')") || {
       fail "Could not create the database. The response above is what Render returned."
       exit 1
     }
@@ -113,11 +115,12 @@ fi
 
 # --- 2. Blueprint sync ----------------------------------------------------
 # The service is defined by render.yaml in the repo (see prepare-server.sh).
-echo "  2. Syncing blueprint from $REPO_URL ..."
+echo "  2. Syncing blueprint from $REPO_URL ($BRANCH) ..."
 if [ "$NO_DB" = true ]; then
-  BP="{\"repoUrl\":\"$REPO_URL\",\"branch\":\"main\"}"
+  BP=$(jq -n --arg u "$REPO_URL" --arg b "$BRANCH" '{repoUrl:$u, branch:$b}')
 else
-  BP="{\"repoUrl\":\"$REPO_URL\",\"branch\":\"main\",\"serviceOverrides\":[{\"type\":\"web\",\"envVars\":[{\"key\":\"DATABASE_URL\",\"fromDatabase\":{\"name\":\"${SLUG}-db\"}}]}]}"
+  BP=$(jq -n --arg u "$REPO_URL" --arg b "$BRANCH" --arg db "${SLUG}-db" \
+    '{repoUrl:$u, branch:$b, serviceOverrides:[{type:"web", envVars:[{key:"DATABASE_URL", fromDatabase:{name:$db}}]}]}')
 fi
 
 SERVICE_ID=""; DEPLOY_ID=""
@@ -179,12 +182,18 @@ if [ -z "$SERVICE_URL" ]; then
 else
   echo "     $SERVICE_URL"
   echo "  5. Verifying ${SERVICE_URL}${HEALTH_PATH} ..."
-  # First request after a cold start can take ~60s on the free plan.
-  HTTP_CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 90 -L "${SERVICE_URL}${HEALTH_PATH}" || echo "000")
-  if [ "$HTTP_CODE" = "200" ]; then
-    VERIFIED=true; echo "     ✅ HTTP 200"
+  # First request after a cold start can take ~60s on the free plan, and the
+  # router may return 502/503 for a few seconds after "live". Three tries.
+  for attempt in 1 2 3; do
+    HTTP_CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 90 -L "${SERVICE_URL}${HEALTH_PATH}" || echo "000")
+    [ "$HTTP_CODE" = "200" ] && { VERIFIED=true; break; }
+    [ "$attempt" -lt 3 ] && { echo "     HTTP $HTTP_CODE — retrying in 10s ($attempt/3)"; sleep 10; }
+  done
+  if [ "$VERIFIED" = true ]; then
+    echo "     ✅ HTTP 200"
   else
-    echo "     ⚠ HTTP $HTTP_CODE — deploy reported '$STATUS' but the app did not answer."
+    echo "     ⚠ HTTP $HTTP_CODE — deploy reported '$STATUS' but the app did not answer at $HEALTH_PATH."
+    echo "       If the API has no $HEALTH_PATH route, re-run with --health-path <existing route>."
   fi
 fi
 

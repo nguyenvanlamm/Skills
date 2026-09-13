@@ -2,13 +2,28 @@
 
 ## Công cụ
 
-**WebSearch** là công cụ chính. Phần lớn dữ liệu du lịch nằm sau chống-bot, nên truy vấn tìm kiếm thường cho kết quả tốt hơn là fetch thẳng.
+Dùng tool **tìm kiếm web** của host (`web_search`, `WebSearch`… tuỳ môi trường) làm công cụ chính. Phần lớn dữ liệu du lịch nằm sau chống-bot, nên truy vấn tìm kiếm thường cho kết quả tốt hơn là fetch thẳng.
 
-**WebFetch** dùng cho: Wikipedia, website chính thức của điểm tham quan/khách sạn, trang tin, blog du lịch, Rome2Rio.
+Tool **fetch trang** (`webfetch`, `WebFetch`…) dùng cho: Wikipedia, website chính thức của điểm tham quan/khách sạn, trang tin, blog du lịch, Rome2Rio.
 
 **Không fetch được** (chống-bot, sẽ trả về lỗi hoặc trang rỗng — đừng lãng phí lượt gọi): Booking.com, Agoda, Airbnb, Google Maps, Google Flights, Skyscanner, Tripadvisor, Foody, Yelp.
 
-Với nhóm không fetch được, lấy dữ liệu gián tiếp qua WebSearch:
+## Ngân sách tra cứu
+
+Một chuyến 4 ngày có thể nuốt 60 lượt tìm kiếm nếu tra từng quán một. Giới hạn theo hạng mục, và **gộp truy vấn** thay vì tách:
+
+| Hạng mục | Lượt tối đa | Cách gộp |
+|---|---|---|
+| Vé di chuyển | 2 | Một truy vấn khứ hồi, một cho phương tiện thay thế nếu cần |
+| Khách sạn | 3 | "khách sạn [hạng] [khu vực] [thành phố] giá review" — một truy vấn ra 5–10 tên kèm rating |
+| Nhà hàng | 1/ngày + 2 | "quán ăn ngon [khu vực] [thành phố] review" cho mỗi cụm lịch trình; 2 lượt cho đặc sản cụ thể |
+| Điểm tham quan | 3 | Vé + giờ mở cửa gộp: "[điểm] giá vé giờ mở cửa [năm]" |
+| Khoảng cách | 2 | Tra khoảng cách giữa các **cụm**, không giữa từng điểm |
+| Baseline chi phí + tỷ giá + thời tiết | 3 | Một lượt mỗi loại |
+
+Tổng thường rơi vào 15–25 lượt cho chuyến 3–5 ngày. Vượt ngưỡng của một hạng mục mà vẫn thiếu dữ liệu → dừng tra hạng mục đó, ghi "chưa có giá chính xác" và đi tiếp. Tra thêm không tạo ra dữ liệu không tồn tại.
+
+Với nhóm không fetch được, lấy dữ liệu gián tiếp qua tìm kiếm:
 
 ```
 "tên khách sạn" review rating booking

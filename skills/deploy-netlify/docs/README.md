@@ -22,6 +22,9 @@ Tự động deploy React client lên Netlify — thêm config, push GitHub, t�
 | `--slug` | Yes | Product slug |
 | `--api-url` | No | URL server production (nếu có) |
 | `--gh-user` | No | GitHub username (auto-detected) |
+| `--public` | No | Public GitHub repo (default private) |
+| `--skip-github` | No | Deploy only, no GitHub repo |
+| `--output` | No | Where to write `netlify-output.json` |
 
 ### Output
 
@@ -31,8 +34,15 @@ Tự động deploy React client lên Netlify — thêm config, push GitHub, t�
   "url": "https://<slug>.netlify.app",
   "site_id": "xxx-xxx",
   "site_name": "<slug>",
-  "deploy_id": "yyy"
+  "deploy_id": "yyy",
+  "deploy_preview_url": "https://yyy--<slug>.netlify.app",
+  "verified": true
 }
+```
+
+`verified: false` → exit code 2. Only consume `url` downstream when `verified` is true.
+
+```
 ```
 
 ## Prerequisites
@@ -41,9 +51,6 @@ Tự động deploy React client lên Netlify — thêm config, push GitHub, t�
 # Netlify token (1 lần)
 echo "<token>" > ~/.config/netlify/token
 chmod 600 ~/.config/netlify/token
-
-# Netlify CLI
-npm install -g netlify-cli
 
 # GitHub CLI (nếu chưa có)
 gh auth login
@@ -54,7 +61,7 @@ gh auth login
 | | Có server | Static site |
 |--|-----------|-------------|
 | `--api-url` | Required | Không cần |
-| `VITE_API_URL` | Set trên Netlify env | Không set |
+| `VITE_API_URL` | Baked into the bundle at local build time from `.env.production` (also mirrored to Netlify env for a possible future repo link) | Không set |
 | netlify.toml | Có | Có |
 | `_redirects` | Có (SPA) | Có (SPA) |
 
@@ -64,7 +71,7 @@ Phase 4, sau `deploy-render`:
 
 ```
 # Nếu có server:
-API_URL=$(jq -r '.url' $PRODUCT_DIR/deploy-output.json)
+API_URL=$(jq -r 'select(.verified==true) | .url // empty' $PRODUCT_DIR/<slug>-server/deploy-output.json)
 /deploy-netlify --client-dir "$PRODUCT_DIR/<slug>-client" --slug "<slug>" --api-url "$API_URL"
 
 # Nếu không có server:

@@ -94,13 +94,7 @@ Compare against today's date. `minSdkVersion` is an engineering choice, not a Pl
 
 ## 4. Store listing
 
-```bash
-identify -format '%wx%h %[channels]\n' store-metadata/icon/icon-512.png
-identify -format '%wx%h %[channels]\n' store-metadata/icon/feature-graphic.png
-wc -m < store-metadata/description/en-US/short_description.txt
-wc -m < store-metadata/description/en-US/full_description.txt
-python3 -c "import json;d=json.load(open('store-metadata/store-listing.json'));print(d.get('unresolved'))"
-```
+All rows in this group except *Description claims*, *Keyword stuffing* and *Category plausibility* are produced by `scripts/check-assets.sh` (`listing.*` ids). Copy them.
 
 | Check | Rule | Verdict if violated |
 |-------|------|--------------------|

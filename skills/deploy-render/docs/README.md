@@ -23,6 +23,9 @@ Tự động deploy FastAPI server lên Render.com — từ sửa code, push Git
 | `--gh-user` | No | auto | GitHub username |
 | `--output` | No | server-dir | Output directory cho `deploy-output.json` |
 | `--no-db` | No | false | Skip PostgreSQL setup (server không cần database) |
+| `--public` | No | private | Public GitHub repo |
+| `--region` | No | oregon | Render region (service + database) |
+| `--health-path` | No | /docs | Route to verify; also `healthCheckPath` in render.yaml |
 
 ### Output
 
@@ -30,11 +33,21 @@ Tự động deploy FastAPI server lên Render.com — từ sửa code, push Git
 ```json
 {
   "url": "https://task-manager-server.onrender.com",
-  "database_id": "db-xxx",
   "service_id": "srv-xxx",
+  "deploy_id": "dep-xxx",
+  "database_id": "dpg-xxx",
+  "database_status": "created",
   "repo_url": "https://github.com/user/task-manager-server",
-  "status": "live"
+  "status": "live",
+  "http_code": "200",
+  "has_db": true,
+  "verified": true
 }
+```
+
+Only consume `url` downstream when `verified` is true; `url` is empty (never guessed) when Render did not return one. Exit code 2 when not verified.
+
+```
 ```
 
 ## Prerequisites
@@ -63,11 +76,11 @@ Thêm vào Phase 4 — Ship Preparation:
 
 ```
 /deploy-render --server-dir "$PRODUCT_DIR/<slug>-server" --slug "<slug>"
-→ ✅ Deployed at https://<slug>-server.onrender.com
+→ deploy-output.json với url + verified; chỉ dùng url khi verified=true
 ```
 
 ## Chú ý
 
-- Render free tier: service sleep sau 15 phút không dùng, tự wake khi có request (chậm ~30s)
-- Free PostgreSQL: 1GB, expire sau 90 ngày
+- Render free tier: service sleep khi không có traffic, tự wake khi có request (request đầu có thể mất tới ~1 phút)
+- **Free PostgreSQL hết hạn sau 30 ngày** kể từ khi tạo, 14 ngày ân hạn, sau đó Render xoá database và toàn bộ dữ liệu. (Bản README cũ ghi 90 ngày — sai.)
 - Nếu deploy thất bại, log build hiện trong Render Dashboard → Service → Events

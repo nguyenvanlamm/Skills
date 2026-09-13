@@ -8,20 +8,48 @@ SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SLUG=""
 OUTPUT_DIR=""
 REGION="us-central"
+EXISTING_ID=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --slug) SLUG="$2"; shift 2 ;;
+    --project-id) EXISTING_ID="$2"; shift 2 ;;
     --output) OUTPUT_DIR="$2"; shift 2 ;;
     --region) REGION="$2"; shift 2 ;;
     *) echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
 
-if [ -z "$SLUG" ]; then echo "❌ --slug required"; exit 1; fi
+if [ -z "$SLUG" ] && [ -z "$EXISTING_ID" ]; then echo "❌ --slug or --project-id required"; exit 1; fi
 if [ -z "$OUTPUT_DIR" ]; then OUTPUT_DIR="$PWD/firebase-output"; fi
-
 mkdir -p "$OUTPUT_DIR"
+
+write_output() {  # write_output <project_id> <project_number> <created:true|false>
+  jq -n --arg id "$1" --arg num "$2" --arg region "$REGION" --argjson created "$3" \
+    '{project_id:$id, project_number:$num, region:$region, created:$created, auth_providers:[]}' \
+    > "$OUTPUT_DIR/firebase-output.json"
+}
+
+# --- Reuse an existing project ----------------------------------------------
+# Every created project counts against a ~10-12 project quota that takes 30 days
+# to free after deletion. Reusing is the only way to run this skill repeatedly.
+if [ -n "$EXISTING_ID" ]; then
+  echo "📦 Using existing project $EXISTING_ID..."
+  if ! firebase projects:list --json 2>/dev/null | jq -e --arg id "$EXISTING_ID" '.result[] | select(.projectId == $id)' >/dev/null; then
+    if gcloud projects describe "$EXISTING_ID" >/dev/null 2>&1; then
+      echo "  GCP project exists but has no Firebase — adding Firebase to it..."
+      firebase projects:addfirebase "$EXISTING_ID" >/dev/null 2>&1 || {
+        echo "❌ Could not add Firebase to $EXISTING_ID. Open https://console.firebase.google.com and add it once."; exit 1; }
+    else
+      echo "❌ Project '$EXISTING_ID' not found (or you lack access). Check: gcloud projects list"; exit 1
+    fi
+  fi
+  PROJECT_NUMBER=$(gcloud projects describe "$EXISTING_ID" --format="value(projectNumber)" 2>/dev/null || echo "")
+  write_output "$EXISTING_ID" "$PROJECT_NUMBER" false
+  echo "✅ Project step complete (reused). Project ID: $EXISTING_ID"
+  exit 0
+fi
+
 echo "📦 Creating Firebase project..."
 
 # Generate a unique project name
@@ -79,14 +107,6 @@ fi
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)" 2>/dev/null || echo "")
 echo "  Project number: $PROJECT_NUMBER"
 
-# Write intermediate output
-cat > "$OUTPUT_DIR/firebase-output.json" <<EOF
-{
-  "project_id": "$PROJECT_ID",
-  "project_number": "$PROJECT_NUMBER",
-  "region": "$REGION",
-  "auth_providers": []
-}
-EOF
+write_output "$PROJECT_ID" "$PROJECT_NUMBER" true
 
 echo "✅ Project step complete. Project ID: $PROJECT_ID"

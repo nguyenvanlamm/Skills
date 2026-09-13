@@ -4,7 +4,7 @@ description: "Lập kế hoạch du lịch toàn diện — đề xuất khách 
 license: MIT
 effort: medium
 metadata:
-  version: 2.0.0
+  version: 2.1.0
   author: "Nguyen Van Lam"
 ---
 
@@ -24,7 +24,17 @@ Chạy tuần tự. Mỗi bước ghi rõ file cần đọc — đọc khi tới
 
 **Bước 1 — Thu thập input.** Đối chiếu với bảng dưới. Thiếu trường bắt buộc thì hỏi, đừng đoán.
 
-**Bước 2 — Tra cứu.** Đọc `references/search.md`. File này quy định nguồn nào cho loại dữ liệu nào, dùng tool gì, và xử lý ra sao khi nguồn không truy cập được.
+**Bước 1b — Kiểm tra khả thi trước khi tra cứu.** Ba phép kiểm nhanh, không cần tool, để không tốn 20 lượt tra cứu cho một chuyến không thể xảy ra:
+
+| Kiểm tra | Cách làm | Nếu không đạt |
+|---|---|---|
+| Thời gian | `days` có đủ cho quãng đường không? (VD 1 ngày Hà Nội → Phú Quốc → về là vô lý) | Nói thẳng, đề xuất số ngày tối thiểu hoặc điểm đến gần hơn, **hỏi lại** trước khi đi tiếp |
+| Ngân sách | Nếu có `budget`: chia cho số người × số ngày. Dưới mức vé di chuyển khứ hồi ước lượng thô là không khả thi | Nêu con số/người/ngày, hỏi user muốn tăng ngân sách, đổi phương tiện hay đổi điểm đến — đừng lập kế hoạch rồi kết luận "vượt 300%" ở cuối |
+| Ngày đi | `start_date` trong quá khứ, hoặc trùng dịp cực cao điểm (Tết, Golden Week) | Quá khứ → hỏi lại. Cao điểm → tiếp tục nhưng cảnh báo giá và tình trạng hết phòng ngay ở Tổng quan |
+
+Con số dùng ở bước này là **ước lượng thô để quyết định có tra cứu tiếp hay không**, không được đưa vào output. Output vẫn tuân thủ nguyên tắc cốt lõi.
+
+**Bước 2 — Tra cứu.** Đọc `references/search.md`. File này quy định nguồn nào cho loại dữ liệu nào, dùng tool gì, giới hạn số lượt tra cứu, và xử lý ra sao khi nguồn không truy cập được.
 
 **Bước 3 — Chọn khách sạn và nhà hàng.** Đọc `references/selection.md`. Chứa toàn bộ ngưỡng lọc (rating, khoảng cách) và quy tắc nới lỏng khi không đủ kết quả.
 
@@ -64,9 +74,13 @@ Khi hỏi thêm, gộp thành một lượt — đừng hỏi từng câu:
 
 Nếu `start_date` đã ở quá khứ so với hôm nay, hỏi lại thay vì lập kế hoạch.
 
+Chuẩn hoá trước khi dùng: `days` ngoài 1–30 → hỏi lại (trên 30 ngày là hành trình dài, ngoài phạm vi); `children` phải kèm tuổi vì tuổi quyết định phụ thu và mật độ lịch trình — thiếu tuổi thì hỏi; `budget` không có đơn vị tiền tệ → hỏi, đừng mặc định VND cho chuyến nước ngoài.
+
+**Nhiều điểm đến** ("Đà Nẵng rồi Huế"): coi là các chặng nối tiếp, chia `days` theo đề xuất của bạn và nói rõ cách chia, thêm chặng di chuyển giữa hai điểm vào lịch trình và bảng chi phí. Không im lặng chỉ lập kế hoạch cho điểm đầu.
+
 ## Phạm vi
 
-Hỗ trợ: du lịch trong nước và nước ngoài, chuyến 1–30 ngày, mọi hình thức (gia đình, cặp đôi, nhóm, một mình; tiết kiệm, nghỉ dưỡng, khám phá).
+Hỗ trợ: du lịch trong nước và nước ngoài, chuyến 1–30 ngày, một hoặc nhiều điểm đến nối tiếp, mọi hình thức (gia đình, cặp đôi, nhóm, một mình; tiết kiệm, nghỉ dưỡng, khám phá).
 
 Không làm: đặt vé/phòng/dịch vụ thay người dùng; tư vấn visa, hộ chiếu, thủ tục pháp lý; du lịch công vụ và hội nghị.
 

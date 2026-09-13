@@ -3,7 +3,7 @@ name: flutter-store-metadata
 description: "Generate Google Play store listing assets: app icon, feature graphic, screenshots, description, privacy policy, and store-listing.json. Use when user says 'store listing', 'metadata', 'store metadata', 'chuẩn bị store', 'tạo metadata', 'screenshots'. Run after flutter-build and before flutter-store-compliance."
 license: MIT
 metadata:
-  version: 2.0.0
+  version: 2.1.0
 ---
 
 # Flutter Store Metadata
@@ -36,27 +36,31 @@ Data-collection flags are **not** inputs — they are derived in Step 1. Asking 
 
 ### Step 1 — Derive the facts
 
-Never take these from user input. Read the project:
+Never take these from user input. Run the script:
 
 ```bash
-sed -n '/^dependencies:/,/^dev_dependencies:/p' pubspec.yaml
-grep -oE 'android:name="android\.permission\.[A-Z_]+"' android/app/src/main/AndroidManifest.xml
-grep -E 'android:label' android/app/src/main/AndroidManifest.xml
-grep "^version:" pubspec.yaml
+bash <skill-dir>/scripts/derive-facts.sh --project . --out store-metadata/derived.json
 ```
+
+It reads `pubspec.yaml` (direct, non-dev dependencies only — an ad SDK in `dev_dependencies` does not ship), every manifest under `android/app/src/`, and `build.gradle(.kts)`, and emits:
 
 | Fact | Evidence |
 |------|----------|
-| Has ads | `google_mobile_ads`, `applovin_max`, `unity_ads`, `facebook_audience_network` |
-| Has IAP | `in_app_purchase`, `purchases_flutter`, `flutter_inapp_purchase` |
-| Has login | `firebase_auth`, `google_sign_in`, `sign_in_with_apple`, `supabase_flutter` |
-| Collects data | `firebase_analytics`, `firebase_crashlytics`, `sentry_flutter`, `amplitude`, `posthog`, `mixpanel` |
-| Sensitive permissions | CAMERA, RECORD_AUDIO, ACCESS_FINE_LOCATION, ACCESS_BACKGROUND_LOCATION, READ_CONTACTS, SMS/CALL_LOG |
-| Network access | `INTERNET` permission, `http`/`dio` packages |
+| `has_ads` | `google_mobile_ads`, `applovin_max`, `unity_ads`, `facebook_audience_network`, `ironsource_mediation` |
+| `has_iap` | `in_app_purchase`, `purchases_flutter`, `flutter_inapp_purchase` |
+| `has_login` | `firebase_auth`, `google_sign_in`, `sign_in_with_apple`, `supabase_flutter`, `amplify_auth_cognito` |
+| `collects_data` | analytics (`firebase_analytics`, `amplitude_flutter`, `mixpanel_flutter`, `posthog_flutter`, `segment_analytics`) **or** crash reporting (`firebase_crashlytics`, `sentry_flutter`, `bugsnag_flutter`) |
+| `push_notifications`, `uses_location`, `uses_camera`, `uses_contacts` | matching package **or** permission |
+| `network_access` | `INTERNET` permission or an HTTP package |
+| `local_only` | none of the above — a short privacy policy is then correct and sufficient |
+| `restricted_permissions` / `sensitive_permissions` | SMS/Call Log · location/camera/mic/contacts/all-files/query-all-packages, each with the manifest file that declares it |
+| `unknown_sdks` | every dependency not in the script's benign or classified lists — the user must state what each collects |
+| `identity` | `pubspec name`, `android:label`, `applicationId`, `version` |
+| `evidence` | `pubspec.yaml:<line>` for every true fact |
 
-Record each derived fact **with the evidence that produced it** — `flutter-store-compliance` compares against the same evidence, and a fact without a source cannot be cross-checked.
+Copy the JSON into `store-listing.json → derived` unchanged. `flutter-store-compliance` runs the same script and diffs — a fact without a `pubspec.yaml:<line>` cannot be cross-checked, which is why the script writes them and you do not.
 
-Also check `app_name` against `android:label`. A listing name that differs from the in-app name is a misleading-metadata rejection; flag the mismatch and ask which is correct.
+Also check `app_name` against `derived.identity.android_label`. A listing name that differs from the in-app name is a misleading-metadata rejection; flag the mismatch and ask which is correct.
 
 If `features` was not given, read `prd.md`, `tasks.md`, then `README.md`. Ask rather than invent — descriptions of features the app lacks are the single most common deceptive-listing rejection.
 
@@ -122,19 +126,7 @@ Output `store-metadata/privacy-policy/privacy-policy.md` + `.html`. Play require
   "locales": ["en-US", "vi-VN"],
   "contact_email": "support@acme.com",
   "privacy_policy_url": null,
-  "derived": {
-    "has_ads": false,
-    "has_iap": true,
-    "has_login": true,
-    "collects_data": true,
-    "sensitive_permissions": ["CAMERA"],
-    "evidence": {
-      "has_iap": "pubspec.yaml: in_app_purchase ^3.2.0",
-      "has_login": "pubspec.yaml: firebase_auth ^5.3.1",
-      "collects_data": "pubspec.yaml: firebase_analytics ^11.3.3",
-      "sensitive_permissions": "AndroidManifest.xml: android.permission.CAMERA"
-    }
-  },
+  "derived": { "…": "the full object written by scripts/derive-facts.sh — has_ads, has_iap, has_login, collects_data, permissions, unknown_sdks, identity, evidence, derived_at" },
   "assets": {
     "icon": "store-metadata/icon/icon-512.png",
     "feature_graphic": "store-metadata/icon/feature-graphic.png",
@@ -175,6 +167,10 @@ Never report "COMPLETE" while `unresolved` is non-empty.
 | `references/icon-assets.md` | Step 2–3 — icon and feature graphic |
 | `references/screenshots.md` | Step 4 — capture, automation, placeholder rules |
 | `references/privacy-policy.md` | Step 6 — deriving a policy that is true |
+
+| Script | Run at |
+|--------|--------|
+| `scripts/derive-facts.sh` | Step 1 — the `derived` block, with evidence, from code only. Also run by `flutter-store-compliance` |
 
 ## Scope
 

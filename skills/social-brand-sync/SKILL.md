@@ -2,489 +2,156 @@
 name: social-brand-sync
 description: "Đồng bộ thương hiệu từ website lên mạng xã hội — phân tích website (logo, tên, màu sắc), tạo ảnh đại diện + ảnh bìa đúng kích thước từng nền tảng, và cập nhật qua API. Hỗ trợ Facebook, LinkedIn, Twitter/X, TikTok, YouTube, GitHub. Không dùng cho đăng bài content, quảng cáo, hoặc nền tảng không được hỗ trợ."
 license: MIT
-effort: max
+effort: high
 metadata:
-  version: 2.0.0
+  version: 3.0.0
   author: "Nguyen Van Lam"
 ---
 
 # Social Brand Sync
 
-Đồng bộ hóa thương hiệu từ website lên mạng xã hội — cập nhật ảnh đại diện, ảnh nền/banner, và tên hiển thị để thống nhất nhận diện thương hiệu trên tất cả nền tảng.
+Đồng bộ hóa thương hiệu từ website lên mạng xã hội — cập nhật ảnh đại diện, ảnh bìa và tên hiển thị để nhận diện thống nhất trên mọi nền tảng.
 
 ## Nguyên tắc
 
-> **Mặc định không ghi.** Skill này thay avatar, ảnh bìa và tên hiển thị trên tài khoản thật của user, cùng lúc trên nhiều nền tảng, và không có nút hoàn tác nào. Mọi lệnh gọi API ghi dữ liệu đều đi qua `can_write` — chạy lần đầu là dry-run, in ra chính xác những gì sẽ đổi ở đâu.
+> **Mặc định không ghi.** Skill này thay avatar, ảnh bìa và tên hiển thị trên tài khoản thật, cùng lúc trên nhiều nền tảng, và không có nút hoàn tác. Lần chạy đầu luôn là dry-run: mọi mục được đánh giá và ghi vào `report.json` là `planned` / `skipped` / `manual` kèm lý do, **không gọi API ghi nào**. Chỉ `--apply` sau khi user đã đọc kế hoạch và đồng ý — và đồng ý cho một nền tảng không phải đồng ý cho tất cả.
 
-Chỉ `--apply` sau khi user đã xem danh sách thay đổi và đồng ý. Đồng ý cho một nền tảng không phải đồng ý cho tất cả — hỏi rõ phạm vi.
+> **Chỉ báo `updated` khi API xác nhận thay đổi đã áp vào profile.** Bản cũ báo LinkedIn "updated" sau khi upload asset mà chưa gắn vào organization, và gọi các endpoint Twitter v2 không tồn tại. Giờ mỗi `updated` tương ứng với một response 2xx của lệnh **áp dụng**, không phải lệnh upload.
 
-**Đổi tên là hành động nặng nhất.** Facebook giới hạn số lần đổi tên Page và có thể đưa vào diện review; đổi hụt có thể khoá luôn khả năng đổi trong nhiều ngày. Mặc định nên chỉ đồng bộ ảnh (`--action profile-pic`, `--action cover`), và chỉ đổi tên khi user yêu cầu đích danh.
+**Đổi tên là hành động nặng nhất.** Facebook giới hạn số lần đổi tên Page và có thể đưa vào diện review. Mặc định nên chỉ đồng bộ ảnh (`--action profile-pic` hoặc `cover`); chỉ đổi tên khi user yêu cầu đích danh.
 
-**Backup trước khi ghi đè.** Ảnh đại diện hiện tại được tải về `<output>/backup/<platform>/` trước khi thay. Không backup được thì script nói rõ chứ không im lặng ghi đè.
+**Backup trước khi ghi đè.** Ảnh đại diện Facebook hiện tại được tải về `<output>/backup/<platform>/` trước khi thay. Không backup được thì script nói rõ.
 
-## Thất bại từng phần
+**Thất bại từng phần là bình thường.** Sáu nền tảng, sáu API. Nền tảng thứ ba lỗi không hoàn tác được hai nền tảng đầu. `report.json` ghi trạng thái từng nền tảng từng mục; báo cáo cuối liệt kê từng dòng, không gộp thành "hoàn tất". Không tự retry một mục đã `updated`.
 
-Sáu nền tảng, mỗi cái một API riêng. Nền tảng thứ ba lỗi không hoàn tác được hai nền tảng đầu. Vì vậy:
+## Khi nào dùng
 
-- Chạy dry-run **toàn bộ** trước, rồi mới apply — để lỗi cấu hình lộ ra trước khi có gì bị đổi.
-- `report.json` ghi trạng thái từng nền tảng từng mục. Báo cáo cuối phải nói rõ cái nào đã đổi, cái nào chưa, chứ không gộp thành một dòng "hoàn tất".
-- Không tự retry một nền tảng đã đổi thành công.
+Dùng khi: ra mắt website mới, rebrand, muốn logo + tên thống nhất giữa website và mạng xã hội.
 
-## When to Use
+Không dùng cho: đăng bài / quảng cáo; nền tảng không hỗ trợ (Instagram, Discord, Reddit, Zalo); chỉnh thông tin không thuộc thương hiệu (bio, mật khẩu, email).
 
-Trigger when:
-- Ra mắt website mới, cập nhật brand identity lên các social platforms
-- Muốn đồng bộ logo + tên thương hiệu giữa website và mạng xã hội
-- Rebrand / thay đổi nhận diện thương hiệu
+## Cái gì làm được qua API — thật sự
 
-Do **not** use for:
-- Đăng bài content / quảng cáo
-- Nền tảng không được hỗ trợ (Instagram, Discord, Reddit, Zalo)
-- Chỉnh sửa thông tin không liên quan đến thương hiệu (bio, password, email)
+| Platform | Avatar | Cover/Banner | Tên | Ghi chú |
+|----------|--------|--------------|-----|---------|
+| Facebook Page | ✅ | ✅ | ✅ (giới hạn) | Graph API v22, Page token |
+| LinkedIn Company | ✅ | ✅ | ✋ manual | Cần token admin của Page (`rw_organization_admin`); upload asset rồi `PARTIAL_UPDATE organization.logoV2/coverPhotoV2` |
+| Twitter/X | ✅ | ✅ | ✅ | **v1.1 `account/update_profile*` + OAuth 1.0a user context** (script ký bằng `twitter_oauth1.py`). Từ 2023 cần tier API trả phí; 402/403 là vấn đề gói, không phải bug |
+| TikTok | ✋ | — | ✋ | Không có API |
+| YouTube | ✋ | ✅ | ✅ | `channelBanners.insert` → `channels.update`; avatar chỉ đổi trong Studio |
+| GitHub | ✋ | — | ✅ | `PATCH /user` chỉ nhận `name`; avatar không có API |
 
-## Prerequisites
+✋ = script tạo ảnh đúng kích thước và ghi hướng dẫn thao tác tay vào `report.json`.
 
-### API Tokens (cần setup 1 lần)
+## Chuẩn bị
 
-| Platform | Env Variable | Scope / Quyền cần |
-|----------|-------------|-------------------|
-| Facebook | `FB_PAGE_ACCESS_TOKEN` | `pages_manage_metadata`, `pages_read_engagement`, `pages_manage_posts` |
-| LinkedIn | `LINKEDIN_ACCESS_TOKEN` | `w_organization_social`, `r_organization_admin` |
-| Twitter/X | `TWITTER_ACCESS_TOKEN` + `TWITTER_ACCESS_SECRET` | `tweet.write`, `users.read`, `account.read`, `profile.write` |
-| TikTok | `TIKTOK_ACCESS_TOKEN` | `user.info.basic` |
-| YouTube | `YT_ACCESS_TOKEN` | `https://www.googleapis.com/auth/youtube.force-ssl` |
-| GitHub | `GITHUB_TOKEN` | `user` (repo không cần) |
+Tool: `curl`, `jq`, `python3` (stdlib), ImageMagick (`magick` hoặc `convert`/`identify`).
 
-```bash
-export FB_PAGE_ACCESS_TOKEN="EA..."
-export LINKEDIN_ACCESS_TOKEN="AQV..."
-export TWITTER_ACCESS_TOKEN="..."
-export TWITTER_ACCESS_SECRET="..."
-export TIKTOK_ACCESS_TOKEN="clt..."
-export YT_ACCESS_TOKEN="ya29..."
-export GITHUB_TOKEN="ghp_..."
-```
+Token và ID theo nền tảng — cách lấy trong `references/api-setup.md`:
 
-### Platform Account IDs
+| Platform | Env |
+|----------|-----|
+| Facebook | `FB_PAGE_ACCESS_TOKEN`, `FB_PAGE_ID` |
+| LinkedIn | `LINKEDIN_ACCESS_TOKEN`, `LINKEDIN_COMPANY_ID` (tuỳ chọn `LINKEDIN_API_VERSION`, mặc định `202409`) |
+| Twitter/X | `TWITTER_API_KEY`, `TWITTER_API_SECRET`, `TWITTER_ACCESS_TOKEN`, `TWITTER_ACCESS_SECRET` — **cả bốn**; bearer token không ghi được profile |
+| YouTube | `YT_ACCESS_TOKEN` (scope `youtube.force-ssl`), `YT_CHANNEL_ID` |
+| GitHub | `GITHUB_TOKEN` (scope `user`) |
+| TikTok | không cần — chỉ tạo ảnh |
 
-| Platform | Env Variable | Cách lấy |
-|----------|-------------|----------|
-| Facebook Page ID | `FB_PAGE_ID` | Graph API Explorer → GET /me/accounts → lấy id |
-| LinkedIn Company ID | `LINKEDIN_COMPANY_ID` | LinkedIn Company Page URL → `/company/{id}` |
-| Twitter User ID | `TWITTER_USER_ID` | API v2: GET /2/users/me |
-| TikTok User ID | `TIKTOK_USER_ID` | API: GET /v2/user/info/ |
-| YouTube Channel ID | `YT_CHANNEL_ID` | YouTube Studio → Settings → Channel → Channel ID |
-| GitHub Username | `GITHUB_USERNAME` | GitHub profile URL |
+Thiếu biến của nền tảng nào → nền tảng đó `skipped` với lý do `missing env`, các nền tảng khác vẫn chạy.
 
-### Tools
+## Tham số
 
-| Tool | Mục đích | Kiểm tra |
-|------|----------|----------|
-| `curl` | Gọi REST API | `which curl` |
-| `jq` | Parse JSON | `which jq` |
-| `convert` (ImageMagick) | Resize / crop ảnh | `which convert` |
-| `identify` (ImageMagick) | Kiểm tra kích thước ảnh | `which identify` |
+| Param | Bắt buộc | Mô tả |
+|-------|----------|-------|
+| `--website` | ✅ | URL `https://` |
+| `--platforms` | ✅ | `facebook,linkedin,twitter,tiktok,youtube,github` — chọn tập con |
+| `--action` | ❌ | `all` (mặc định) · `profile-pic` · `cover` · `name` |
+| `--brand-name` | ❌ | Ghi đè tên trích từ website |
+| `--logo-url` / `--cover-url` / `--color` | ❌ | Ghi đè khi phân tích website sai hoặc site là SPA không có OG tags |
+| `--output-dir` | ❌ | Mặc định `/tmp/social-brand-sync/<domain>` |
+| `--apply` | ❌ | Thực hiện ghi. Không có → dry-run |
+
+## Chạy
 
 ```bash
-which curl jq convert identify 2>/dev/null || echo "Missing tools — cài ImageMagick: sudo apt install imagemagick"
+# 1. Dry-run toàn bộ: phân tích, tạo ảnh, lập kế hoạch từng nền tảng
+bash scripts/sync.sh --website https://example.com --platforms facebook,linkedin,github
+
+# 2. Đọc kế hoạch (stdout + <output>/report.json), sửa bằng --brand-name/--logo-url nếu cần
+
+# 3. Áp dụng — thu hẹp phạm vi nếu chưa chắc
+bash scripts/sync.sh --website https://example.com --platforms facebook,linkedin,github --action profile-pic --apply
 ```
 
-### Temp Directory
+| Script | Việc | Ghi |
+|--------|------|-----|
+| `analyze-website.py` | Fetch HTML một lần; tên (og:site_name → application-name → JSON-LD → title → alt logo → domain), logo (apple-touch-icon lớn nhất → icon → TileImage → img logo trong header), cover (og:image → twitter:image), màu (CSS `--primary` → theme-color). Ghi nguồn của từng giá trị; thiếu → `null` + liệt kê trong `missing` | `brand-info.json` |
+| `process-images.sh` | Tải logo (fallback favicon), chuẩn hoá thành PNG vuông có nền màu thương hiệu, sinh ảnh từng nền tảng đúng kích thước, cover từ ảnh gốc hoặc sinh từ màu + logo, validate bằng `identify` | `<platform>/*.png`, `images-manifest.json` |
+| `update-platform.sh` | Một nền tảng: kiểm tra env, từng mục → `planned` (dry-run) hoặc gọi API, retry 1 lần khi 429/5xx, backup, ghi report | `report.json` |
+| `twitter_oauth1.py` | Ký HMAC-SHA1 OAuth 1.0a và gọi `account/update_profile_image|_banner|` (stdlib) | — |
+| `sync.sh` | Orchestrator cho 4 bước trên; nền tảng lỗi không dừng nền tảng khác | tất cả |
 
-```bash
-mkdir -p /tmp/social-brand-sync
-```
-
-## Subagent Architecture
-
-### Pattern: Sequential Pipeline
-
-```
-                     ┌──────────────────────────┐
-                     │     Main Orchestrator     │
-                     │     (reads SKILL.md)      │
-                     └─────────┬──────┬──────────┘
-                               │      │
-              ┌────────────────┘      └────────────────┐
-              ▼                                          ▼
-  ┌────────────────────────┐              ┌────────────────────────┐
-  │   website-analyzer     │              │    image-processor     │
-  │   (general agent)      │              │    (general agent)     │
-  │                        │              │                        │
-  │   - Fetch website      │              │   - Download logo      │
-  │   - Extract logo URL   │              │   - Resize theo        │
-  │   - Brand name         │              │     platform specs     │
-  │   - Brand colors       │              │   - Generate cover     │
-  │   - Cover / OG image   │              │   - Validate output    │
-  └───────────┬────────────┘              └───────────┬────────────┘
-              │                                       │
-              └───────────────┬───────────────────────┘
-                              ▼
-              ┌──────────────────────────┐
-              │   Update Platforms       │
-              │   (bash + curl)          │
-              │                          │
-              │   Facebook  ──────────▶  │
-              │   LinkedIn  ──────────▶  │
-              │   Twitter/X ──────────▶  │
-              │   TikTok    ──────────▶  │
-              │   YouTube   ──────────▶  │
-              │   GitHub    ──────────▶  │
-              └──────────────────────────┘
-```
-
-### Agent Files
-
-| File | Vai trò | Output |
-|------|---------|--------|
-| `agents/website-analyzer.md` | Phân tích website, lấy brand metadata | Brand info JSON |
-| `agents/image-processor.md` | Download logo + resize theo platform | Directories with processed images |
-
-## Input Parameters
-
-| Param | Required | Description |
-|-------|----------|-------------|
-| `--website` | Yes | URL website (VD: `https://example.com`) |
-| `--platforms` | Yes | Danh sách platform cách nhau bằng dấu phẩy (VD: `facebook,linkedin,twitter`) |
-
-Supported platforms: `facebook`, `linkedin`, `twitter`, `tiktok`, `youtube`, `github`
+Có thể chạy từng script rời — `update-platform.sh` tự tạo `report.json` và dòng của nền tảng nếu chưa có.
 
 ## Output
 
-Kết quả trả về dạng JSON + thư mục ảnh đã xử lý:
+```
+<output-dir>/
+├── brand-info.json        # tên, logo_url, cover_url, màu + nguồn của từng giá trị + missing[]
+├── images-manifest.json   # mỗi ảnh: path, kích thước thật, kích thước kỳ vọng, ok
+├── report.json            # trạng thái từng nền tảng × {profile_pic, cover, name}
+├── originals/             # logo.<ext>, logo-square.png, cover.<ext>
+├── backup/<platform>/     # ảnh cũ trước khi ghi đè (khi apply)
+├── facebook/  profile-pic.png 360² · cover.png 851×315
+├── linkedin/  profile-pic.png 400² · cover.png 1584×396
+├── twitter/   profile-pic.png 400² · header.png 1500×500
+├── tiktok/    profile-pic.png 200²
+├── youtube/   profile-pic.png 800² · banner.png 2560×1440
+└── github/    profile-pic.png 512²
+```
 
-```
-/tmp/social-brand-sync/{domain}/
-├── report.json              # Kết quả tổng hợp
-├── originals/
-│   ├── logo.{png,jpg}       # Logo gốc
-│   └── cover.{png,jpg}      # Ảnh bìa gốc (nếu có)
-├── facebook/
-│   ├── profile-pic.png      # 180x180
-│   └── cover.png            # 851x315
-├── linkedin/
-│   ├── profile-pic.png      # 400x400
-│   └── cover.png            # 1584x396
-├── twitter/
-│   ├── profile-pic.png      # 400x400
-│   └── header.png           # 1500x500
-├── tiktok/
-│   └── profile-pic.png      # 200x200
-├── youtube/
-│   ├── profile-pic.png      # 800x800
-│   └── banner.png           # 2560x1440
-└── github/
-    └── profile-pic.png      # 512x512
-```
+`report.json`:
 
 ```json
 {
-  "website": "https://example.com",
-  "brand_name": "Example Brand",
-  "processed_at": "2026-06-16T10:30:00Z",
+  "website": "https://example.com", "brand_name": "Example", "brand_info_source": "og:site_name + apple-touch-icon (180px)",
+  "processed_at": "2026-09-13T10:30:00Z", "images_dir": "/tmp/social-brand-sync/example.com",
   "updates": [
-    {
-      "platform": "facebook",
-      "profile_pic": "updated|skipped|failed",
-      "cover": "updated|skipped|failed",
-      "name": "updated|skipped|failed",
-      "url": "https://facebook.com/...",
-      "error": null
-    }
-  ],
-  "images_dir": "/tmp/social-brand-sync/example.com"
-}
-```
-
-## Workflow
-
-### Step 1: Parse Input & Validate
-
-- Parse `--website`, `--platforms`
-- Validate URL format, giao thức HTTPS
-- Kiểm tra API tokens cho từng platform trong environment
-- Kiểm tra ImageMagick (`convert`, `identify`)
-- Tạo thư mục output: `/tmp/social-brand-sync/{domain}/`
-- Platform thiếu token → skip, ghi vào report
-
-```bash
-DOMAIN=$(echo "$WEBSITE" | sed -E 's|https?://||' | sed 's|/.*||')
-OUTPUT_DIR="/tmp/social-brand-sync/$DOMAIN"
-mkdir -p "$OUTPUT_DIR"/{originals,facebook,linkedin,twitter,tiktok,youtube,github}
-```
-
-### Step 2: Analyze Website
-
-Gọi subagent `website-analyzer`:
-
-```bash
-task --prompt "Analyze website at $WEBSITE for brand assets..." --subagent-type general
-```
-
-Subagent sẽ dùng `webfetch` và phân tích HTML để lấy:
-
-1. **Brand name**: Từ `<title>`, `og:site_name`, logo alt text
-2. **Logo URL**: Từ `apple-touch-icon`, `favicon`, OG image, manifest.json, ảnh trong header
-3. **Cover image**: Từ `og:image` lớn nhất, hero image, background image
-4. **Brand colors**: Từ CSS custom properties, `<meta name="theme-color">`, dominant colors từ logo
-
-Kết quả lưu vào `$OUTPUT_DIR/brand-info.json`:
-
-```json
-{
-  "name": "Example Brand",
-  "logo_url": "https://example.com/logo.png",
-  "cover_url": "https://example.com/og-image.jpg",
-  "favicon_url": "https://example.com/favicon.ico",
-  "colors": {
-    "primary": "#2563eb",
-    "theme_color": "#ffffff"
-  },
-  "source": "og:site_name + apple-touch-icon"
-}
-```
-
-### Step 3: Process Images
-
-Gọi subagent `image-processor`:
-
-```bash
-task --prompt "Download and resize brand images from $OUTPUT_DIR/brand-info.json for platforms: $PLATFORMS..." --subagent-type general
-```
-
-Subagent sẽ:
-
-1. **Download logo** từ URL → `$OUTPUT_DIR/originals/logo.{png,jpg}`
-2. **Download cover** (nếu có) → `$OUTPUT_DIR/originals/cover.{png,jpg}`
-3. **Nếu không có cover**: Tạo cover từ logo + brand color với `convert`:
-   ```bash
-   convert -size 1584x396 "xc:$PRIMARY_COLOR" \
-     \( logo.png -resize 200x200 -gravity center -geometry +0+0 -composite \) \
-     "$OUTPUT_DIR/linkedin/cover.png"
-   ```
-4. **Resize logo** cho từng platform theo thông số trong `references/platform-specs.md`:
-
-```bash
-# Facebook profile pic (180x180)
-convert logo.png -resize 180x180 -gravity center -extent 180x180 "$OUTPUT_DIR/facebook/profile-pic.png"
-
-# LinkedIn profile pic (400x400)
-convert logo.png -resize 400x400 -gravity center -extent 400x400 "$OUTPUT_DIR/linkedin/profile-pic.png"
-
-# Twitter header (1500x500)
-convert cover.png -resize 1500x500^ -gravity center -extent 1500x500 "$OUTPUT_DIR/twitter/header.png"
-```
-
-5. **Validate**: Dùng `identify` kiểm tra kích thước từng file
-
-### Step 4: Update Platforms
-
-Chạy script `scripts/update-platform.sh` cho từng platform (tự động cập nhật logo + banner + tên):
-
-```bash
-# Xem trước (mặc định — không ghi gì):
-bash scripts/update-platform.sh \
-  --platform <platform> --output-dir "$OUTPUT_DIR" --brand-name "$BRAND_NAME"
-
-# Thực hiện thật, sau khi user đã duyệt danh sách thay đổi:
-bash scripts/update-platform.sh \
-  --platform <platform> --output-dir "$OUTPUT_DIR" --brand-name "$BRAND_NAME" --apply
-```
-
-`--action` giới hạn phạm vi: `profile-pic`, `cover`, `name`, hoặc `all`. Mặc định `all` là rộng nhất — cân nhắc thu hẹp.
-
-Hoặc gọi API trực tiếp bằng `curl` nếu platform đơn giản:
-
-#### Facebook (Graph API v22.0)
-
-```bash
-# Upload profile picture
-curl -X POST "https://graph.facebook.com/v22.0/$FB_PAGE_ID/picture" \
-  -F "access_token=$FB_PAGE_ACCESS_TOKEN" \
-  -F "source=@$OUTPUT_DIR/facebook/profile-pic.png" \
-  -F "type=profile_media"
-
-# Upload cover photo
-RESP=$(curl -s -X POST "https://graph.facebook.com/v22.0/$FB_PAGE_ID/photos" \
-  -F "access_token=$FB_PAGE_ACCESS_TOKEN" \
-  -F "source=@$OUTPUT_DIR/facebook/cover.png" \
-  -F "published=false")
-PHOTO_ID=$(echo "$RESP" | jq -r '.id')
-curl -s -X POST "https://graph.facebook.com/v22.0/$FB_PAGE_ID" \
-  -d "cover=$PHOTO_ID&access_token=$FB_PAGE_ACCESS_TOKEN"
-
-# Update name
-curl -s -X POST "https://graph.facebook.com/v22.0/$FB_PAGE_ID" \
-  -d "name=$BRAND_NAME&access_token=$FB_PAGE_ACCESS_TOKEN"
-```
-
-#### LinkedIn (API v2)
-
-```bash
-# Upload profile logo (dùng Media Upload API)
-UPLOAD_URL=$(curl -s -X POST "https://api.linkedin.com/v2/assets" \
-  -H "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "registerUploadRequest": {
-      "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
-      "owner": "urn:li:organization:'$LINKEDIN_COMPANY_ID'",
-      "serviceRelationships": [{
-        "relationshipType": "OWNER",
-        "identifier": "urn:li:userGeneratedContent"
-      }]
-    }
-  }' | jq -r '.value.uploadMechanism["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"].uploadUrl')
-
-curl -X POST "$UPLOAD_URL" \
-  -H "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN" \
-  -T "$OUTPUT_DIR/linkedin/profile-pic.png"
-
-# Update company logo
-ASSET_URN=$(echo $UPLOAD_RESP | jq -r '.value.asset')
-curl -s -X POST "https://api.linkedin.com/v2/organizationalEntityAcls" \
-  -H "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN" \
-  -d "{
-    "patch": {
-      "$orgUrn": {
-        "logoV2": {
-          "com.linkedin.common.VectorImage": {
-            "rootUrl": \"$ASSET_URN\"
-          }
-        }
-      }
-    }
-  }"
-```
-
-#### Twitter/X (API v2 + OAuth 1.0a)
-
-Twitter API v2 yêu cầu OAuth 1.0a User Context để cập nhật profile. Dùng script riêng:
-
-```bash
-# Update profile image
-curl -s -X POST "https://api.twitter.com/2/users/$TWITTER_USER_ID/profile_image" \
-  -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"profile_image\": {\"media_id\": \"$MEDIA_ID\"}}"
-
-# Upload media trước
-MEDIA_ID=$(curl -s -X POST "https://upload.twitter.com/1.1/media/upload.json" \
-  -H "Authorization: OAuth oauth_consumer_key=..., oauth_token=..., oauth_signature=..." \
-  -F "media=@$OUTPUT_DIR/twitter/profile-pic.png" | jq -r '.media_id_string')
-
-# Update header
-curl -s -X POST "https://api.twitter.com/2/users/$TWITTER_USER_ID/profile_banner" \
-  -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"banner\": {\"media_id\": \"$MEDIA_ID\"}}"
-
-# Update name
-curl -s -X PUT "https://api.twitter.com/2/users/$TWITTER_USER_ID" \
-  -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\": \"$BRAND_NAME\"}"
-```
-
-#### TikTok
-
-TikTok API không hỗ trợ cập nhật avatar/tên. Skill sẽ:
-1. Tạo ảnh avatar đúng kích thước TikTok (200x200)
-2. Ghi vào report là "manual — cần upload thủ công"
-3. Output hướng dẫn: vào TikTok Studio → Edit profile → Upload ảnh từ thư mục `$OUTPUT_DIR/tiktok/`
-
-#### YouTube (YouTube Data API v3)
-
-```bash
-# Update banner
-curl -s -X POST "https://www.googleapis.com/upload/youtube/v3/channels?part=brandingSettings&uploadType=media" \
-  -H "Authorization: Bearer $YT_ACCESS_TOKEN" \
-  -H "Content-Type: image/png" \
-  --data-binary "@$OUTPUT_DIR/youtube/banner.png"
-
-# Update profile picture — cần upload lên Google Photos hoặc dùng API riêng
-# YouTube API không support trực tiếp, cần dùng Google Account API
-
-# Update channel name
-curl -s -X PUT "https://www.googleapis.com/youtube/v3/channels?part=brandingSettings&mine=true" \
-  -H "Authorization: Bearer $YT_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "'$YT_CHANNEL_ID'",
-    "brandingSettings": {
-      "channel": {
-        "title": "'$BRAND_NAME'"
-      }
-    }
-  }'
-```
-
-#### GitHub (REST API v3)
-
-```bash
-# Update avatar (phải là URL public, hoặc upload lên GitHub trước)
-# GitHub API không cho upload file trực tiếp làm avatar
-# Cần upload ảnh lên 1 URL public trước, rồi:
-curl -s -X PATCH "https://api.github.com/user" \
-  -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "'$BRAND_NAME'",
-    "avatar_url": "https://example.com/avatar.png"
-  }'
-```
-
-### Step 5: Generate Report
-
-Tổng hợp kết quả vào `$OUTPUT_DIR/report.json`:
-
-```json
-{
-  "website": "https://example.com",
-  "brand_name": "Example Brand",
-  "brand_info_source": "og:site_name + apple-touch-icon",
-  "processed_at": "2026-06-16T10:30:00Z",
-  "images_dir": "/tmp/social-brand-sync/example.com",
-  "updates": [
-    {
-      "platform": "facebook",
-      "profile_pic": "updated",
-      "cover": "updated",
-      "name": "skipped",
-      "profile_url": "https://facebook.com/example",
-      "error": null
-    },
-    {
-      "platform": "tiktok",
-      "profile_pic": "manual",
-      "name": "manual",
-      "profile_url": null,
-      "instructions": "Vào TikTok Studio → Edit profile → Upload ảnh từ /tmp/social-brand-sync/example.com/tiktok/profile-pic.png"
-    }
+    { "platform": "facebook", "mode": "apply", "profile_pic": "updated", "cover": "updated", "name": "not-requested", "profile_url": "https://facebook.com/123", "error": null },
+    { "platform": "linkedin", "mode": "apply", "profile_pic": "failed", "cover": "planned", "name": "manual", "error": "profile_pic: apply: HTTP 403 …" },
+    { "platform": "tiktok",   "mode": "apply", "profile_pic": "manual", "cover": "skipped", "name": "manual", "error": "profile_pic: TikTok has no profile-update API. …" }
   ]
 }
 ```
 
-## Edge Cases
+Trạng thái: `planned` (dry-run, sẽ ghi) · `updated` · `failed` · `skipped` (thiếu file/env/không áp dụng) · `manual` (nền tảng không có API — kèm hướng dẫn) · `not-requested` (ngoài `--action`).
 
-- **Website không có logo rõ ràng**: Dùng favicon, resize lên; báo warning
-- **Logo không phải square**: Cắt center, thêm padding với brand color background
-- **Website không có OG image / cover**: Tạo cover đơn giản từ brand color + logo
-- **API token thiếu hoặc hết hạn**: Skip platform, ghi vào report
-- **Rate limit (429)**: Đợi 15s + retry 1 lần; nếu vẫn fail thì skip
-- **Ảnh quá lớn (>10MB)**: Resize xuống dưới 5MB, giữ tỉ lệ
-- **Platform không support action đó** (VD: TikTok không có cover): Skip action đó
-- **Tên quá dài cho platform** (VD: Twitter 50 chars): Cắt ngắn + thêm "..."
-- **Mạng xã hội không có trong danh sách hỗ trợ**: Báo lỗi + list platform hợp lệ
-- **Website không load được (timeout/404)**: Dừng, báo lỗi
+## Quy trình cho agent
 
-## Acceptance Criteria
+1. Chạy `sync.sh` **không** `--apply`. Đọc `brand-info.json`: tên/logo có đúng không? SPA không có OG tags → hỏi user URL logo, chạy lại với `--logo-url`. Đừng tự đoán URL logo.
+2. Trình bày kế hoạch cho user theo đúng `report.json`: nền tảng nào sẽ đổi gì, cái nào thiếu token, cái nào phải làm tay. Hỏi rõ phạm vi (`--platforms`, `--action`).
+3. `--apply` đúng phạm vi đã duyệt. Đọc lại `report.json`, báo từng dòng. `failed` → trích `error`, gợi ý sửa từ `references/api-setup.md § Troubleshooting`; không tự retry mục đã `updated`.
+4. Mục `manual` → đưa đường dẫn file ảnh và vị trí trong UI nền tảng.
 
-- [ ] Website được phân tích thành công — lấy được brand name + logo
-- [ ] Logo được download và resize đúng kích thước từng platform
-- [ ] Cover image được tạo/resize (từ website hoặc auto-generate)
-- [ ] Các platform có API token được cập nhật thành công
-- [ ] Platform thiếu token được skip và thông báo
-- [ ] TikTok output ảnh + hướng dẫn manual upload
-- [ ] Report JSON được generate đầy đủ kết quả
-- [ ] ImageMagick được cài đặt và sử dụng thành công
+Agent files `agents/website-analyzer.md`, `agents/image-processor.md` mô tả logic của hai script để đọc khi cần hiểu/gỡ lỗi; không cần chạy chúng "bằng tay" nữa.
+
+## Edge cases
+
+| Tình huống | Xử lý |
+|-----------|-------|
+| Website không load được | `analyze-website.py` exit 1 với lỗi; dừng |
+| Không tìm thấy logo | Dùng favicon (cảnh báo độ phân giải thấp); vẫn không có → dừng, hỏi `--logo-url` |
+| Logo không vuông / có nền trong suốt | Đặt lên nền màu thương hiệu, pad thành vuông — không kéo giãn |
+| Không có OG image | Sinh cover từ màu + logo; `images-manifest.json → generated_covers: true` |
+| Không có màu thương hiệu | Nền trung tính `#1F2937`, ghi cảnh báo |
+| Thiếu token một nền tảng | Nền tảng đó `skipped (missing env: …)`, các nền tảng khác chạy tiếp |
+| 429 / 5xx | Retry một lần sau 15 giây, rồi `failed` |
+| Twitter 402/403 | Tier API không cho ghi profile — ghi rõ trong `error`; không phải lỗi script |
+| LinkedIn apply 403 | Token không phải admin của Page hoặc thiếu `rw_organization_admin` |
+| Tên quá dài | Cắt theo giới hạn nền tảng (FB 75, X 50, YT 70, GH 100) — báo trong plan |
+| Nền tảng ngoài danh sách | `sync.sh` từ chối ngay, liệt kê nền tảng hợp lệ |
+
+## Không làm
+
+Đăng bài; Instagram/Discord/Reddit/Zalo; đổi bio/email/mật khẩu; tự tạo OAuth token thay user; bỏ qua dry-run.

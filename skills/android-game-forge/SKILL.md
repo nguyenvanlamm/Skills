@@ -3,7 +3,7 @@ name: android-game-forge
 description: Build a complete, buildable Kotlin + Jetpack Compose Android game from a short idea — locked design system (4 contrast-verified palettes), bundled OFL typography, canvas art direction, component library, fixed-timestep engine, then verify by compiling, measuring WCAG contrast, and grepping the design system. Use when the user wants an Android game generated from scratch. Don't use for Flutter (flutter-init), non-game Android apps, or Unity/Godot.
 license: MIT
 metadata:
-  version: 3.0.0
+  version: 3.1.0
 ---
 
 # Android Game Forge
@@ -72,6 +72,8 @@ SKILL=<this skill's directory>              # the scripts live beside SKILL.md, 
 mkdir -p gradle && bash "$SKILL/scripts/resolve-versions.sh" > gradle/libs.versions.toml
 ```
 
+If it prints `WARN: offline fallback used for: …` on stderr, the named coordinates came from the built-in pins and may be stale — carry that into the Step 8 report. (v3.0 set this flag inside a subshell, so the warning could never fire.)
+
 Non-negotiable from that file: **`compileSdk`/`targetSdk` 36, `minSdk` 26, JVM 17, portrait-locked, edge-to-edge.** From 31 Aug 2026 Google Play refuses new submissions targeting below API 36, so a game generated today with `targetSdk 35` is born unpublishable. `minSdk` is 26 rather than 24 because `FontVariation.Settings` needs it and the entire type scale rides on variable fonts.
 
 ### Step 3 — Design system and typography
@@ -139,6 +141,8 @@ Visual coherence beats asset fidelity: three mixed free sprite styles look cheap
 ```bash
 bash "$SKILL/scripts/check.sh"          # run from the project root; add --no-build in degraded mode
 ```
+
+Needs bash 4+ (macOS: `brew install bash`, then run it with that bash) — the script says so instead of failing on a syntax error. `stat` and `sort` are used in forms that work on both GNU and BSD userlands.
 
 The script greps what a self-report cannot be trusted on, computes what a grep cannot see, and compiles what neither can: hex literals outside the theme, raw `dp` and inline `fontSize`/`color` in screens, missing `R.*` targets, `safeDrawing`, the `dt` clamp, haptics + sound pairing, the seven screens, and a real `assembleDebug` whose APK is **newer than the build started** — a stale APK from an earlier run is a failure, not a pass.
 

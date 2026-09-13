@@ -26,6 +26,12 @@ Chạy trước khi gửi phản hồi. Mục nào không đạt thì quay lại
 - [ ] Nếu có trẻ em hoặc người già: đã giảm mật độ và quãng đường đi bộ
 - [ ] Nếu có `special_requirements`: đã kiểm tra từng điểm có đáp ứng không
 - [ ] Nếu tra được thời tiết: lịch đã điều chỉnh theo
+- [ ] Nếu nhiều điểm đến: có chặng di chuyển giữa các điểm trong lịch trình **và** trong bảng chi phí; số đêm mỗi điểm cộng lại = tổng đêm
+
+**Tự kiểm tra tính nhất quán số học:**
+- [ ] Tổng chi phí = tổng các dòng (cộng lại thật, đừng tin con số đã viết)
+- [ ] Số bữa ăn trong bảng Nhà hàng = 3 × số ngày (trừ bữa trên máy bay/tàu đã ghi rõ)
+- [ ] Mỗi điểm trong bảng Điểm tham quan xuất hiện trong lịch trình, và ngược lại
 
 ## Cấu trúc output
 

@@ -5,7 +5,9 @@ services:
     repo: https://github.com/{{gh_user}}/{{slug}}-server
     branch: main
     plan: free
+    region: {{region}}
     dockerfilePath: ./Dockerfile
+    healthCheckPath: {{health_path}}
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -13,9 +15,11 @@ services:
           property: connectionString
       - key: PORT
         value: 8000
+      - key: WEB_CONCURRENCY
+        value: 2
 
 databases:
   - name: {{slug}}-db
     plan: free
-    region: oregon
-    version: "16"
+    region: {{region}}
+    postgresMajorVersion: "16"

@@ -11,7 +11,12 @@ set -uo pipefail
 GOOGLE=https://dl.google.com/dl/android/maven2
 CENTRAL=https://repo1.maven.org/maven2
 
+STALE_FILE=$(mktemp); trap 'rm -f "$STALE_FILE"' EXIT
+
 # latest <repo> <group/path> <version-regex> <fallback>
+# Runs inside $(...), so a plain STALE=1 here would be lost with the subshell —
+# the old version had exactly that bug and never printed its warning. Touch a
+# marker file instead.
 latest() {
   local out
   out=$(curl -sfL --max-time 12 "$1/$2/maven-metadata.xml" 2>/dev/null \
@@ -19,11 +24,9 @@ latest() {
         | sed 's/<[^>]*>//g' \
         | grep -vEi 'alpha|beta|rc|dev|eap|-M[0-9]|snapshot' \
         | grep -E "$3" \
-        | sort -V | tail -1)
-  if [ -n "$out" ]; then echo "$out"; else echo "$4"; STALE=1; fi
+        | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+  if [ -n "$out" ]; then echo "$out"; else echo "$4"; echo "$2" >> "$STALE_FILE"; fi
 }
-
-STALE=0
 
 # AGP: newest stable 8.x on purpose. AGP 9 dropped kotlinOptions and several
 # variant APIs, so most Gradle snippets in circulation break against it.
@@ -59,7 +62,7 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 TOML
 
-if [ "$STALE" -eq 1 ]; then
-  echo "WARN: at least one version came from the offline fallback and may be stale." >&2
-  echo "      Re-run with network access if dependency resolution fails." >&2
+if [ -s "$STALE_FILE" ]; then
+  echo "WARN: offline fallback used for: $(tr '\n' ' ' < "$STALE_FILE")" >&2
+  echo "      These pins may be stale. Re-run with network access if dependency resolution fails." >&2
 fi

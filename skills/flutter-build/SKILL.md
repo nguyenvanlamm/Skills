@@ -3,7 +3,7 @@ name: flutter-build
 description: "Build a Flutter Android appbundle (AAB) or APK for release. Use when user says 'build', 'build app', 'build aab', 'build apk', 'release build', 'build flutter'. Run after flutter-signing and before flutter-store-metadata."
 license: MIT
 metadata:
-  version: 2.0.0
+  version: 2.1.0
 ---
 
 # Flutter Build
@@ -121,36 +121,28 @@ Use the deterministic path, never `find | head -1`:
 | apk | `build/app/outputs/flutter-apk/app-release.apk` |
 | apk, split | `build/app/outputs/flutter-apk/app-<abi>-release.apk` |
 
-```bash
-[ "$(stat -c %Y "$OUT")" -gt "$START" ] || { echo "STALE: artifact predates this build"; exit 1; }
-```
-
-**A file older than `$START` means the build did not produce it.** Report failure — never a stale artifact as a success.
-
 ### Step 6 — Verify the artifact
 
 ```bash
-BT() { command -v bundletool >/dev/null && bundletool "$@" || java -jar ~/bundletool.jar "$@"; }
-
-BT dump manifest --bundle="$OUT" --xpath="/manifest/@android:versionCode"
-BT dump manifest --bundle="$OUT" --xpath="/manifest/uses-sdk/@android:targetSdkVersion"
-BT dump manifest --bundle="$OUT" --xpath="/manifest/application/@android:debuggable"   # expect empty
-jarsigner -verify "$OUT" | head -1                                                      # expect "jar verified"
-keytool -printcert -jarfile "$OUT" | grep Owner                                         # must NOT be CN=Android Debug
+bash <skill-dir>/scripts/verify-artifact.sh --artifact "$OUT" --started-at "$START" --out build/release/verify.json
 ```
 
-- **AAB → `jarsigner`. APK → `apksigner verify --print-certs`.** They are not interchangeable: `jarsigner` only reads v1 (JAR) signatures, and AGP omits v1 when `minSdk >= 24`, so it reports a correctly-signed APK as unsigned. `apksigner` lives in `$ANDROID_HOME/build-tools/<version>/`.
-- 16 KB alignment — the authoritative check, whatever `ndkVersion` said:
+One script, one JSON, one vocabulary (`OK` · `WARN` · `BLOCK` · `UNVERIFIED`), shared with `flutter-publish`'s preflight so the two never disagree about what "signed" means. It checks:
 
-```bash
-W=$(mktemp -d); unzip -qo "$OUT" -d "$W"
-find "$W" -name '*.so' -exec sh -c \
-  'printf "%s %s\n" "$(readelf -lW "$1" | awk "\$1==\"LOAD\"{print \$NF}" | sort -u | tail -1)" "$1"' _ {} \;
-```
+| Check | Tool | BLOCK when |
+|-------|------|-----------|
+| `freshness` | mtime vs `--started-at` | artifact predates this build — **never report a stale file as success** |
+| `applicationId` | bundletool / aapt2 | `com.example.*`; placeholder prefixes (`com.myapp.`, `com.tenapp.`, `com.test.`, `com.app.`) |
+| `targetSdk` | same | below the floor (36; 35 is WARN before 2026-08-31) — compares against today's date |
+| `debuggable` | same | `true` |
+| `versionCode` | same | > 2,100,000,000 |
+| `signing` | `jarsigner` (AAB) / `apksigner` (APK) | unsigned or `CN=Android Debug`. **They are not interchangeable**: jarsigner reads v1 only and AGP omits v1 when `minSdk >= 24` |
+| `alignment16k` | `readelf -lW` on every `.so` | any LOAD alignment below `0x4000` — the offending plugin path is named |
+| `size` | file size | > 500 MB; WARN > 200 MB; WARN > 60 MB (unusual for Flutter — look at assets) |
 
-Every LOAD alignment must be `0x4000` or larger. `0x1000` → **BLOCK**, and the printed path names the plugin at fault.
+`UNVERIFIED` means the tool is missing (bundletool, jarsigner, readelf/llvm-readelf) and is **never** counted as a pass — the script names what to install. Exit 1 on any BLOCK. Portable: `stat`/`readelf` fall back to their macOS spellings.
 
-- Size: warn above 200 MB (Play warns users on mobile data), block above 500 MB base module. For a typical Flutter app anything over ~60 MB deserves a look at uncompressed assets — the old "150 MB limit" figure is wrong.
+Read `build/release/verify.json`; the report's `Checks` line is copied from it.
 
 ### Step 7 — Save artifacts and provenance
 
@@ -161,7 +153,7 @@ cp "$OUT" build/release/
 
 **The debug-info directory is the only thing that can decode crash reports from an obfuscated release.** Keep it per version code, and never delete one for a version still live on Play. See `references/obfuscation.md`.
 
-Write `build/release/build-info.json` — this is what lets `flutter-publish` tell whether the AAB matches the source:
+Write `build/release/build-info.json` — this is what lets `flutter-publish` tell whether the AAB matches the source. `sha256`, `version_code`, `target_sdk` and the alignment result come from `verify.json`, not from a second computation:
 
 ```json
 {
@@ -175,6 +167,7 @@ Write `build/release/build-info.json` — this is what lets `flutter-publish` te
   "git": { "sha": "<git rev-parse HEAD>", "dirty": false, "branch": "main" },
   "flutter": "<flutter --version, first line>",
   "target_sdk": 36,
+  "verify": "build/release/verify.json",
   "built_at": "2026-07-27T10:00:00Z",
   "duration_seconds": 214
 }
@@ -205,6 +198,10 @@ Report gate warnings even on success. If `targetSdk` was implicit and resolved t
 |------|-----------|
 | `references/build-errors.md` | The build fails |
 | `references/obfuscation.md` | Enabling obfuscation, or a crash report is unreadable |
+
+| Script | Run at |
+|--------|--------|
+| `scripts/verify-artifact.sh` | Step 6 — manifest, signing, debuggable, 16 KB, size → `verify.json`; exit 1 on BLOCK |
 
 ## Scope
 

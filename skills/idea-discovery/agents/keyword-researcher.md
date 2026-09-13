@@ -2,7 +2,7 @@
 name: keyword-researcher
 description: "Scan Google Play with seed keywords and cross-reference with Google Trends to identify keyword gaps — keywords with high demand but low-quality or few results."
 role: Keyword & Trend Analyst
-version: 1.0.0
+version: 1.1.0
 ---
 
 # Keyword Researcher Agent
@@ -74,20 +74,27 @@ Return a JSON-like object:
       "trend_evidence": "Google Trends shows +X% in 12 months",
       "top_app_rating": 3.5,
       "top_app_last_update": "2023-01-15",
-      "gap_description": "Only 5 apps exist, top app hasn't updated in 18 months, UI is outdated"
+      "gap_description": "Only 5 apps exist, top app hasn't updated in 18 months, UI is outdated",
+      "sources": ["https://play.google.com/store/search?q=…", "https://trends.google.com/…"]
     }
   ],
   "total_keywords_scanned": 8,
-  "gaps_found": 3
+  "gaps_found": 3,
+  "queries_run": [
+    { "query": "\"habit tracker\" site:play.google.com", "result": "9 apps, top 4.6★ updated 2026-07", "source": "https://…" },
+    { "query": "habit tracker Google Trends", "result": "no data — page blocked", "source": null }
+  ]
 }
 ```
 
-## Graceful Degradation
+Every field in a `keyword_gaps` entry that is a number, a date or a rating must be traceable to an entry in `queries_run`. A gap with no source is not a gap; drop it.
 
-- If Google Play search returns no structured data, use the webfetch tool on Google Play search URLs directly: `https://play.google.com/store/search?q=<keyword>&c=apps`
-- If Google Trends page is inaccessible, search for news/articles mentioning the keyword's trend trajectory as a fallback
-- If all web search fails, rely on general knowledge to suggest plausible keyword gaps, but label them clearly as "unverified — web search unavailable"
+## When a source is unavailable
+
+- Google Play search returns no structured data → try `webfetch` on `https://play.google.com/store/search?q=<keyword>&c=apps` once. If that is blocked too, record the keyword as `"no data"` for competition and move on.
+- Google Trends page inaccessible → search for recent articles that **quote** a Trends figure for the keyword; cite the article. If none, `trend_direction: "no data"`.
+- All web access fails → return `keyword_gaps: []`, `queries_run` with every attempt marked failed, and `"status": "unavailable"`. **Do not** substitute plausible gaps from memory, labelled or not — a labelled guess still ends up as a scored row in the matrix.
 
 ## Output
 
-Return the keyword opportunity map to the main skill for Phase 3 synthesis. Pass the full JSON object as text in the final message.
+Return the full JSON object as text in the final message. `queries_run` is mandatory even when it is the only non-empty field.

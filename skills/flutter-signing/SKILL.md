@@ -3,7 +3,7 @@ name: flutter-signing
 description: "Generate keystore, configure release signing, and back up keys for a Flutter Android project. Use when user says 'signing', 'keystore', 'key store', 'release key', 'sign app', 'ký app', 'flutter signing'. Run after flutter-init and before flutter-build."
 license: MIT
 metadata:
-  version: 2.0.0
+  version: 2.1.0
 ---
 
 # Flutter Signing
@@ -57,43 +57,23 @@ git log --all --oneline -- '*.jks' '*.keystore' 'android/key.properties' | head
 
 Anything found means the credential is compromised — add to `.gitignore`, remove from the index, and generate a **new** key rather than reusing it. If the repo was ever pushed, say plainly that deleting the file does not undo the exposure.
 
-### Step 3 — Generate passwords
+### Steps 3–5 — Generate passwords, keystore and key.properties
+
+One script does all three, and does the parts that are easy to get wrong correctly:
 
 ```bash
-STORE_PASS=$(openssl rand -base64 24 | tr -d '\n')
-KEY_PASS=$(openssl rand -base64 24 | tr -d '\n')
+bash <skill-dir>/scripts/generate-keystore.sh --cn "<App Name>" [--alias upload] [--keysize 4096] [--validity 10000]
 ```
 
-Without openssl: `head -c 24 /dev/urandom | base64`. Do not hand-write a password; do not reuse one.
+What it guarantees, and why each matters:
 
-### Step 4 — Generate the keystore
+- **Passwords never touch `argv` or stdin prompts.** They are generated (`openssl rand`, 30 chars) and handed to keytool through `-storepass:env` / `-keypass:env`. The v2.0 instructions piped two passwords on stdin — but `keytool -genkeypair` prompts *store, re-enter store, key, re-enter key*, so that pipe fed the wrong answers and failed with "passwords don't match" on every run.
+- **PKCS12, not JKS.** JKS is deprecated by the JDK (a warning on every use) and its separate store/key passwords are the source of the prompt-sequence trap above. PKCS12 has one password for both; `key.properties` carries it twice and Gradle is happy.
+- `key.properties` is written with `umask 077` and `chmod 600`; `.gitignore` gets the credential patterns; `git check-ignore` confirms both files are untracked.
+- It **refuses** to overwrite an existing keystore without `--force`, and says why (a published app breaks on a new key). With `--force` the old files are moved to `*.bak.<timestamp>`, never deleted.
+- It verifies the keystore opens with the recorded password and prints SHA-1 / SHA-256.
 
-**Do not pass passwords as command-line arguments.** Anything in `argv` is visible to every process on the machine via `ps`, and lands in shell history. Feed them on stdin instead:
-
-```bash
-printf '%s\n%s\n' "$STORE_PASS" "$KEY_PASS" | keytool -genkeypair -v \
-  -keystore android/app/upload-keystore.jks \
-  -storetype JKS \
-  -keyalg RSA -keysize "${KEYSIZE:-4096}" \
-  -validity "${VALIDITY_DAYS:-10000}" \
-  -alias "${KEY_ALIAS:-upload}" \
-  -dname "CN=${APP_NAME}" 2>&1 | grep -v -i "password"
-```
-
-`-genkey` still works but is the deprecated spelling; use `-genkeypair`. If `keytool` is missing, the JDK is missing — `flutter doctor` will say the same. Install OpenJDK 17 (AGP 8.x expects 17, not the newest available).
-
-### Step 5 — key.properties
-
-```properties
-storePassword=<generated>
-keyPassword=<generated>
-keyAlias=upload
-storeFile=upload-keystore.jks
-```
-
-```bash
-chmod 600 android/key.properties
-```
+If `keytool` is missing, the JDK is missing — `flutter doctor` will say the same. Install OpenJDK 17 (AGP 8.x expects 17, not the newest available).
 
 `storeFile` is resolved relative to `android/app/`. On Windows, a `.properties` file treats `\` as an escape character — write `C:/keys/upload.jks` or `C:\\keys\\upload.jks`, never a single backslash. A path with one backslash silently resolves to nothing, and Flutter then falls back to **debug signing without failing the build**.
 
@@ -125,9 +105,9 @@ git check-ignore -v android/key.properties android/app/upload-keystore.jks
 ### Step 9 — Verify
 
 ```bash
-# The keystore opens with the recorded password and contains the alias
-printf '%s\n' "$STORE_PASS" | keytool -list -v \
-  -keystore android/app/upload-keystore.jks -alias "$KEY_ALIAS" | grep -E "Alias|Valid|SHA1|SHA-256"
+# The keystore opens with the recorded password and contains the alias (the script already did this once)
+KS_PASS=$(sed -n 's/^storePassword=//p' android/key.properties) keytool -list -v \
+  -keystore android/app/upload-keystore.jks -storepass:env KS_PASS -alias upload | grep -E "Alias|Valid|SHA1|SHA256"
 
 # Gradle picks it up for the release variant
 (cd android && ./gradlew signingReport) 2>&1 | grep -A6 "Variant: release"
@@ -142,7 +122,7 @@ Record the **SHA-1 and SHA-256 fingerprints** in the report. They are needed for
 ```
 FLUTTER SIGNING — OK
 
-Keystore    android/app/upload-keystore.jks  (RSA 4096, alias "upload", valid to 2053-07)
+Keystore    android/app/upload-keystore.jks  (PKCS12, RSA 4096, alias "upload", valid to 2053-07)
 Config      android/key.properties (chmod 600) · signingConfigs.release attached
 Verified    keytool -list OK · gradlew signingReport shows release variant signed
 Ignored     *.jks, key.properties untracked (git check-ignore confirmed)
@@ -166,6 +146,10 @@ Never report backup as complete when the only copy is a second file on the same 
 |------|-----------|
 | `references/gradle-config.md` | Step 6 — Groovy and Kotlin DSL blocks, with the fail-loud variant |
 | `references/key-custody.md` | Step 7 — Play App Signing, what loss actually costs, how to store the key |
+
+| Script | Run at |
+|--------|--------|
+| `scripts/generate-keystore.sh` | Steps 3–5 — passwords via `:env`, PKCS12 keystore, `key.properties`, `.gitignore`, verification, fingerprints |
 
 ## Scope
 

@@ -24,7 +24,7 @@ The rejection email names a policy section. Read that section before acting — 
 | Rejection | Common actual cause | Fix |
 |-----------|--------------------|-----|
 | App access / login | Reviewer could not get past a login | Add working `test_credentials` + exact steps in App content → App access. Verify the account still works. |
-| Data safety inaccurate | Declaration contradicts the privacy policy or observed SDK behavior | Reconcile all three: the app's real behaviour, `data-safety.csv`, and the privacy policy |
+| Data safety inaccurate | Declaration contradicts the privacy policy or observed SDK behavior | Reconcile all three: the app's real behaviour, the Data Safety answers (`data-safety.md`), and the privacy policy |
 | Privacy policy | URL 404s, is not HTTPS, or does not mention the data actually collected | Host it publicly; name every data type the app collects |
 | Broken functionality | Crash on the reviewer's device, or a dead-end screen | Read the pre-launch report — it usually reproduces it |
 | Deceptive/misleading listing | Screenshots or description promise features that are not there | Make the listing match the app |

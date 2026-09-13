@@ -5,9 +5,17 @@
 # Exit 0 = every mechanical check passed. Exit 1 = at least one FAIL.
 set -uo pipefail
 
+# Associative arrays need bash 4+. macOS ships 3.2 — say so instead of dying on
+# a syntax error at line 23.
+if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ]; then
+  echo "FATAL: bash ${BASH_VERSION} is too old (need 4+). On macOS: brew install bash, then run with /opt/homebrew/bin/bash check.sh"
+  exit 1
+fi
+
 NO_BUILD=0
-[ "${1:-}" = "--no-build" ] && NO_BUILD=1
+for a in "$@"; do [ "$a" = "--no-build" ] && NO_BUILD=1; done
 HERE=$(cd "$(dirname "$0")" && pwd)   # the skill's scripts/ dir, not the project
+mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0; }   # GNU, then BSD
 
 SRC=$(find app/src/main/java app/src/main/kotlin -type d -path '*/ui/theme' 2>/dev/null | head -1 | sed 's|/ui/theme$||')
 if [ -z "${SRC:-}" ] || [ ! -d "$SRC" ]; then
@@ -44,7 +52,7 @@ else
     APK=$(ls -t app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1)
     if [ -z "$APK" ]; then
       no A "A1 compile" "gradle reported success but produced no APK"
-    elif [ "$(stat -c %Y "$APK" 2>/dev/null || echo 0)" -lt "$START" ]; then
+    elif [ "$(mtime "$APK")" -lt "$START" ]; then
       no A "A1 compile" "STALE APK from an earlier run — this build produced nothing"
     else
       ok A "A1 compile — $(du -h "$APK" | cut -f1) $(basename "$APK")"

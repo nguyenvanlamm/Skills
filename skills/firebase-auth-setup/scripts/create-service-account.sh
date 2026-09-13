@@ -37,19 +37,21 @@ else
   echo "  ✅ Service account created"
 fi
 
-# Grant Firebase Admin SDK role
-echo "  Granting Firebase Admin SDK Administrator role..."
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${SA_EMAIL}" \
-  --role="roles/firebase.admin" \
-  --quiet 2>/dev/null || true
-
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${SA_EMAIL}" \
-  --role="roles/iam.serviceAccountTokenCreator" \
-  --quiet 2>/dev/null || true
-
-echo "  ✅ Roles granted"
+# Roles — least privilege for what this skill sets up (Authentication only):
+#   roles/firebaseauth.admin           manage users, verify/revoke tokens
+#   roles/iam.serviceAccountTokenCreator  mint custom tokens
+# roles/firebase.admin (the old grant) also covers Firestore, Storage, Hosting…
+# which this skill explicitly does not configure. If the backend later needs
+# Firestore, add roles/datastore.user then — do not pre-grant everything.
+echo "  Granting Firebase Authentication Admin + Token Creator..."
+for role in roles/firebaseauth.admin roles/iam.serviceAccountTokenCreator; do
+  if gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+       --member="serviceAccount:${SA_EMAIL}" --role="$role" --quiet >/dev/null 2>&1; then
+    echo "  ✅ $role"
+  else
+    echo "  ⚠ Could not grant $role — the active account may lack resourcemanager.projects.setIamPolicy"
+  fi
+done
 
 # Create/download key
 if [ -f "$KEY_FILE" ]; then
@@ -61,6 +63,7 @@ else
     --project "$PROJECT_ID" --quiet
   echo "  ✅ Key downloaded to $KEY_FILE"
 fi
+chmod 600 "$KEY_FILE" 2>/dev/null || true
 
 # Verify key file
 if [ -f "$KEY_FILE" ]; then

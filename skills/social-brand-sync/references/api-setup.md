@@ -52,8 +52,9 @@ export FB_PAGE_ID="123456789"
    - Create App → Điền thông tin
 
 2. **Request scopes**
-   - `w_organization_social`, `r_organization_admin`
-   - `w_member_social` (nếu cần personal profile)
+   - `rw_organization_admin` — **bắt buộc** để đổi logo/cover của Company Page (`PARTIAL_UPDATE /v2/organizations/{id}`); `w_organization_social` chỉ đủ để đăng bài
+   - Cần Community Management API access và tài khoản phải là **admin** của Page
+   - Đổi **tên** Company Page không có API — làm tay trong Page admin
    - Redirect URL: `https://www.linkedin.com/developers/tools/oauth/redirect`
 
 3. **Lấy Access Token** (OAuth 2.0 Authorization Code Flow)
@@ -90,8 +91,11 @@ export LINKEDIN_COMPANY_ID="12345678"
 ## Twitter / X
 
 ### Requirements
-- Twitter Developer account (Basic/Pro để có profile.write scope)
-- Project + App trong Developer Portal
+- Twitter/X Developer account với tier cho phép ghi profile (Basic trở lên — từ 2023 Free tier không gọi được `account/update_profile*`; lỗi 402/403 là vấn đề gói)
+- Project + App trong Developer Portal, **App permissions = Read and write**
+
+### Tại sao cần OAuth 1.0a
+Đổi avatar/banner/tên chỉ có trên các endpoint v1.1 `account/update_profile_image`, `account/update_profile_banner`, `account/update_profile`. Chúng yêu cầu **OAuth 1.0a user context** (request ký HMAC-SHA1). Bearer token (app-only) và các endpoint kiểu `POST /2/users/:id/profile_image` **không tồn tại** — bản cũ của skill gọi chúng và luôn thất bại. `scripts/twitter_oauth1.py` ký và gọi đúng endpoint.
 
 ### Steps
 
@@ -104,22 +108,21 @@ export LINKEDIN_COMPANY_ID="12345678"
    - OAuth 2.0 → Client ID + Secret
    - Scopes: `tweet.write`, `users.read`, `account.read`, `profile.write`, `offline.access`
 
-3. **Lấy Access Token + Secret**
-   - Keys and tokens → Access Token and Secret
-   - Hoặc dùng OAuth 2.0 PKCE flow
+3. **Lấy 4 khoá OAuth 1.0a**
+   - Keys and tokens → **API Key and Secret** (consumer) và **Access Token and Secret** (của tài khoản sẽ đổi)
+   - Nếu Access Token được tạo khi app còn Read-only → Regenerate sau khi đổi permission
 
-4. **Lấy User ID**
+4. **Kiểm tra**
    ```bash
-   curl -s "https://api.twitter.com/2/users/me" \
-     -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" | jq -r '.data.id'
+   python3 scripts/twitter_oauth1.py verify   # 200 + screen_name là đúng khoá
    ```
 
 ### Env Variables
 ```bash
+export TWITTER_API_KEY="..."        # consumer key
+export TWITTER_API_SECRET="..."     # consumer secret
 export TWITTER_ACCESS_TOKEN="..."
 export TWITTER_ACCESS_SECRET="..."
-export TWITTER_BEARER_TOKEN="AAAA..."
-export TWITTER_USER_ID="123456789"
 ```
 
 ---
@@ -173,10 +176,12 @@ export TIKTOK_USER_ID="..."
 
 3. **Lấy Access Token**
    ```bash
-   # Dùng gcloud CLI hoặc OAuth 2.0 playground
-   # https://developers.google.com/oauthplayground
-   # Chọn YouTube Data API v3 → scope youtube.force-ssl
+   # OAuth 2.0 playground: https://developers.google.com/oauthplayground
+   # Chọn YouTube Data API v3 → scope youtube.force-ssl → Authorize → Exchange → copy access_token
+   # Token hết hạn sau 1 giờ — lấy ngay trước khi --apply
    ```
+
+   Banner: `channelBanners.insert` (upload) rồi `channels.update` với `brandingSettings.image.bannerExternalUrl` — script làm cả hai bước. Avatar kênh **không** đổi được qua API.
 
 4. **Lấy Channel ID**
    ```bash
@@ -222,8 +227,8 @@ curl -s "https://graph.facebook.com/debug_token?input_token=$FB_PAGE_ACCESS_TOKE
 # LinkedIn
 curl -s "https://api.linkedin.com/v2/me" -H "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN"
 
-# Twitter
-curl -s "https://api.twitter.com/2/users/me" -H "Authorization: Bearer $TWITTER_BEARER_TOKEN"
+# Twitter/X (OAuth 1.0a)
+python3 scripts/twitter_oauth1.py verify
 
 # YouTube
 curl -s "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true" \
@@ -244,3 +249,7 @@ curl -s "https://api.github.com/user" -H "Authorization: Bearer $GITHUB_TOKEN"
 | `403 Forbidden` | Không có quyền | Kiểm tra scope / role |
 | `404 Not Found` | Wrong ID (Page/Company) | Kiểm tra lại ID |
 | TikTok API không có endpoint | TikTok không hỗ trợ update profile qua API | Upload thủ công |
+| X: `402 Payment Required` / `453` | Tier API không có quyền v1.1 account endpoints | Nâng tier hoặc đổi tay trong X Settings |
+| X: `401 Could not authenticate` | Sai một trong 4 khoá, hoặc Access Token tạo lúc app còn Read-only | Regenerate Access Token sau khi bật Read and write |
+| LinkedIn: `403` khi PARTIAL_UPDATE | Token không phải admin Page / thiếu `rw_organization_admin` | Xin lại token với scope đúng bằng tài khoản admin |
+| YouTube: `403 insufficientPermissions` | Token thiếu scope `youtube.force-ssl` hoặc không phải chủ kênh | Lấy lại token đúng scope |

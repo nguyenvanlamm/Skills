@@ -2,7 +2,7 @@
 name: idea-synthesizer
 description: "Cross-reference keyword gap data and pain point clusters, score candidate opportunities, select the single best app idea, and write idea.md with full evidence."
 role: Synthesis & Output Writer
-version: 1.0.0
+version: 1.1.0
 ---
 
 # Idea Synthesizer Agent
@@ -62,9 +62,17 @@ Score each candidate on 5 dimensions (1-10 each, max 50):
 | **Feasibility** | Needs team/budget | 1 dev, 4-6 weeks | 1 dev, 2 weeks |
 | **Niche Fit** | Too broad | Somewhat narrow | Very specific niche |
 
-### Step 3: Select winner
+A dimension with no evidence behind it scores **"—" (no data)**, not a middle-of-the-road 5. Candidates are ranked on the dimensions that have data; the count of scored dimensions is shown next to the total (`31/40 over 4 dims`).
 
-Sort by total score descending. Apply tiebreakers:
+### Step 3: Select winner — or decline to
+
+**Minimum bar** — a candidate is eligible only if:
+- at least one of {Pain Intensity, Keyword Demand} is ≥ 6 **and** backed by a linked source, and
+- Competitive Weakness ≥ 5 with at least one named competitor and its rating/last-update from a lookup.
+
+If no candidate is eligible, the output is **"No viable opportunity in scope `<scope>`"** with: what was searched (from `queries_run`), what came back, and what would need to be true for the answer to change. Do not write `idea.md`. A user told to stop has lost an hour; a user handed a manufactured opportunity loses weeks.
+
+Otherwise sort eligible candidates by total descending. Tiebreakers:
 1. Higher Pain Intensity
 2. Higher Keyword Demand
 3. Higher Niche Fit
@@ -72,8 +80,8 @@ Sort by total score descending. Apply tiebreakers:
 Select the single winner. Write a rationale:
 
 ```
-Winner: [Name] — Score: X/50
-Why this wins: [2-3 sentence explanation]
+Winner: [Name] — Score: X/50 (N dims scored)
+Why this wins: [2-3 sentence explanation, each pointing at a source]
 Runner-up: [Name] — Score: X/50
 ```
 
@@ -141,16 +149,17 @@ Write `idea.md` to the current directory with this structure:
 - App reviews: [app names and review counts]
 ```
 
-## Graceful Degradation
+## Degraded inputs
 
-- If no keyword gaps or pain points are found, use general knowledge to propose the most plausible opportunity in the given scope, clearly labeled as "low confidence — generated without live research data"
-- If scoring results in a tie, apply tiebreakers as defined in Step 3
-- If the output directory is not writable, print the idea.md content to stdout so the user can save it manually
+- One agent returned `status: unavailable` / `no_data` → build candidates from the other agent's data only; every dimension that agent would have fed scores "—". Say so in the matrix header.
+- Both agents empty → the minimum bar cannot be met. Output "No viable opportunity" with the research log. **Never** propose an idea from general knowledge, however labelled — the old "low confidence" fallback is what this version removes.
+- Scoring tie → tiebreakers in Step 3.
+- Output directory not writable → print the `idea.md` content so the user can save it.
 
 ## Output
 
 Return:
-1. The full opportunity matrix (all candidates with scores)
-2. Winner announcement with rationale
-3. Final `idea.md` content
+1. The full opportunity matrix (all candidates, per-dimension scores or "—", dims-scored count)
+2. Winner announcement with rationale — or the "No viable opportunity" statement
+3. Final `idea.md` content (if a winner exists)
 4. Path where `idea.md` was written

@@ -2,116 +2,127 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# --- Defaults ---
 SLUG=""
 OUTPUT_DIR=""
 REGION="us-central"
+PROJECT_ID=""
+GOOGLE_CLIENT_ID="${GOOGLE_OAUTH_CLIENT_ID:-}"
+GOOGLE_CLIENT_SECRET="${GOOGLE_OAUTH_CLIENT_SECRET:-}"
 
-# --- Parse args ---
+usage() {
+  cat <<EOF
+Usage: $0 --slug <slug> [options]
+   or: $0 --project-id <existing-project> [options]
+
+  --slug                  Base name; project id becomes <slug>-<rand4>
+  --project-id            Reuse an existing Firebase/GCP project instead of creating one
+                          (avoids the ~10-12 project quota; the project must already have Firebase enabled)
+  --output <dir>          Output directory (default: \$PWD/firebase-output)
+  --region <region>       Recorded in the output for downstream use (default: us-central)
+  --google-client-id      OAuth 2.0 client id → enables Google sign-in
+  --google-client-secret  OAuth 2.0 client secret (required with the id)
+                          (also read from GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET)
+EOF
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --slug) SLUG="$2"; shift 2 ;;
+    --project-id) PROJECT_ID="$2"; shift 2 ;;
     --output) OUTPUT_DIR="$2"; shift 2 ;;
     --region) REGION="$2"; shift 2 ;;
-    --help)
-      echo "Usage: $0 --slug <slug> [--output <dir>] [--region <region>]"
-      echo ""
-      echo "Required:"
-      echo "  --slug        Product slug (e.g. task-manager)"
-      echo "Optional:"
-      echo "  --output      Output directory (default: \$PWD/firebase-output)"
-      echo "  --region      GCP region (default: us-central)"
-      exit 0
-      ;;
+    --google-client-id) GOOGLE_CLIENT_ID="$2"; shift 2 ;;
+    --google-client-secret) GOOGLE_CLIENT_SECRET="$2"; shift 2 ;;
+    --help|-h) usage; exit 0 ;;
     *) echo "Unknown arg: $1. Use --help for usage."; exit 1 ;;
   esac
 done
 
-if [ -z "$SLUG" ]; then
-  echo "❌ --slug is required. Use --help for usage."
-  exit 1
+if [ -z "$SLUG" ] && [ -z "$PROJECT_ID" ]; then
+  echo "❌ --slug or --project-id is required. Use --help for usage."; exit 1
 fi
-if [ -z "$OUTPUT_DIR" ]; then
-  OUTPUT_DIR="$PWD/firebase-output"
+if { [ -n "$GOOGLE_CLIENT_ID" ] && [ -z "$GOOGLE_CLIENT_SECRET" ]; } || { [ -z "$GOOGLE_CLIENT_ID" ] && [ -n "$GOOGLE_CLIENT_SECRET" ]; }; then
+  echo "❌ --google-client-id and --google-client-secret must be given together."; exit 1
 fi
-
+[ -n "$OUTPUT_DIR" ] || OUTPUT_DIR="$PWD/firebase-output"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 
 echo ""
 echo "═══════════════════════════════════════════════"
-echo "  Firebase Auth Setup — $SLUG"
+echo "  Firebase Auth Setup — ${PROJECT_ID:-$SLUG}"
 echo "═══════════════════════════════════════════════"
 echo ""
 
-# --- Step 1: Check Prerequisites ---
 echo "◆ Step 1/5: Checking prerequisites..."
 bash "$SCRIPT_DIR/check-prereqs.sh"
 echo ""
 
-# --- Step 2: Create Firebase Project ---
-echo "◆ Step 2/5: Creating Firebase project..."
-bash "$SCRIPT_DIR/create-project.sh" \
-  --slug "$SLUG" \
-  --output "$OUTPUT_DIR" \
-  --region "$REGION"
+echo "◆ Step 2/5: Firebase project..."
+bash "$SCRIPT_DIR/create-project.sh" ${SLUG:+--slug "$SLUG"} ${PROJECT_ID:+--project-id "$PROJECT_ID"} \
+  --output "$OUTPUT_DIR" --region "$REGION"
 echo ""
 
-PROJECT_ID=""
-if [ -f "$OUTPUT_DIR/firebase-output.json" ]; then
-  PROJECT_ID=$(jq -r '.project_id // empty' "$OUTPUT_DIR/firebase-output.json")
-fi
-
-if [ -z "$PROJECT_ID" ]; then
-  echo "❌ Failed to get project_id from Step 2 output."
-  exit 1
-fi
-
+PROJECT_ID=$(jq -r '.project_id // empty' "$OUTPUT_DIR/firebase-output.json" 2>/dev/null || true)
+[ -n "$PROJECT_ID" ] || { echo "❌ Failed to get project_id from Step 2 output."; exit 1; }
 PROJECT_NUMBER=$(jq -r '.project_number // empty' "$OUTPUT_DIR/firebase-output.json")
 
-# --- Step 3: Enable Auth Providers ---
 echo "◆ Step 3/5: Enabling Auth providers..."
-bash "$SCRIPT_DIR/enable-auth.sh" \
-  --project "$PROJECT_ID" \
-  --output "$OUTPUT_DIR"
+bash "$SCRIPT_DIR/enable-auth.sh" --project "$PROJECT_ID" --output "$OUTPUT_DIR" \
+  ${GOOGLE_CLIENT_ID:+--google-client-id "$GOOGLE_CLIENT_ID"} \
+  ${GOOGLE_CLIENT_SECRET:+--google-client-secret "$GOOGLE_CLIENT_SECRET"}
 echo ""
 
-# --- Step 4: Create Web App ---
 echo "◆ Step 4/5: Creating web app..."
-bash "$SCRIPT_DIR/create-web-app.sh" \
-  --project "$PROJECT_ID" \
-  --output "$OUTPUT_DIR"
+bash "$SCRIPT_DIR/create-web-app.sh" --project "$PROJECT_ID" --output "$OUTPUT_DIR"
 echo ""
 
-# --- Step 5: Create Service Account ---
 echo "◆ Step 5/5: Creating service account..."
-bash "$SCRIPT_DIR/create-service-account.sh" \
-  --project "$PROJECT_ID" \
-  --project-number "$PROJECT_NUMBER" \
-  --output "$OUTPUT_DIR"
+bash "$SCRIPT_DIR/create-service-account.sh" --project "$PROJECT_ID" \
+  ${PROJECT_NUMBER:+--project-number "$PROJECT_NUMBER"} --output "$OUTPUT_DIR"
 echo ""
 
+# --- Local hygiene: the output dir holds an admin private key --------------
+# Doing this here (not asking the user to) is the difference between "documented"
+# and "done".
+chmod 600 "$OUTPUT_DIR/service-account-key.json" 2>/dev/null || true
+GITIGNORE=""
+for d in "$OUTPUT_DIR" "$(dirname "$OUTPUT_DIR")"; do
+  if git -C "$d" rev-parse --show-toplevel >/dev/null 2>&1; then GITIGNORE="$(git -C "$d" rev-parse --show-toplevel)/.gitignore"; break; fi
+done
+if [ -n "$GITIGNORE" ]; then
+  REL=$(python3 -c "import os,sys;print(os.path.relpath(sys.argv[1], sys.argv[2]))" "$OUTPUT_DIR" "$(dirname "$GITIGNORE")" 2>/dev/null || basename "$OUTPUT_DIR")
+  for pattern in "$REL/service-account-key.json" "$REL/firebase-output.json"; do
+    grep -qxF "$pattern" "$GITIGNORE" 2>/dev/null || echo "$pattern" >> "$GITIGNORE"
+  done
+  echo "  ✅ Added key + output paths to $GITIGNORE"
+else
+  echo "  ⚠ Output dir is not inside a git repo — remember to gitignore service-account-key.json wherever it ends up"
+fi
+
+PROVIDERS=$(jq -r '.auth_providers | join(", ")' "$OUTPUT_DIR/firebase-output.json" 2>/dev/null || echo "?")
+
+echo ""
 echo "═══════════════════════════════════════════════"
 echo "  ✅ Firebase Auth Setup Complete!"
 echo "═══════════════════════════════════════════════"
 echo ""
-echo "  Output directory: $OUTPUT_DIR"
+echo "  Project:    $PROJECT_ID"
+echo "  Providers:  $PROVIDERS"
+echo "  Output:     $OUTPUT_DIR"
 echo ""
 echo "  Files:"
-echo "    firebase-output.json        — Full config (project, web, service account)"
-echo "    firebase-web-config.json    — Web app config for React client"
-echo "    service-account-key.json    — 🔒 Service account private key (DO NOT COMMIT)"
+echo "    firebase-output.json        — Full config (project, web app, service account, providers)"
+echo "    firebase-web-config.json    — Web app config for the client"
+echo "    service-account-key.json    — 🔒 admin private key, chmod 600, DO NOT COMMIT"
 echo ""
 echo "  Next steps:"
-echo "    1. Server:"
-echo "       - Install firebase-admin: pip install firebase-admin"
-echo "       - Set env: FIREBASE_PROJECT_ID=$PROJECT_ID"
-echo "       - Set env: GOOGLE_APPLICATION_CREDENTIALS=$OUTPUT_DIR/service-account-key.json"
-echo "    2. Client:"
-echo "       - Install firebase: npm install firebase"
-echo "       - Copy firebase-web-config.json values to .env"
+echo "    Server: pip install firebase-admin"
+echo "            FIREBASE_PROJECT_ID=$PROJECT_ID"
+echo "            GOOGLE_APPLICATION_CREDENTIALS=$OUTPUT_DIR/service-account-key.json"
+echo "    Client: npm install firebase; copy firebase-web-config.json values to .env"
+echo "            Read auth_providers before rendering a Google button — it is only there if you passed an OAuth client."
 echo ""
-echo "  Project:  https://console.firebase.google.com/project/$PROJECT_ID/overview"
+echo "  Console:  https://console.firebase.google.com/project/$PROJECT_ID/authentication/providers"
 echo ""

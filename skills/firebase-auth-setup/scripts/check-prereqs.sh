@@ -1,71 +1,48 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
 echo "🔍 Checking prerequisites..."
-
 FAILED=0
 
-# firebase-tools
-if command -v firebase &>/dev/null; then
-  echo "  ✓ firebase-tools: $(firebase --version 2>&1 | head -1)"
-else
-  echo "  ✗ firebase-tools: not found"
-  echo "    → Install: npm install -g firebase-tools"
-  FAILED=1
-fi
+need() {  # need <cmd> <version-cmd> <install-hint>
+  if command -v "$1" &>/dev/null; then
+    echo "  ✓ $1: $(eval "$2" 2>&1 | head -1)"
+  else
+    echo "  ✗ $1: not found"; echo "    → $3"; FAILED=1
+  fi
+}
 
-# gcloud
+need firebase "firebase --version" "npm install -g firebase-tools"
+need gcloud   "gcloud --version"   "https://cloud.google.com/sdk/docs/install"
+need jq       "jq --version"       "apt install jq / brew install jq"
+need curl     "curl --version"     "apt install curl / brew install curl"
+
+# Ambient auth is all the scripts use: firebase-tools for project/app creation,
+# gcloud for the Identity Toolkit REST calls and IAM. A `firebase login:ci`
+# token is NOT required — an older version demanded one and never used it.
 if command -v gcloud &>/dev/null; then
-  echo "  ✓ gcloud: $(gcloud --version 2>&1 | head -1)"
-else
-  echo "  ✗ gcloud: not found"
-  echo "    → Install: https://cloud.google.com/sdk/docs/install"
-  FAILED=1
+  ACCOUNT=$(gcloud auth list --format="value(account)" --filter=status:ACTIVE 2>/dev/null | head -1 || true)
+  if [ -n "$ACCOUNT" ]; then
+    echo "  ✓ gcloud active account: $ACCOUNT"
+  else
+    echo "  ✗ gcloud: no active account"; echo "    → gcloud auth login"; FAILED=1
+  fi
 fi
 
-# jq
-if command -v jq &>/dev/null; then
-  echo "  ✓ jq: $(jq --version 2>&1)"
-else
-  echo "  ✗ jq: not found"
-  echo "    → Install: apt install jq / brew install jq"
-  FAILED=1
-fi
-
-# Firebase CI token
-CI_TOKEN_FILE="${FIREBASE_TOKEN_PATH:-$HOME/.config/firebase/ci-token}"
-CI_TOKEN=""
-if [ -f "$CI_TOKEN_FILE" ]; then
-  CI_TOKEN="$(cat "$CI_TOKEN_FILE" | tr -d ' \n\r')"
-fi
-if [ -n "$CI_TOKEN" ]; then
-  echo "  ✓ Firebase CI token: $CI_TOKEN_FILE"
-elif [ -n "${FIREBASE_TOKEN:-}" ]; then
-  echo "  ✓ Firebase CI token: \$FIREBASE_TOKEN env var"
-else
-  echo "  ✗ Firebase CI token: not found"
-  echo "    → Run: firebase login:ci --no-localhost"
-  echo "    → Then save token to: $CI_TOKEN_FILE"
-  echo "    → Or set: export FIREBASE_TOKEN=<token>"
-  FAILED=1
-fi
-
-# gcloud auth
-if gcloud auth list --format="value(account)" 2>/dev/null | grep -q .; then
-  ACCOUNT=$(gcloud auth list --format="value(account)" --filter=status:ACTIVE 2>/dev/null | head -1)
-  echo "  ✓ gcloud active account: $ACCOUNT"
-else
-  echo "  ✗ gcloud: no active account"
-  echo "    → Run: gcloud auth login"
-  FAILED=1
+if command -v firebase &>/dev/null; then
+  # `firebase login:list` prints the logged-in accounts; empty or error means not logged in.
+  if firebase login:list 2>/dev/null | grep -qE '@'; then
+    echo "  ✓ firebase-tools: logged in"
+  elif [ -n "${FIREBASE_TOKEN:-}" ]; then
+    echo "  ✓ firebase-tools: using \$FIREBASE_TOKEN (CI mode)"
+  else
+    echo "  ✗ firebase-tools: not logged in"; echo "    → firebase login   (or export FIREBASE_TOKEN for CI)"; FAILED=1
+  fi
 fi
 
 echo ""
 if [ "$FAILED" -eq 1 ]; then
-  echo "❌ Prerequisites check FAILED. Fix errors above and retry."
+  echo "❌ Prerequisites check FAILED. Fix the items above and retry."
   exit 1
-else
-  echo "✅ All prerequisites satisfied."
 fi
+echo "✅ All prerequisites satisfied."

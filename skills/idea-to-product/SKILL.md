@@ -4,7 +4,7 @@ description: "End-to-end product builder from trend analysis to runnable code. F
 license: MIT
 effort: max
 metadata:
-  version: 2.0.0
+  version: 2.1.0
   author: "Nguyen Van Lam"
 ---
 
@@ -12,9 +12,25 @@ metadata:
 
 4-phase orchestrator that takes trending topics and produces a runnable full-stack product — idea validation, product definition, implementation, and ship preparation.
 
-Stack: FastAPI (Python) + React (Vite/Tailwind/shadcn/ui) + SQLite.
+Stack: FastAPI (Python) + React (Vite/Tailwind/shadcn/ui) + SQLite (local) / PostgreSQL (Render).
 
 **Server và client là 2 project riêng biệt**, mỗi project là một GitHub repo độc lập để dễ dàng deploy và maintain.
+
+## Cách gọi skill con
+
+Các lệnh dạng `/skill-name --flag value` trong file này là **mô tả ý định**, không phải CLI thật. Trên mỗi host (Devin CLI, Claude Code, opencode) hãy gọi skill qua cơ chế của host (skill tool, `/name`, …) và truyền các giá trị đó trong prompt. Mỗi skill con có contract input/output riêng — bảng dưới ghi đúng contract đã đọc từ SKILL.md của chúng:
+
+| Skill | Đọc | Ghi |
+|-------|-----|-----|
+| `trend-ideas` | — | `trend-report.md`, `idea.md` + `validate.md` của idea thắng (v2.2+) |
+| `idea-validator` | `idea.md` trong thư mục | `validate.md` cùng thư mục |
+| `prd-generator` | **`idea.md` + `validate.md` cùng thư mục** — không nhận idea dạng chuỗi | `prd.md` cùng thư mục |
+| `tad-generator` | `prd.md` | `tad.md` |
+| `tasks-generator` | `prd.md` (+ `tad.md` nếu có, cùng thư mục) | `tasks.md` |
+
+Vì vậy mọi file planning nằm **cùng một thư mục** `$PRODUCT_DIR/` — đừng đổi tên `tad.md` thành `architecture.md` hay tách thư mục, downstream tìm theo tên mặc định.
+
+**Kiểm tra skill có sẵn:** không dò đường dẫn. Trước mỗi phase, liệt kê skill phase đó cần; nếu host báo không có skill nào, dừng ở đầu phase và nêu tên — đừng chạy nửa phase rồi mới phát hiện.
 
 ## When to Use
 
@@ -39,8 +55,8 @@ All of these must be installed before starting:
 
 | Skill | Version | Phase |
 |-------|---------|-------|
-| `trend-ideas` | 2.1.0+ | 1 |
-| `idea-validator` | 1.2.0+ | 1 |
+| `trend-ideas` | 2.2.0+ | 1 |
+| `idea-validator` | 1.2.0+ | 1 (được `trend-ideas` gọi; gọi trực tiếp khi user đưa idea sẵn) |
 | `prd-generator` | 1.2.0+ | 2 |
 | `tad-generator` | 1.2.0+ | 2 |
 | `tasks-generator` | 1.2.0+ | 2 |
@@ -48,9 +64,9 @@ All of these must be installed before starting:
 | `frontend-design` | 1.2.0+ | 3 |
 | `code-review` | 1.0.0+ | 3 |
 | `test-coverage` | 1.2.0+ | 3 |
-| `firebase-auth-setup` | 2.0.0+ | 3 (bắt buộc — thay thế JWT tự build) |
+| `firebase-auth-setup` | 2.1.0+ | 3 (chỉ khi PRD có đăng nhập) |
 | `devops-pipeline` | 1.0.0+ | 4 |
-| `docs-generator` | 1.2.0+ | 4 |
+| `doc-manager` | 1.0.0+ | 4 (bản cũ ghi `docs-generator` — skill đó không tồn tại) |
 | `deploy-render` | 2.0.0+ | 4 (nếu cần deploy server) |
 | `deploy-netlify` | 2.0.0+ | 4 (nếu cần deploy client) |
 | `oss-ready` | 1.1.0+ | 4 |
@@ -86,15 +102,15 @@ npx skills add https://github.com/nguyenvanlamm/Skills
    ├── <product-slug>-server/    # FastAPI backend (Python repo)
    └── <product-slug>-client/    # React frontend (Node repo)
    ```
-5. **Ask user for GitHub repo names** (hoặc dùng slug mặc định):
-   - Server repo: `gh repo create <product-slug>-server --private`
-   - Client repo: `gh repo create <product-slug>-client --private`
-6. **Initialize git** trong từng project:
+5. **Chốt tên GitHub repo** với user (mặc định `<slug>-server`, `<slug>-client`, private) — **chỉ ghi nhận**, chưa tạo. Tạo repo là hành động hướng ra ngoài, thuộc Phase 4 sau gate.
+6. **Initialize git** trong từng project (`git init -b main`); commit đầu tiên chỉ sau khi Phase 3 có code — commit một thư mục rỗng không có giá trị.
+7. **Verify prerequisite skills** cho Phase 1–2 (xem "Cách gọi skill con"). Thiếu thì dừng, nêu tên.
+8. **Kiểm tra runtime + port** một lần, để lỗi lộ ra trước khi tốn 30 phút sinh code:
    ```bash
-   cd <product-slug>-server && git init && git add . && git commit -m "Initial commit"
-   cd <product-slug>-client && git init && git add . && git commit -m "Initial commit"
+   python3 --version && node --version && npm --version && git config user.email
+   for p in 8000 5173; do (command -v ss >/dev/null && ss -ltn | grep -q ":$p " || lsof -iTCP:$p -sTCP:LISTEN >/dev/null 2>&1) && echo "port $p BUSY"; done
    ```
-7. **Verify all prerequisite skills** are installed. If any missing, report the list and stop.
+   Port bận → hỏi user giải phóng hoặc chốt port khác **ngay bây giờ**, và dùng port đó nhất quán trong Makefile, vite proxy và CORS ở Phase 3.
 
 ## Workflow
 
@@ -102,7 +118,7 @@ npx skills add https://github.com/nguyenvanlamm/Skills
 Phase 1 — Idea Generation  → trend-ideas + idea-validator
 Phase 2 — Product Planning (GATE) → prd-generator + tad-generator + tasks-generator
 Phase 3 — Build Product (GATE) → logo-designer + frontend-design + implement + code-review + test-coverage
-Phase 4 — Ship Prep → devops-pipeline + docs-generator + oss-ready + seo-ai-optimizer + landing-page-generator + release-manager
+Phase 4 — Ship Prep → devops-pipeline + doc-manager + oss-ready + seo-ai-optimizer + landing-page-generator + release-manager
 ```
 
 Approval gates after Phase 1, 2, and 3: **must not advance** without explicit user approval.
@@ -113,21 +129,23 @@ Approval gates after Phase 1, 2, and 3: **must not advance** without explicit us
 
 ## Phase 1: Idea Generation & Validation
 
-Invoke `trend-ideas` to fetch trends, brainstorm 3 ideas, validate each via `idea-validator`, and select the winning idea.
+**Nếu user đã có idea** → bỏ qua `trend-ideas`: viết `$PRODUCT_DIR/idea.md` từ mô tả của user, gọi `idea-validator` trên `$PRODUCT_DIR` để có `validate.md`, rồi sang gate.
+
+Ngược lại, invoke `trend-ideas` to fetch trends, brainstorm 3 ideas, validate each via `idea-validator`, and select the winning idea:
 
 ```
-/trend-ideas --output "$PRODUCT_DIR/trend-report.md"
+/trend-ideas --output "$PRODUCT_DIR/trend-report.md" --output-dir "$PRODUCT_DIR"
 ```
 
-**Output:** `$PRODUCT_DIR/trend-report.md` containing:
-- Top 15 trending topics with growth/volume/core-need
-- 3 validated ideas with composite scores
-- Winning idea with full detail and validation summary
+**Output:**
+- `$PRODUCT_DIR/trend-report.md` — top topics, 3 ideas with composite scores, winner
+- `$PRODUCT_DIR/ideas/<n>-<slug>/{idea.md,validate.md}` — mỗi idea một cặp
+- **`$PRODUCT_DIR/idea.md` + `$PRODUCT_DIR/validate.md`** — cặp của idea thắng; đây là input thật của Phase 2
 
 **Check:**
 - [ ] trend-report.md exists
-- [ ] Winning idea clearly identified with name and score
-- [ ] All 4 validation dimensions present (Creativity, Feasibility, Market Impact, Technical Execution)
+- [ ] `$PRODUCT_DIR/idea.md` và `validate.md` tồn tại và là của idea thắng (tên khớp report)
+- [ ] `validate.md` có đủ 4 ratings (Creativity, Feasibility, Market Impact, Technical Execution) và Quick Verdict
 
 **Step Completion Report:**
 ```
@@ -143,54 +161,54 @@ Invoke `trend-ideas` to fetch trends, brainstorm 3 ideas, validate each via `ide
 
 ### GATE: Present winning idea to user for approval.
 
-If not approved, do not advance. Ask the user to choose a different idea or re-run Phase 1.
+If not approved, do not advance. User chọn idea khác trong `ideas/<n>-…/` → copy cặp `idea.md`/`validate.md` đó lên `$PRODUCT_DIR/` rồi gate lại; hoặc re-run Phase 1.
 
 ---
 
 ## Phase 2: Product Definition
 
+Cả ba skill đọc/ghi trong **`$PRODUCT_DIR/`** theo tên file mặc định của chúng. Truyền `$PRODUCT_DIR` làm project directory, không truyền nội dung.
+
 ### Step 2a: Generate PRD
 
-Invoke `prd-generator` with the winning idea from the trend report:
-
 ```
-/prd-generator --idea "$(extract winning idea from trend-report.md)" --output "$PRODUCT_DIR/prd.md"
+/prd-generator  (project dir: $PRODUCT_DIR — đọc idea.md + validate.md, ghi prd.md)
 ```
 
-**Output:** `$PRODUCT_DIR/prd.md` — structured PRD with features, user stories, success criteria, and scope.
+Thêm vào prompt ràng buộc stack của orchestrator này (FastAPI + React/Vite + SQLite/PostgreSQL, 2 repo, Firebase Auth nếu có đăng nhập) để PRD không đề xuất stack khác.
+
+**Output:** `$PRODUCT_DIR/prd.md`.
 
 ### Step 2b: Generate Technical Architecture
 
-Invoke `tad-generator` with the PRD:
-
 ```
-/tad-generator "$PRODUCT_DIR/prd.md" --output "$PRODUCT_DIR/architecture.md"
+/tad-generator  (project dir: $PRODUCT_DIR — đọc prd.md, ghi tad.md)
 ```
 
-**Output:** `$PRODUCT_DIR/architecture.md` — data flow diagrams, component tree, API routes, database schema.
+**Output:** `$PRODUCT_DIR/tad.md` — data flow, component tree, API routes, DB schema. Giữ tên `tad.md`; `tasks-generator` tìm đúng tên này.
 
 ### Step 2c: Generate Tasks
 
-Invoke `tasks-generator` with the PRD and architecture:
-
 ```
-/tasks-generator "$PRODUCT_DIR/prd.md" --arch "$PRODUCT_DIR/architecture.md" --output "$PRODUCT_DIR/tasks.md"
+/tasks-generator  (project dir: $PRODUCT_DIR — đọc prd.md + tad.md, ghi tasks.md)
 ```
 
-**Output:** `$PRODUCT_DIR/tasks.md` — sprint-ready task breakdown with effort estimates.
+**Output:** `$PRODUCT_DIR/tasks.md`.
 
 **Check:**
-- [ ] prd.md exists with features, user stories, success criteria
-- [ ] architecture.md exists with API routes, DB schema, component tree
+- [ ] prd.md exists with features, user stories, success criteria, và stack khớp orchestrator
+- [ ] tad.md exists with API routes, DB schema, component tree
 - [ ] tasks.md exists with phased task breakdown
+- [ ] Xác định `needs_auth` (PRD có register/login) và `needs_db` (PRD có dữ liệu bền vững) — ghi lại, Phase 3–4 dùng
 
 **Step Completion Report:**
 ```
 ◆ Product Definition (step 2 of 4)
 ······································································
   PRD written:           √ pass (prd.md)
-  Architecture doc:      √ pass (architecture.md)
+  Architecture doc:      √ pass (tad.md)
   Task breakdown:        √ pass (tasks.md — <N> tasks)
+  Flags:                 needs_auth=<bool> needs_db=<bool>
   ____________________________
   Result:                PASS
 ```
@@ -217,35 +235,28 @@ Invoke `frontend-design` to generate the UI shell:
 /frontend-design --product "<product-name>" --output "$PRODUCT_DIR/frontend" --framework react --styling tailwind --components shadcn
 ```
 
-### Step 3c: Firebase Auth Setup (bắt buộc — thay thế JWT tự build)
+### Step 3c: Firebase Auth Setup (chỉ khi `needs_auth`)
 
-Khi PRD có yêu cầu register/login (F1), **bắt buộc dùng Firebase Auth**. Không tự build JWT.
+Khi PRD có yêu cầu register/login, **dùng Firebase Auth**. Không tự build JWT/hash password. Không có đăng nhập → bỏ qua bước này, ghi `N/A` trong report.
 
-**Prerequisites check** — xác nhận các tool sau đã được cài đặt và cấu hình trước khi chạy:
+`firebase-auth-setup` tự kiểm tra prerequisites (`firebase-tools`, `gcloud`, `jq`, `gcloud auth`) trong `check-prereqs.sh` và dừng với hướng dẫn nếu thiếu — không cần kiểm tra lại ở đây. Lưu ý: tạo project Firebase **tốn quota** (~10–12 project/tài khoản); nếu user đã có project, truyền `--project-id` để dùng lại thay vì tạo mới.
 
-| Tool | Check command | Nếu thiếu |
-|------|---------------|-----------|
-| `firebase-tools` | `firebase --version` | `npm install -g firebase-tools` |
-| `gcloud` | `gcloud --version` | https://cloud.google.com/sdk/docs/install |
-| `jq` | `jq --version` | `apt install jq` / `brew install jq` |
-| Firebase CI token | `cat ~/.config/firebase/ci-token` | `firebase login:ci --no-localhost` rồi lưu vào `~/.config/firebase/ci-token` |
-| gcloud auth | `gcloud auth list` | `gcloud auth login` hoặc `gcloud auth application-default login` |
-
-Nếu thiếu bất kỳ mục nào → báo lỗi + hướng dẫn cài đặt, **dừng lại**, không chạy `firebase-auth-setup`.
-
-```markdown
+```
 /firebase-auth-setup --slug "<product-slug>" --output "$PRODUCT_DIR/firebase-config"
 ```
 
-Sau khi chạy xong, đọc `$PRODUCT_DIR/firebase-config/firebase-output.json` để lấy:
-- `project_id` → ghi vào server `.env` là `FIREBASE_PROJECT_ID`
-- `web_app` → ghi vào client `.env` là `VITE_FIREBASE_*`
-- `service_account.key_path` → ghi vào server `.env` là `GOOGLE_APPLICATION_CREDENTIALS`
+Sau khi chạy xong, đọc `$PRODUCT_DIR/firebase-config/firebase-output.json`:
+- `project_id` → server `.env`: `FIREBASE_PROJECT_ID`
+- `web_app.*` → client `.env`: `VITE_FIREBASE_*`
+- `service_account.key_path` → server `.env`: `GOOGLE_APPLICATION_CREDENTIALS`
+- **`auth_providers`** → quyết định UI login: chỉ sinh nút Google (`signInWithPopup`) khi mảng có `"google"`. Mặc định skill chỉ bật `email` — Google cần OAuth client mà API không tự tạo được. Sinh nút Google khi provider chưa bật là bug UI lộ ra ngay lần click đầu.
+
+`firebase-config/` phải nằm trong `.gitignore` của **cả hai** repo (chứa service account key).
 
 **Verify end-to-end** sau khi setup:
-1. Kiểm tra server start được: `cd server && uvicorn main:app --reload --port 8000` (200 OK)
-2. Kiểm tra client gọi được Firebase: dùng browser devtools verify `firebase.auth()` không báo lỗi
-3. Thử login Email/Password hoặc Google trên client, verify server nhận được ID token (gọi `GET /api/v1/auth/me` với token)
+1. Server start: `make dev` → `GET /api/v1/health` 200
+2. Client init Firebase không lỗi console
+3. Login Email/Password trên client → gọi `GET /api/v1/auth/me` với ID token → 200 và trả về `uid`
 
 ---
 
@@ -266,7 +277,7 @@ Using the PRD, architecture, and tasks as specifications, build the full product
 ├── routes/
 │   ├── __init__.py
 │   ├── auth.py          # Verify Firebase ID token (firebase_admin.auth.verify_id_token)
-│   └── ...              # Domain-specific routes per architecture.md
+│   └── ...              # Domain-specific routes per tad.md
 ├── services/
 │   ├── __init__.py
 │   └── ...              # Business logic layer
@@ -298,12 +309,12 @@ lint:
 
 Server conventions:
 - Use `SQLAlchemy 2.0` style (declarative base, async not required for SQLite)
+- `database.py` đọc **`DATABASE_URL` từ env**, mặc định SQLite (template trong `references/tech-stack.md`). Nhờ vậy `deploy-render` không phải ghi đè file này khi chuyển sang PostgreSQL.
 - All routes under prefix `/api/v1`
-- CORS allow client's production URL + `http://localhost:5173`
+- CORS: đọc `ALLOWED_ORIGINS` từ env (mặc định `http://localhost:5173`), không hardcode `*`. Production URL của client được thêm vào ở Phase 4f **sau khi** biết URL Netlify.
 - Health check at `GET /api/v1/health`
 - `README.md` ghi rõ client repo URL + cách clone cả 2 để chạy fullstack
-- `routes/auth.py` verify Firebase ID token bằng `firebase_admin.auth.verify_id_token` (không hash password, không dùng JWT tự build)
-- `firebase_config.py` init `firebase_admin` với service account key
+- Nếu `needs_auth`: `routes/auth.py` verify Firebase ID token bằng `firebase_admin.auth.verify_id_token`; `firebase_config.py` init `firebase_admin` với service account key. Nếu không: bỏ hai file này và `firebase-admin` khỏi requirements.
 
 ---
 
@@ -455,53 +466,45 @@ Mỗi bước dưới đây chạy **riêng cho từng repo** (server + client),
 ### Step 4c: Documentation
 
 ```
-/docs-generator "$PRODUCT_DIR/<slug>-server" --output "$PRODUCT_DIR/<slug>-server/docs"
-/docs-generator "$PRODUCT_DIR/<slug>-client" --output "$PRODUCT_DIR/<slug>-client/docs"
+/doc-manager "$PRODUCT_DIR/<slug>-server"   → docs/ khớp code, mỗi claim trích path:line
+/doc-manager "$PRODUCT_DIR/<slug>-client"
 ```
 
-### Step 4d: Push to GitHub
+### Step 4d: Tạo repo và push lên GitHub
 
-Push cả 2 repo lên GitHub:
+Tên repo và visibility đã chốt ở Setup và được user duyệt ở gate Phase 4. Với mỗi repo:
 
 ```bash
-cd $PRODUCT_DIR/<slug>-server
-git remote add origin git@github.com:<user>/<slug>-server.git
-git push -u origin main
-
-cd $PRODUCT_DIR/<slug>-client
-git remote add origin git@github.com:<user>/<slug>-client.git
-git push -u origin main
+cd "$PRODUCT_DIR/<slug>-server"
+git add -A && git commit -qm "feat: initial <product-name> server" || true
+gh repo create "<user>/<slug>-server" --private --source=. --remote=origin --push
 ```
+
+Trước khi push, xác nhận không có secret trong index: `git ls-files | grep -E '\.env$|service-account|firebase-config'` phải rỗng. Có → gỡ khỏi index, thêm `.gitignore`, và coi giá trị đó là đã lộ nếu repo từng public.
+
+Nếu **có deploy** (4e/4f), có thể bỏ 4d: `deploy-render` và `deploy-netlify` tự tạo repo `<slug>-server` / `<slug>-client` và push. Chạy cả hai chỉ tạo commit "chore" thừa.
 
 ### Step 4e: Deploy Server to Render (nếu cần)
 
-Deploy server FastAPI lên Render.com. Kiểm tra xem server có cần database không (dựa vào PRD hoặc kiểm tra có `models.py` với `Base` không):
+Dùng cờ `needs_db` từ Phase 2 (không đoán lại từ `models.py`):
 
 ```bash
-# Có database (mặc định):
-/deploy-render --server-dir "$PRODUCT_DIR/<slug>-server" --slug "<slug>"
-
-# Không cần database (thêm --no-db):
-/deploy-render --server-dir "$PRODUCT_DIR/<slug>-server" --slug "<slug>" --no-db
+/deploy-render --server-dir "$PRODUCT_DIR/<slug>-server" --slug "<slug>"          # needs_db
+/deploy-render --server-dir "$PRODUCT_DIR/<slug>-server" --slug "<slug>" --no-db  # không có DB
 ```
 
-→ URL production: `https://<slug>-server.onrender.com`
+Đọc `deploy-output.json`: chỉ dùng `url` khi **`verified: true`**. `url` rỗng hay `verified: false` → server chưa chạy, **không** deploy client trỏ vào nó; sửa server trước. Nhắc user: PostgreSQL free của Render **hết hạn sau 30 ngày** (skill con đã cảnh báo, nhắc lại ở final report).
 
 ### Step 4f: Deploy Client to Netlify (nếu có client)
 
-Deploy React client lên Netlify:
-
 ```bash
-# Nếu có server:
-API_URL=$(jq -r '.url' "$PRODUCT_DIR/deploy-output.json" 2>/dev/null || echo "")
-if [ -n "$API_URL" ]; then
-  /deploy-netlify --client-dir "$PRODUCT_DIR/<slug>-client" --slug "<slug>" --api-url "$API_URL"
-else
-  /deploy-netlify --client-dir "$PRODUCT_DIR/<slug>-client" --slug "<slug>"
-fi
+API_URL=$(jq -r 'select(.verified==true) | .url // empty' "$PRODUCT_DIR/<slug>-server/deploy-output.json" 2>/dev/null)
+/deploy-netlify --client-dir "$PRODUCT_DIR/<slug>-client" --slug "<slug>" ${API_URL:+--api-url "$API_URL"}
 ```
 
-→ URL: `https://<slug>.netlify.app` (hoặc tên khác nếu bị trùng)
+`--slug` là namespace **toàn cầu** của Netlify — `task-manager` gần chắc đã có người lấy; dùng slug đủ riêng.
+
+Sau khi có URL Netlify: thêm nó vào `ALLOWED_ORIGINS` của server (env trên Render Dashboard hoặc `render.yaml`) và redeploy server, nếu không mọi request từ client production bị CORS chặn. Đây là bước hay bị quên nhất của Phase 4 — kiểm tra bằng một request thật từ URL Netlify tới `/api/v1/health`.
 
 ### Step 4g: Landing Page from README (client repo)
 
@@ -601,8 +604,10 @@ Open http://localhost:5173
 
 ## Edge Cases
 
-- **Missing prerequisite skill**: Report the list of missing skills and stop. Provide the install command.
-- **trend-ideas fails to fetch trends**: Retry once. If still fails, use `webfetch` on `https://explodingtopics.com` as fallback. If both fail, ask user to provide an idea directly.
+- **Missing prerequisite skill**: Report the list of missing skills and stop at the start of the phase that needs them. Provide the install command.
+- **trend-ideas fails to fetch trends**: script đã retry 3×; không scrape HTML (xem trend-ideas v2.2). Hỏi user đưa idea trực tiếp → nhánh "user đã có idea" ở Phase 1.
+- **deploy-render `verified: false`**: không deploy client; đọc Dashboard log, sửa, chạy lại. Không ghi URL chưa verify vào final report.
+- **Client production bị CORS**: `ALLOWED_ORIGINS` chưa có URL Netlify — xem 4f.
 - **User disapproves at Phase 1 gate**: Ask which idea they prefer or if they want to re-run Phase 1.
 - **User disapproves at Phase 2 gate**: Revise PRD/tasks per user feedback.
 - **User disapproves at Phase 3 gate**: Fix specific issues before moving to Phase 4.

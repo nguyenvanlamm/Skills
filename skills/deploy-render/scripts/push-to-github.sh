@@ -4,21 +4,23 @@ set -euo pipefail
 SERVER_DIR=""
 SLUG=""
 GH_USER=""
+VISIBILITY="private"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --server-dir) SERVER_DIR="$2"; shift 2 ;;
     --slug) SLUG="$2"; shift 2 ;;
     --gh-user) GH_USER="$2"; shift 2 ;;
+    --public) VISIBILITY="public"; shift ;;
     *) echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
 
-if [ -z "$SERVER_DIR" ]; then echo "❌ --server-dir required"; exit 1; fi
-if [ -z "$SLUG" ]; then echo "❌ --slug required"; exit 1; fi
+[ -n "$SERVER_DIR" ] || { echo "❌ --server-dir required"; exit 1; }
+[ -n "$SLUG" ]       || { echo "❌ --slug required"; exit 1; }
+command -v gh >/dev/null || { echo "❌ gh CLI not found — https://cli.github.com"; exit 1; }
 
 echo "◆ Pushing to GitHub..."
-
 cd "$SERVER_DIR"
 
 # Determine the GitHub account from the API. `gh auth status` is human-readable
@@ -27,13 +29,14 @@ cd "$SERVER_DIR"
 if [ -z "$GH_USER" ]; then
   GH_USER=$(gh api user --jq .login 2>/dev/null || true)
 fi
-if [ -z "$GH_USER" ]; then
-  echo "❌ Cannot determine GitHub user. Provide --gh-user or run 'gh auth login'."
-  exit 1
-fi
+[ -n "$GH_USER" ] || { echo "❌ Cannot determine GitHub user. Provide --gh-user or run 'gh auth login'."; exit 1; }
 echo "  GitHub user: $GH_USER"
 
-# A repo must exist locally before `gh repo create --source=.` can use it.
+REPO_NAME="${SLUG}-server"
+REPO_SLUG="$GH_USER/$REPO_NAME"
+REPO_URL="https://github.com/$REPO_SLUG"
+
+# --- Local repo -----------------------------------------------------------
 if [ ! -d .git ]; then
   echo "  Initialising git repository..."
   git init -q -b main
@@ -41,65 +44,60 @@ fi
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)
 [ "$BRANCH" != "HEAD" ] || { echo "❌ Detached HEAD — check out a branch first."; exit 1; }
 
-# Server repos carry real secrets; never publish local env files.
-for pattern in ".env" ".env.*" "__pycache__/" "*.db" "*.sqlite3"; do
+# render.yaml is written with a placeholder owner by prepare-server.sh; fill it
+# in before the commit so the pushed blueprint points at the real repo.
+if [ -f render.yaml ] && grep -q PLACEHOLDER_USER render.yaml; then
+  sed "s/PLACEHOLDER_USER/$GH_USER/g" render.yaml > render.yaml.tmp && mv render.yaml.tmp render.yaml
+  echo "  ✅ render.yaml → repo $REPO_URL"
+fi
+# The blueprint deploys whatever branch it names; make that the branch being pushed.
+if [ -f render.yaml ] && ! grep -qE "^\s*branch:\s*$BRANCH\s*$" render.yaml; then
+  sed -E "s/^(\s*branch:\s*).*/\1$BRANCH/" render.yaml > render.yaml.tmp && mv render.yaml.tmp render.yaml
+  echo "  ✅ render.yaml → branch $BRANCH"
+fi
+
+# Server repos carry real secrets; never publish local env files or keys.
+for pattern in ".env" ".env.*" "__pycache__/" "*.db" "*.sqlite3" "*.bak" "service-account*.json"; do
   grep -qxF "$pattern" .gitignore 2>/dev/null || echo "$pattern" >> .gitignore
 done
-git ls-files --error-unmatch .env >/dev/null 2>&1 && {
-  echo "  ⚠ .env is tracked — removing from the index"
-  git rm --cached -q .env 2>/dev/null || true
-} || true
-
-REPO_NAME="${SLUG}-server"
-REPO_URL="https://github.com/$GH_USER/$REPO_NAME"
-
-# Create GitHub repo if needed
-if gh repo view "$GH_USER/$REPO_NAME" &>/dev/null 2>&1; then
-  echo "  Repo $GH_USER/$REPO_NAME already exists on GitHub"
-else
-  echo "  Creating repo: $GH_USER/$REPO_NAME..."
-  gh repo create "$GH_USER/$REPO_NAME" --private --source=. --remote=origin --push 2>&1 || {
-    gh repo create "$GH_USER/$REPO_NAME" --private --push 2>&1 || {
-      echo "❌ Failed to create repo. Try: gh repo create $GH_USER/$REPO_NAME --private"
-      exit 1
-    }
-  }
-  echo "  ✅ Repo created: $REPO_URL"
+TRACKED_SECRETS=$(git ls-files | grep -E '(^|/)\.env(\..*)?$|service-account.*\.json$' || true)
+if [ -n "$TRACKED_SECRETS" ]; then
+  echo "  ⚠ Secret-looking files are tracked — removing from the index:"
+  echo "$TRACKED_SECRETS" | sed 's/^/     /'
+  echo "$TRACKED_SECRETS" | xargs git rm --cached -q --
+  echo "     If this repo was ever pushed, treat those values as leaked and rotate them."
 fi
 
-# Update render.yaml with correct GitHub user
-if [ -f "render.yaml" ]; then
-  # -i with no argument is GNU-only; BSD/macOS sed needs an explicit suffix.
-  sed "s/PLACEHOLDER_USER/$GH_USER/g" render.yaml > render.yaml.tmp && mv render.yaml.tmp render.yaml
-  echo "  ✅ Updated render.yaml with user $GH_USER"
-fi
-
-# Set up remote
-if git remote get-url origin &>/dev/null 2>&1; then
-  echo "  Remote origin already set: $(git remote get-url origin)"
-else
-  git remote add origin "$REPO_URL"
-  echo "  Added remote: $REPO_URL"
-fi
-
-# Stage, commit, push
+# Commit BEFORE creating the remote: `gh repo create --source=. --push` fails on
+# a repository with zero commits ("src refspec main does not match any").
 git add -A
-
-if git diff --cached --quiet; then
+if git diff --cached --quiet && git rev-parse HEAD >/dev/null 2>&1; then
   echo "  No changes to commit."
 else
-  git commit -m "Add Dockerfile + Render deployment config"
+  git commit -q -m "chore: add Dockerfile + Render deployment config"
   echo "  ✅ Committed"
 fi
 
-echo "  Pushing..."
-git push -u origin "$BRANCH" 2>&1 || {
-  echo "  Pulling remote changes first..."
-  git pull --rebase origin main 2>/dev/null || true
-  git push -u origin "$BRANCH" 2>&1 || {
-    echo "❌ Push failed. Push manually: git push -u origin $BRANCH"
+# --- Remote ---------------------------------------------------------------
+if gh repo view "$REPO_SLUG" >/dev/null 2>&1; then
+  echo "  Repo exists: $REPO_SLUG"
+  git remote get-url origin >/dev/null 2>&1 || { git remote add origin "$REPO_URL.git"; echo "  Added remote origin"; }
+else
+  echo "  Creating $VISIBILITY repo: $REPO_SLUG"
+  gh repo create "$REPO_SLUG" "--$VISIBILITY" --source=. --remote=origin || {
+    echo "❌ Failed to create the repository. Try: gh repo create $REPO_SLUG --$VISIBILITY"
     exit 1
   }
-}
+fi
 
-echo "✅ Push complete: $REPO_URL"
+# --- Push -----------------------------------------------------------------
+if ! git push -u origin "$BRANCH" 2>&1; then
+  echo "  Push rejected; rebasing onto the remote branch..."
+  git pull --rebase origin "$BRANCH" || {
+    echo "❌ Rebase failed — resolve the conflict, then: git push -u origin $BRANCH"
+    exit 1
+  }
+  git push -u origin "$BRANCH" || { echo "❌ Push failed. Push manually: git push -u origin $BRANCH"; exit 1; }
+fi
+
+echo "✅ Pushed $BRANCH → $REPO_URL"

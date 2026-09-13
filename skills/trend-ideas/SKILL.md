@@ -4,239 +4,181 @@ description: "Fetch top 15 trending topics from Exploding Topics, brainstorm 3 i
 license: MIT
 effort: medium
 metadata:
-  version: 2.1.0
+  version: 2.2.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
 # Trend Ideas
 
-Analyze real-time trending topics from Exploding Topics and generate 3 novel business ideas that address the underlying market needs.
+Analyze real-time trending topics from Exploding Topics and generate 3 novel business ideas that address the underlying market needs, then let `idea-validator` score them.
+
+## Core principle
+
+> **Numbers in the report come from the script or from `idea-validator` — never from this skill's own judgement.** Growth and volume are copied from `fetch_trends.py` output. Ratings and verdicts are copied from `idea-validator`. If either source is unavailable, the report says so; it does not fill the gap with an estimate and call it "validated".
 
 ## Prerequisites
 
-- Python 3.x must be installed and available in the path.
-- Internet access (to fetch `explodingtopics.com/api/trends`).
-- No additional Python packages required (uses only stdlib — `urllib` + `json`).
-- **`idea-validator` skill** must be available. Invoke it through the host's skill mechanism (in Claude Code: the `Skill` tool, or `/idea-validator`). Do not probe a hardcoded filesystem path — where skills live differs per host, and a path check that fails makes this skill refuse to run in an environment where the skill is in fact present.
+- Python 3.9+ on the path. The script is stdlib-only (`urllib`, `json`, `argparse`).
+- Internet access to `explodingtopics.com` — **or** a saved raw response passed with `--from-file`.
+- The **`idea-validator` skill** must be invokable by the host (skill tool, `/idea-validator`, or equivalent). Do not probe a filesystem path — skills live in different places on different hosts, and a path check that fails makes this skill refuse to run where the skill is in fact present. Confirm availability by attempting the invocation at Step 5, not by guessing earlier.
+
+## Input
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `output` | ❌ | stdout | Path for the markdown report (e.g. `$PRODUCT_DIR/trend-report.md`) |
+| `output_dir` | ❌ | dir of `output`, else `.` | Where per-idea `idea.md` / `validate.md` files are written (see Step 5) |
+| `limit` | ❌ | 15 | Topics to fetch |
+| `from_file` | ❌ | — | Reuse a saved raw API response (offline, or to reproduce a previous run) |
 
 ## Workflow
 
-This skill runs fully automatically — no user approval needed between steps.
+Fully automatic — no user approval between steps.
 
 ---
 
-### Step 1: Fetch Top 15 Trending Topics
+### Step 1: Fetch trending topics
 
-Run the fetch script:
+The script lives beside this file. Resolve its path from the skill directory, not from the working directory:
 
 ```bash
-python scripts/fetch_trends.py
+python3 "<skill-dir>/scripts/fetch_trends.py" --limit 15 --save-raw "<output_dir>/trends-raw.json"
 ```
 
-**Expected output (stdout):** A JSON object with a `topics` array. Each topic has:
-- `name` — Topic name
-- `growth_pct` — 24-month growth as percentage (e.g., 3233)
-- `search_volume` — Monthly search volume
-- `url` — Link to the topic page
-- `path` — URL path
+`--save-raw` keeps the raw response so a re-run with `--from-file trends-raw.json` reproduces the same topic list without another network call.
 
-**Edge cases handled by the script:**
-- Network failure → JSON error + exit code 1
-- API returns empty → JSON error + exit code 1
-- Growth format → normalised, with the branch recorded in `growth_basis`
+**stdout** is one JSON object: `topics[]` (`name`, `growth_pct`, `growth_raw`, `growth_basis`, `search_volume`, `url`), `count`, `total_available`, `source`, `fetched_at`.
 
-**Two caveats to carry into the report, not to hide:**
+**Failure handling — one rule, no exceptions:** exit code 1 with `{"error": ...}` means the data is unavailable. The script already retried 3× with backoff. **Stop and report that trends could not be fetched.** Do not scrape `explodingtopics.com` HTML as a fallback — the page is client-rendered and the numbers you would read off it are not the API's numbers; a report built that way claims a source it did not use. The user may supply `--from-file` from an earlier run, or provide an idea directly (then this skill does not apply — use `idea-validator`).
 
-`explodingtopics.com/api/trends` is an **undocumented internal endpoint**, fetched with a browser User-Agent. It can change shape or start refusing requests at any time, and this skill has no other source. A failure here is not a bug to work around — stop and say the data is unavailable.
+**Two caveats to carry into the report:**
 
-The growth field has been seen both as a ratio (`0.3233`) and as a percentage (`3233`), so the script picks per value: `<= 100` is treated as a ratio and multiplied, above that is taken as already-percent. Each topic carries `growth_basis` saying which branch ran. **The two forms genuinely overlap** — a raw `32.33` could be either 32% or 3233%. When growth figures drive the ranking, check `growth_basis` against the topic's page before quoting a number as fact.
+`explodingtopics.com/api/trends` is an **undocumented internal endpoint**. It can change shape or refuse requests at any time.
+
+`growth["24"]` is a **multiplier** (verified against topic pages, 2026-09): `2.12` renders as +212%, and `99` renders as **+99X+** — the upstream cap for breakout topics, not 99%. The script multiplies by 100 and labels capped values `capped 99x+ (upstream cap, not a measurement)` in `growth_basis`. Treat capped topics as "exploding, magnitude unknown": rank them highly, but never quote "9900%" as a measured figure. `search_volume` is `0` for many of them — a real signal that the topic is too new for volume data.
 
 ---
 
-### Step 2: Analyze Each Topic
+### Step 2: Analyze each topic
 
-For each of the 15 topics, determine:
-
-| Field | Question to answer |
-|-------|-------------------|
-| Core Need | What fundamental need does this serve? (health, status, convenience, identity, etc.) |
-| Target Audience | Demographics, psychographics, early adopters |
-| Growth Drivers | Why is interest spiking now? (tech, culture, regulation, media) |
-| Pain Points | What frustrates consumers in this space? |
-| Existing Landscape | Current solutions and their weaknesses |
-
-Use the **Idea Analysis Framework** in `references/idea-framework.md` for the full template.
+For each topic, fill the Topic Analysis Template in `references/idea-framework.md`: Core Need, Target Audience, Growth Drivers, Pain Points, Existing Landscape. This is analysis, not lookup — no numbers are introduced here.
 
 ---
 
-### Step 3: Synthesize Patterns
+### Step 3: Synthesize patterns
 
-1. **Cluster** the 15 topics by shared core needs
-2. **Identify** which clusters have the strongest momentum (highest avg growth, largest TAM)
-3. **Select** 3 opportunity spaces that combine:
-   - High growth trajectory
-   - Underserved or fragmented solutions
-   - Feasible to execute (not capital-intensive or regulated to death)
+1. **Cluster** topics by shared core need.
+2. **Rank** clusters by momentum (average `growth_pct`, total `search_volume`).
+3. **Select** 3 opportunity spaces that combine high growth, underserved or fragmented solutions, and feasibility (not capital-intensive or heavily regulated).
 
----
-
-### Step 4: Brainstorm 3 Ideas
-
-For each of the 3 opportunity spaces, flesh out:
-
-- **Name** — Short brandable name
-- **Elevator Pitch** — One sentence
-- **Core Need Addressed** — Which cluster's need
-- **How It Works** — 2-3 sentence explanation
-- **Target Audience** — Specific early adopter profile
-- **Why Now** — Timeliness
-- **Go-to-Market Sketch** — Channel, hook, first 90 days
-- **Monetization** — Business model
-- **Risk Factor** — Top risk
-
-Template in `references/idea-framework.md`.
-
-After brainstorming all 3, save each idea as a structured block for Step 5.
+If everything clusters into one need, still produce 3 distinct angles or sub-segments within it.
 
 ---
 
-### Step 5: Validate Each Idea with idea-validator
+### Step 4: Brainstorm 3 ideas
 
-For **each** of the 3 ideas produced in Step 4, run the `idea-validator` skill to get a structured evaluation and numeric score.
+One per opportunity space, using the Idea Template in `references/idea-framework.md`: Name, Elevator Pitch, Core Need, How It Works, Target Audience, Why Now, Go-to-Market Sketch, Monetization, Risk Factor.
 
-**Prerequisite check:** Confirm `idea-validator` is invokable by the host. If it is not available, stop and say so — do not substitute your own judgement for a validation step the report claims was performed.
+---
 
-**Per-idea workflow:**
+### Step 5: Validate each idea with idea-validator
+
+`idea-validator` reads an `idea.md` and writes a `validate.md` beside it. Give each idea its own directory so the three runs do not overwrite each other, and so downstream skills (`prd-generator` needs exactly these two files) can consume the winner without re-extraction:
 
 ```
-For idea N (name):
-  1. Set ARGUMENTS = full idea package:
-     - Name + Elevator Pitch
-     - Core Need + How It Works
-     - Target Audience
-     - Monetization Model
-     - Risk Factor
-
-  2. Follow the idea-validator 5-phase pipeline from its SKILL.md.
-     Since the idea is already fully defined in Step 4:
-
-     Phase 1 (Clarify) — Skip user questions. Instead, immediately
-     populate idea.md with the data from Step 4.
-
-     Phase 2 (Tech Context) — Make reasonable assumptions:
-       - Stack: web/mobile (choose whichever fits the idea best)
-       - Timeline: 3-6 months to MVP with a small team (2-3 devs)
-       - Budget: bootstrapped / pre-seed
-       - Constraints: none beyond standard startup constraints
-
-     Phase 3 (Competitive Landscape) — Run as instructed:
-       Perform live web searches (at least 4-6 queries) to map
-       competitors, OSS alternatives, adjacent solutions, and
-       failed predecessors. Update validate.md with findings.
-
-     Phase 4 (Critical Evaluation) — Run as instructed:
-       Produce Quick Verdict (Build it / Maybe / Skip it) and
-       the 4 Ratings table (each 1-10).
-
-     Phase 5 (Improvements) — Run as instructed:
-       List how to strengthen, produce enhanced version, and
-       implementation roadmap.
-
-  3. From terminal output extract the Ratings table:
-     | Dimension         | Score |
-     |-------------------|-------|
-     | Creativity        | X/10  |
-     | Feasibility       | X/10  |
-     | Market Impact     | X/10  |
-     | Technical Execution | X/10 |
-
-  4. Extract Quick Verdict: Build it / Maybe / Skip it
-
-  5. Compute composite score (0-100):
-     composite = (Creativity + Feasibility + Market Impact + Technical Execution) × 2.5
-
-  6. Record: { name, composite, verdict, creativity, feasibility, market_impact, technical_execution }
+<output_dir>/ideas/
+├── 1-<slug>/idea.md      ← written by this skill from Step 4
+│            validate.md  ← written by idea-validator
+├── 2-<slug>/…
+└── 3-<slug>/…
 ```
 
-**Note:** idea-validator will create files (`idea.md`, `validate.md`) in its configured storage root and commit/push them. That's expected.
+Write `idea.md` first (the full idea package from Step 4), then invoke `idea-validator` on that directory. Its Phase 1 (Clarify) needs no user questions — the idea is already fully specified. For Phase 2 (Tech Context), state these assumptions rather than asking: web/mobile stack as fits the idea; 3–6 months to MVP with 2–3 devs; bootstrapped; standard startup constraints. Phases 3–5 (competitive landscape with live searches, critical evaluation, improvements) run as that skill instructs.
+
+From each `validate.md` extract, verbatim:
+
+| Field | Source line in idea-validator output |
+|-------|--------------------------------------|
+| Quick Verdict | `Build it` / `Maybe` / `Skip it` |
+| Creativity, Feasibility, Market Impact, Technical Execution | the 4-row Ratings table, each `X/10` |
+
+Then compute `composite = (C + F + M + T) × 2.5` (0–100) and record `{ name, dir, composite, verdict, c, f, m, t }`.
+
+**If `idea-validator` is not invokable:** stop after writing the three `idea.md` files and report that validation could not run. Do not score the ideas yourself and label the result "validated" — that misrepresents where the numbers came from. The three `idea.md` files are still useful output; say so.
 
 ---
 
-### Step 6: Select Best Idea
+### Step 6: Select the winner
 
-Compare the 3 composite scores:
+1. Highest composite.
+2. Tie → `Build it` > `Maybe` > `Skip it`.
+3. Tie → higher Market Impact.
+4. Tie → higher Feasibility.
+5. Still tied → pick the first and say the tie was broken arbitrarily.
 
-1. **Primary sort:** composite score (highest wins)
-2. **Tiebreaker 1:** prefer `Build it` > `Maybe` > `Skip it`
-3. **Tiebreaker 2:** prefer higher Market Impact score
-4. **Tiebreaker 3:** prefer higher Feasibility score
+Copy the winner's `idea.md` and `validate.md` to `<output_dir>/idea.md` and `<output_dir>/validate.md`. That pair is the contract downstream orchestrators (`idea-to-product`, `idea-to-play-store`) rely on.
 
-Designate the winner as **Winning Idea**.
+If all three are `Skip it`, still pick the highest — and put that fact in the first line of the Winning Idea section, not in a footnote.
 
 ---
 
-### Step 7: Output Report
-
-Produce a structured markdown report with:
+### Step 7: Report
 
 ```markdown
 # Trend Ideas Report
-*Generated: {date}*
+*Generated: {fetched_at} · source: {source} · {count}/{requested} topics*
 
-## Top 15 Trending Topics
+## Top {count} Trending Topics
 
-| # | Topic | Growth | Volume | Core Need |
-|---|-------|--------|--------|-----------|
-| 1 | ... | ... | ... | ... |
+| # | Topic | Growth | Basis | Volume | Core Need |
+|---|-------|--------|-------|--------|-----------|
+| 1 | ... | +212% | multiplier x100 | 246,000 | ... |
+| 2 | ... | 99x+ (capped) | capped 99x+ | 0 | ... |
 
 ## 3 Ideas — Validation Scores
 
-| Idea | Creativity | Feasibility | Market | Technical | Composite | Verdict |
-|------|-----------|-------------|--------|-----------|-----------|---------|
-| Idea 1 | 8/10 | 7/10 | 9/10 | 6/10 | 75/100 | Build it |
-| Idea 2 | ... | ... | ... | ... | ... | ... |
-| Idea 3 | ... | ... | ... | ... | ... | ... |
+| Idea | Creativity | Feasibility | Market | Technical | Composite | Verdict | Files |
+|------|-----------|-------------|--------|-----------|-----------|---------|-------|
+| Idea 1 | 8/10 | 7/10 | 9/10 | 6/10 | 75/100 | Build it | ideas/1-… |
 
 *Composite = (Creativity + Feasibility + Market Impact + Technical Execution) × 2.5*
 
-## Winning Idea: {name} — {composite}/100
+## Winning Idea: {name} — {composite}/100 ({verdict})
 
-{Elevator pitch + rationale for why this idea scores highest}
+{Elevator pitch + why it outscored the others}
 
-{Full idea detail from Step 4}
+{Full idea from Step 4}
 
 ### Validation Summary
-{Quick Verdict + Top Strengths + Top Concerns from idea-validator output}
+{Quick Verdict + top strengths + top concerns, quoted from validate.md}
+
+## Caveats
+- Endpoint is undocumented; growth basis per topic in the table above.
+- {fewer than requested topics / all Skip it / tie broken arbitrarily — whichever applied}
 ```
 
-## Expected Output
+Write to `output` if given, else print.
 
-After a full run, the agent produces a structured markdown report containing:
-1. **Top 15 topics table** with growth, volume, and core need for each
-2. **3 fully-fleshed ideas** following the idea template
-3. **Validation scores** for each idea (4 sub-dimensions + composite 0-100)
-4. **Winning idea** — the highest-scoring idea with full detail and validation summary
+## Acceptance criteria
 
-## Acceptance Criteria
+- [ ] `fetch_trends.py` exit 0; report shows `count`/`requested` and `source`
+- [ ] Every topic has a Core Need
+- [ ] 3 ideas, each with all template fields
+- [ ] 3 × `idea.md` written; 3 × `validate.md` present (or the run stopped with a clear "validation unavailable")
+- [ ] All 4 ratings per idea copied from `validate.md`, composite arithmetic correct
+- [ ] Winner chosen by composite + tiebreakers; `<output_dir>/idea.md` + `validate.md` are the winner's
+- [ ] No growth/volume/rating figure appears that is not in the script output or a `validate.md`
 
-A run passes when **all** of the following are true:
+## Edge cases
 
-- [ ] `scripts/fetch_trends.py` runs without error and returns 15 topics (or fewer if the source has fewer)
-- [ ] Each of the 15 topics has a clear "Core Need" identified
-- [ ] 3 ideas are presented, each with elevator pitch, target audience, go-to-market sketch, monetization, and risk
-- [ ] Each of the 3 ideas has been validated via `idea-validator` with all 4 ratings extracted
-- [ ] Composite scores are computed correctly: (C + F + M + T) × 2.5
-- [ ] Winning idea is selected by highest composite score (with tiebreakers)
-- [ ] Ideas are grounded in the trend data (not generic startup advice)
-- [ ] Report is output as valid markdown
-
-## Edge Cases
-
-- **Script fails to fetch:** Use `webfetch` tool on `https://explodingtopics.com` (text format) as fallback; parse topics manually from the text output
-- **Only N < 15 topics available:** Use all available topics; note the limitation in the report
-- **All topics cluster into one need:** Still generate 3 distinct ideas targeting different sub-segments or angles within that need
-- **Growth values are zero/negative:** Include them but note they may be declining trends; prioritize positive-growth topics for idea generation
-- **idea-validator not available:** Report that the validation step cannot run, and stop. Scoring ideas yourself and labelling the result "validated" misrepresents where the numbers came from.
-- **idea-validator cannot parse ARGUMENTS:** Fall back to pasting the idea description manually when prompted by idea-validator's Phase 1
-- **idea-validator verdict is "Skip it" for all 3 ideas:** Still pick the highest-scoring one, but note the risk prominently in the final report
-- **Composite scores tie:** Apply tiebreakers in order: Verdict > Market Impact > Feasibility. If still tied, pick arbitrarily and note it.
+| Situation | Handling |
+|-----------|----------|
+| Fetch fails after retries | Stop. Report unavailable. Offer `--from-file` or direct `idea-validator` use. **No HTML scraping.** |
+| Fewer than `limit` topics | Use all; state `count/requested` in the report header |
+| Zero or negative growth | Keep in the table, flagged; do not build ideas on them |
+| All topics one cluster | 3 sub-segment angles |
+| `idea-validator` unavailable | Write the 3 `idea.md`, stop, say validation did not run |
+| `idea-validator` output missing a rating | Re-read `validate.md`; if truly absent, mark that idea `incomplete` and exclude it from the winner selection, saying so |
+| All verdicts `Skip it` | Pick highest composite; lead the Winning Idea section with the warning |
+| Composite tie | Tiebreakers in order; arbitrary last, disclosed |
+| `<output_dir>/idea.md` already exists | Ask before overwriting — it may be a previous winner the user is working from |

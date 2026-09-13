@@ -7,54 +7,50 @@ Fetch top 15 trending topics from Exploding Topics, brainstorm 3 product ideas, 
 ## Workflow
 
 ```
-Step 1: Fetch 15 trending topics from Exploding Topics API
+Step 1: Fetch trending topics (scripts/fetch_trends.py, retries + --save-raw)
 Step 2: Analyze each topic (core need, audience, growth drivers)
 Step 3: Synthesize patterns → 3 opportunity spaces
 Step 4: Brainstorm 3 fully-fleshed ideas
-Step 5: Validate each idea via idea-validator (4-dimension scoring)
-Step 6: Select best idea (composite score + tiebreakers)
+Step 5: Write ideas/<n>-<slug>/idea.md → idea-validator writes validate.md beside it
+Step 6: Select best idea (composite + tiebreakers) → copy winner to <output_dir>/idea.md + validate.md
 Step 7: Output structured markdown report
 ```
 
 ## Prerequisites
 
-- **Python 3.x** (stdlib only — `urllib` + `json`, no pip packages)
-- **Internet access** to fetch `explodingtopics.com`
-- **idea-validator** skill installed at `~/.config/opencode/skills/idea-validator/`
+- **Python 3.9+** (stdlib only — no pip packages)
+- **Internet access** to `explodingtopics.com`, or a saved raw response via `--from-file`
+- **idea-validator** skill invokable by the host (any location — the skill does not probe paths)
 
-## Usage
+## Script
 
 ```bash
-/trend-ideas --output "$PRODUCT_DIR/trend-report.md"
+python3 scripts/fetch_trends.py --limit 15 --save-raw trends-raw.json   # live
+python3 scripts/fetch_trends.py --from-file trends-raw.json              # offline / reproducible
+python3 scripts/fetch_trends.py --min-volume 1000                        # drop tiny topics
 ```
 
-### Output
+Exit 0 with `{"topics": [...]}`; exit 1 with `{"error": "..."}`. Diagnostics go to stderr.
 
-`trend-report.md` containing:
-- Top 15 topics table (growth %, volume, core need)
-- 3 validated ideas with composite scores (0-100)
-- Winning idea with full detail and validation summary
+## Output
 
-### Score Formula
+- `<output>` — markdown report (topics table with `growth_basis`, 3 ideas with scores, winner)
+- `<output_dir>/ideas/<n>-<slug>/{idea.md,validate.md}` — one pair per idea
+- `<output_dir>/idea.md` + `validate.md` — the winner, in the exact shape `prd-generator` consumes
+
+### Score formula
 
 ```
 Composite = (Creativity + Feasibility + Market Impact + Technical Execution) × 2.5
 ```
 
-## Edge Cases
+## Edge cases
 
-- **API fetch fails**: Fallback to `webfetch` on `https://explodingtopics.com` (text mode)
-- **Fewer than 15 topics**: Use all available; note in report
-- **Negative/zero growth**: Include but prioritize positive growth
-- **All topics same cluster**: Generate 3 distinct angles/sub-segments
-- **All ideas scored "Skip it"**: Still pick highest; flag risk in report
+- **API fetch fails** after 3 retries: stop and say so. No HTML scraping fallback — it would claim a source that was not used.
+- **Fewer than 15 topics**: use all; report `count/requested`.
+- **idea-validator unavailable**: write the 3 `idea.md`, stop, report validation did not run.
+- **All ideas "Skip it"**: pick highest; lead the winner section with the warning.
 
-## Integration with idea-to-product
+## Integration with idea-to-product / idea-to-play-store
 
-Trong Phase 1 — Idea Generation:
-
-```
-/trend-ideas --output "$PRODUCT_DIR/trend-report.md"
-```
-
-Kết quả được dùng làm input cho `idea-validator` → `prd-generator` → build.
+Phase 1 invokes this skill with `output=$PRODUCT_DIR/trend-report.md` and `output_dir=$PRODUCT_DIR`. The orchestrator then hands `$PRODUCT_DIR/idea.md` + `validate.md` to `prd-generator` without re-running validation.

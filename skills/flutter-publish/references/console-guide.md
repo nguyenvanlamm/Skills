@@ -34,7 +34,7 @@ Then accept the Developer Program Policies and US export law declarations.
 | **Ads** | Contains ads, yes/no | Count third-party SDK ads. Mismatch with reality is a policy violation. |
 | **Content rating** | Questionnaire | Cannot be automated. Answer honestly; a wrong rating is grounds for removal. |
 | **Target audience and content** | Age groups | Including under-13 triggers the full Families policy. |
-| **Data safety** | Every data type collected/shared | Import `store-metadata/data-safety.csv` from `flutter-store-compliance`. **Must match the privacy policy** — inconsistency is a frequent rejection. |
+| **Data safety** | Every data type collected/shared | Enter the answers from `store-metadata/data-safety.md` (`flutter-store-compliance`). It is an answer sheet, not an import file — the CSV schema is versioned and a wrong import is a false declaration. **Must match the privacy policy** — inconsistency is a frequent rejection. |
 | **Advertising ID** | Whether the app uses AD_ID | Declare yes if any analytics/ads SDK is present. |
 | **Government apps** | Usually No | — |
 | **Financial features** | Payments, lending, crypto | If yes, expect extra verification and regional restrictions. |
@@ -49,8 +49,8 @@ Then accept the Developer Program Policies and US export law declarations.
 | Asset | Requirement | Source |
 |-------|-------------|--------|
 | App name | ≤ 30 chars | `store-listing.json` |
-| Short description | ≤ 80 chars | `store-metadata/description/short_description.txt` |
-| Full description | ≤ 4000 chars | `store-metadata/description/full_description.txt` |
+| Short description | ≤ 80 chars | `store-metadata/description/<locale>/short_description.txt` |
+| Full description | ≤ 4000 chars | `store-metadata/description/<locale>/full_description.txt` |
 | App icon | 512×512 PNG, 32-bit | `store-metadata/icon/icon-512.png` |
 | Feature graphic | 1024×500 | `store-metadata/icon/feature-graphic.png` |
 | Phone screenshots | 2 minimum, 8 maximum, 16:9 or 9:16, 320–3840 px | `store-metadata/screenshots/phone/` |

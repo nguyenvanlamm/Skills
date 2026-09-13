@@ -61,7 +61,7 @@ echo "  1/3 Resolving site '$SLUG'..."
 SITE_JSON=$(api GET "/sites?filter=all" | jq -r --arg n "$SLUG" '[.[] | select(.name == $n)][0] // empty')
 
 if [ -z "$SITE_JSON" ]; then
-  SITE_JSON=$(api POST "/sites" "{\"name\":\"$SLUG\",\"ssl\":true}")
+  SITE_JSON=$(api POST "/sites" "$(jq -n --arg n "$SLUG" '{name:$n, ssl:true}')")
   if [ -z "$(jq -r '.id // empty' <<<"$SITE_JSON")" ]; then
     echo "❌ Could not create site '$SLUG':"
     jq -r '.message // .errors // .' <<<"$SITE_JSON" 2>/dev/null | head -5
@@ -89,7 +89,7 @@ if [ -n "$API_URL" ]; then
   echo "  2/3 Mirroring VITE_API_URL into Netlify site config..."
   if [ -n "$ACCOUNT_ID" ]; then
     ENV_RESP=$(api POST "/accounts/$ACCOUNT_ID/env?site_id=$SITE_ID" \
-      "[{\"key\":\"VITE_API_URL\",\"scopes\":[\"builds\",\"runtime\"],\"values\":[{\"context\":\"all\",\"value\":\"$API_URL\"}]}]")
+      "$(jq -n --arg v "$API_URL" '[{key:"VITE_API_URL", scopes:["builds","runtime"], values:[{context:"all", value:$v}]}]')")
     if jq -e 'type=="array" and any(.[]; .key=="VITE_API_URL")' <<<"$ENV_RESP" >/dev/null 2>&1; then
       echo "  ✅ Mirrored (the build-time value comes from .env.production)"
     else
@@ -107,14 +107,32 @@ fi
 echo "  3/3 Building and deploying..."
 cd "$CLIENT_DIR"
 
-npm run build 2>&1 | tail -20 || { echo "❌ Build failed (see output above)"; exit 1; }
-[ -d dist ] || { echo "❌ Build produced no dist/ directory"; exit 1; }
-echo "  ✅ Build complete"
+# A fresh checkout has no node_modules; `npm run build` then fails with a
+# misleading "vite: not found". Install once, preferring the lockfile.
+if [ ! -d node_modules ]; then
+  echo "     node_modules missing — installing..."
+  if [ -f package-lock.json ]; then npm ci --no-audit --no-fund >/dev/null 2>&1 || npm install --no-audit --no-fund >/dev/null
+  else npm install --no-audit --no-fund >/dev/null; fi
+fi
+
+# The directory Netlify serves is whatever netlify.toml says — read it rather
+# than assuming dist/, so a custom vite build.outDir still works.
+PUBLISH_DIR=$(sed -nE 's/^[[:space:]]*publish[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' netlify.toml 2>/dev/null | head -1)
+PUBLISH_DIR="${PUBLISH_DIR:-dist}"
+
+rm -rf "$PUBLISH_DIR"   # never deploy a stale build from a previous run
+BUILD_LOG=$(mktemp)
+if ! npm run build >"$BUILD_LOG" 2>&1; then
+  echo "❌ Build failed — last 30 lines:"; tail -30 "$BUILD_LOG"; rm -f "$BUILD_LOG"; exit 1
+fi
+rm -f "$BUILD_LOG"
+[ -f "$PUBLISH_DIR/index.html" ] || { echo "❌ Build produced no $PUBLISH_DIR/index.html — check vite build.outDir vs netlify.toml publish"; exit 1; }
+echo "  ✅ Build complete ($PUBLISH_DIR/, $(du -sh "$PUBLISH_DIR" | cut -f1))"
 
 DEPLOY_JSON=$(npx --yes netlify-cli deploy \
-  --dir=dist --prod --site="$SITE_ID" --json 2>/dev/null) || {
+  --dir="$PUBLISH_DIR" --prod --site="$SITE_ID" --json 2>/dev/null) || {
   echo "❌ Deploy failed. Re-run without --json for detail:"
-  echo "   npx netlify-cli deploy --dir=dist --prod --site=$SITE_ID"
+  echo "   npx netlify-cli deploy --dir=$PUBLISH_DIR --prod --site=$SITE_ID"
   exit 1
 }
 
@@ -126,11 +144,22 @@ echo "  ✅ Deploy complete"
 
 # --- Verify it actually serves --------------------------------------------
 echo "◆ Verifying $FINAL_URL ..."
-HTTP_CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 -L "$FINAL_URL" || echo "000")
-if [ "$HTTP_CODE" = "200" ]; then
-  VERIFIED=true;  echo "  ✅ HTTP 200"
+# CDN propagation can lag the API response by a few seconds — retry briefly
+# rather than declaring a fresh deploy broken on the first 404.
+VERIFIED=false; HTTP_CODE="000"
+for attempt in 1 2 3 4; do
+  BODY=$(mktemp)
+  HTTP_CODE=$(curl -sS -o "$BODY" -w '%{http_code}' --max-time 30 -L "$FINAL_URL" || echo "000")
+  # A 200 with an empty or non-HTML body is a misconfigured publish dir, not a working site.
+  if [ "$HTTP_CODE" = "200" ] && grep -qi '<html' "$BODY"; then VERIFIED=true; fi
+  rm -f "$BODY"
+  [ "$VERIFIED" = true ] && break
+  [ "$attempt" -lt 4 ] && sleep 5
+done
+if [ "$VERIFIED" = true ]; then
+  echo "  ✅ HTTP 200, HTML body"
 else
-  VERIFIED=false; echo "  ⚠ HTTP $HTTP_CODE — deploy was accepted but the site did not serve a 200."
+  echo "  ⚠ HTTP $HTTP_CODE — deploy was accepted but the site did not serve an HTML page."
 fi
 
 # --- Output ---------------------------------------------------------------

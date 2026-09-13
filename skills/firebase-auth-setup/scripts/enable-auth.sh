@@ -54,6 +54,27 @@ call() {  # call <method> <url> [json-body] -> prints "<http_code>\n<body>"
 split_code() { printf '%s' "${1##*$'\n'}"; }
 split_body() { printf '%s' "${1%$'\n'*}"; }
 
+# --- Initialise Identity Platform ----------------------------------------
+# On a fresh project the config endpoint 404s until Authentication has been
+# "started" once — the Console's "Get started" button does exactly this call.
+# Doing it here removes the one manual step the old version told users to do.
+# 409 = already initialised; 403 = API still propagating (retry once).
+echo "  Initialising Identity Platform (Authentication → Get started)..."
+for attempt in 1 2 3; do
+  RESP=$(call POST "$API/identityPlatform:initializeAuth" '{}')
+  CODE=$(split_code "$RESP")
+  case "$CODE" in
+    200|409) break ;;
+    403|404|429|5*) [ "$attempt" -lt 3 ] && { echo "     HTTP $CODE — API propagating, retrying in 10s ($attempt/3)"; sleep 10; } ;;
+    *) break ;;
+  esac
+done
+case "$CODE" in
+  200) echo "  ✅ Identity Platform initialised" ;;
+  409) echo "  ✓ Identity Platform already initialised" ;;
+  *)   echo "  ⚠ initializeAuth returned HTTP $CODE — continuing; the Email/Password step will tell if it matters" ;;
+esac
+
 # --- Email/Password -------------------------------------------------------
 # Identity Platform config shape: signIn.email.{enabled,passwordRequired}
 echo "  Enabling Email/Password..."
@@ -63,8 +84,8 @@ CODE=$(split_code "$RESP"); BODY=$(split_body "$RESP")
 if [ "$CODE" != "200" ]; then
   echo "❌ Email/Password could not be enabled (HTTP $CODE)"
   echo "   $(printf '%s' "$BODY" | jq -r '.error.message // .' 2>/dev/null | head -3)"
-  echo "   Most common cause: Identity Platform is not initialised for this project."
-  echo "   Open the Firebase Console → Authentication → Get started once, then re-run."
+  echo "   If initializeAuth above also failed: open Firebase Console → Authentication → Get started once, then re-run."
+  echo "   If HTTP 403: the active gcloud account needs Firebase Admin / Owner on $PROJECT_ID."
   exit 1
 fi
 EMAIL_OK=true

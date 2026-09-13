@@ -13,7 +13,9 @@ lib/
     constants/
     utils/
     widgets/
-  features/              one directory per feature, added as features are built
+  features/
+    home/
+      home_screen.dart   the one real screen the scaffold ships
 test/
   widget_test.dart
 ```
@@ -89,6 +91,7 @@ class AppTheme {
 
 ```dart
 import 'package:flutter/material.dart';
+import '../features/home/home_screen.dart';
 
 class AppRoutes {
   static const String home = '/';
@@ -108,7 +111,40 @@ class AppRoutes {
 }
 ```
 
-The home route must point at a real widget, not `Placeholder()`. `flutter run` on a fresh scaffold should show something intentional — the first thing the user sees should not look broken. A minimal `HomeScreen` with the app name and an empty state is enough.
+The home route must point at a real widget, not `Placeholder()`. `flutter run` on a fresh scaffold should show something intentional — the first thing the user sees should not look broken.
+
+**`lib/features/home/home_screen.dart`**
+
+```dart
+import 'package:flutter/material.dart';
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Task Flow')),      // same string as App.title
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.inbox_outlined, size: 64, color: scheme.outline),
+            const SizedBox(height: 16),
+            Text('Nothing here yet', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text('Your first feature goes in lib/features/',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+This is the only file under `features/`; it exists so `routes.dart` imports something real and `flutter analyze` has nothing to complain about.
 
 **`test/widget_test.dart`** — replace the generated counter test, which references the template's widgets and fails after they are removed:
 

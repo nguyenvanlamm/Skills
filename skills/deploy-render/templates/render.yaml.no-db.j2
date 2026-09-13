@@ -5,4 +5,11 @@ services:
     repo: https://github.com/{{gh_user}}/{{slug}}-server
     branch: main
     plan: free
+    region: {{region}}
     dockerfilePath: ./Dockerfile
+    healthCheckPath: {{health_path}}
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: WEB_CONCURRENCY
+        value: 2

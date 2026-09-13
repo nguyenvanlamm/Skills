@@ -4,7 +4,7 @@ description: "Tự động deploy React/Vite client lên Netlify — thêm netli
 license: MIT
 effort: medium
 metadata:
-  version: 2.0.0
+  version: 2.1.0
   author: "Nguyen Van Lam"
 ---
 
@@ -42,6 +42,8 @@ Lấy tại Netlify Dashboard → User settings → Applications → Personal ac
 | `--slug` | ✅ | Tên site, **duy nhất trên toàn Netlify** |
 | `--api-url` | ❌ | URL server production, nếu có backend |
 | `--gh-user` | ❌ | GitHub account; mặc định lấy từ `gh api user` |
+| `--public` | ❌ | Tạo repo GitHub public (mặc định private) |
+| `--skip-github` | ❌ | Chỉ deploy, không tạo/push repo GitHub |
 | `--output` | ❌ | Nơi ghi `netlify-output.json`; mặc định `--client-dir` |
 
 `--slug` là namespace toàn cầu của Netlify, không phải của riêng tài khoản. `task-manager` gần như chắc chắn đã có người lấy — dùng tên cụ thể hơn (`acme-task-manager`). Script tìm site trùng tên trong tài khoản trước, chỉ tạo mới khi không thấy, và **báo lỗi rõ ràng** khi tên đã bị người khác chiếm thay vì im lặng nhận một site tên khác.
@@ -49,8 +51,10 @@ Lấy tại Netlify Dashboard → User settings → Applications → Personal ac
 ## Chạy
 
 ```bash
-bash scripts/deploy.sh --client-dir <path> --slug <slug> [--api-url <url>] [--gh-user <user>]
+bash scripts/deploy.sh --client-dir <path> --slug <slug> [--api-url <url>] [--gh-user <user>] [--public] [--skip-github]
 ```
+
+`deploy.sh` kiểm tra **trước khi làm gì**: `curl`/`jq`/`npm` (+ `gh` trừ khi `--skip-github`), `package.json` có script `build`, `--api-url` có scheme. Lỗi ở đây rẻ hơn lỗi sau khi build 2 phút.
 
 Ba bước, chạy độc lập được:
 
@@ -58,7 +62,9 @@ Ba bước, chạy độc lập được:
 |--------|------|
 | `scripts/prepare-client.sh` | `netlify.toml`, `public/_redirects`, `.env.production` |
 | `scripts/push-to-github.sh` | `git init` nếu cần, gitignore file env, tạo repo, push |
-| `scripts/netlify-client.sh` | Tạo/tìm site, mirror env var, build, deploy, verify |
+| `scripts/netlify-client.sh` | Tạo/tìm site, mirror env var, `npm ci` nếu thiếu `node_modules`, build sạch, deploy, verify |
+
+`prepare-client.sh` **giữ nguyên** `netlify.toml` có sẵn của project (chỉ thêm SPA redirect nếu thiếu) và chỉ thay dòng `VITE_API_URL` trong `.env.production`, không xoá biến khác. Thư mục deploy đọc từ `publish` trong `netlify.toml`, nên `build.outDir` tuỳ biến vẫn chạy.
 
 ## Env var hoạt động thế nào
 
@@ -85,7 +91,7 @@ Hệ quả thực tế: đổi API URL thì phải **build và deploy lại**, s
 }
 ```
 
-`verified: false` nghĩa là deploy được chấp nhận nhưng URL không trả về 200 — thường do SPA fallback thiếu hoặc build ra thư mục rỗng. Script exit 2 trong trường hợp này.
+`verified: true` nghĩa là URL trả về **200 kèm body HTML** (thử tối đa 4 lần, cách 5 giây, để CDN kịp lan). `false` nghĩa là deploy được chấp nhận nhưng site không phục vụ được trang — thường do SPA fallback thiếu hoặc `publish` không khớp output build. Script exit 2 trong trường hợp này.
 
 ## GitHub
 
@@ -98,15 +104,20 @@ Script tự thêm `.env`, `.env.*`, `node_modules/`, `dist/` vào `.gitignore`, 
 | Tình huống | Xử lý |
 |-----------|-------|
 | Không có token | Dừng, hướng dẫn lấy token |
-| Thiếu `curl`/`jq`/`npm` | Dừng ngay, nêu tên lệnh thiếu |
+| Thiếu `curl`/`jq`/`npm`/`gh` | Dừng **trước** bước 1, nêu tên lệnh thiếu |
+| Không có `package.json` hoặc script `build` | Dừng — không phải project Vite |
+| Thiếu `node_modules` | `npm ci` (có lockfile) hoặc `npm install`, rồi build |
+| Đã có `netlify.toml` riêng | Giữ nguyên, chỉ thêm SPA redirect nếu thiếu |
+| `--api-url` thiếu `http(s)://` | Dừng — giá trị sẽ bị nhúng nguyên vào bundle |
 | Slug đã bị người khác chiếm | Dừng, đề nghị slug cụ thể hơn — không nhận site tên khác |
 | Site đã tồn tại trong tài khoản | Dùng lại, không tạo trùng |
 | Build lỗi | In 20 dòng cuối, dừng |
-| Build không ra `dist/` | Dừng — thường do `publish` trong `netlify.toml` không khớp output của Vite |
+| Build không ra `<publish>/index.html` | Dừng — `publish` trong `netlify.toml` không khớp `build.outDir` của Vite. Thư mục cũ bị xoá trước build nên không deploy nhầm bản cũ |
 | Không có `--api-url` | Bỏ qua env, deploy static thuần |
 | Chưa `git init` | Tự init `-b main` |
 | Branch không phải `main` | Push đúng branch hiện tại |
-| Deploy xong nhưng không 200 | Ghi `verified: false`, exit 2 |
+| Deploy xong nhưng không 200/HTML sau 4 lần thử | Ghi `verified: false`, exit 2 |
+| Không muốn đụng GitHub | `--skip-github` |
 
 ## Không làm
 

@@ -4,9 +4,9 @@ description: "Research market gaps across Google Play, Google Trends, Reddit, an
 license: MIT
 effort: max
 metadata:
-  version: 2.0.0
+  version: 2.1.0
   author: Luong NGUYEN <luongnv89@gmail.com>
-  architecture: "Parallel research subagents (keyword-researcher + pain-point-miner) → synthesis agent (idea-synthesizer) → final idea.md output"
+  architecture: "Two independent research agents (keyword-researcher + pain-point-miner, parallel when the host allows) → synthesis agent (idea-synthesizer) → idea.md + research-log.md"
 ---
 
 # Idea Discovery
@@ -19,10 +19,13 @@ Find untapped app opportunities by analyzing keyword gaps, trend data, user pain
 
 The output of this skill reads like research. That is exactly why a plausible-sounding fabricated statistic is more damaging here than anywhere else: the user will build on it. Prior knowledge about a market is for **choosing what to search for**, never for filling in a cell in the opportunity matrix.
 
-Two things follow:
+Three things follow:
 
 - Every claim in `idea.md` carries a link or a named source next to it. A claim that cannot be sourced gets deleted, not softened.
 - The scores below are **structured judgement, not measurement**. Say so when presenting them. Summing five 1-10 opinions into "38/50" does not make it a measurement, and precision implied by a total out of 50 should not be read as accuracy.
+- **Every query that was run is logged**, hit or miss, in `research-log.md`. "No data found" is only a credible finding when the reader can see what was searched. The log is also what makes the "nothing worth building" verdict defensible rather than lazy.
+
+Prior knowledge has exactly one legitimate use here: choosing seed keywords and app names **to search for**. It is never a source for a rating, a count, an update date, or a "known weakness". The agent files say the same thing; an older version of them allowed a "general knowledge, labelled low-confidence" fallback, which in practice produced confident-looking matrices built on nothing. That fallback is gone.
 
 ## When to Use
 
@@ -60,25 +63,31 @@ Phase 4 ────────────────────────
   Write idea.md with full evidence, audience, MVP, and risks
 ```
 
-### Phase 1: Parallel Research (load subagents)
+### Phase 1: Research (two independent agents)
 
-Launch these subagents concurrently (both can run at the same time):
+The two agents take **only `scope`** as input and do not depend on each other — that is what makes them safe to run in parallel. Cross-referencing keyword gaps against pain points is the synthesizer's job in Phase 3, not something either researcher does.
 
 **Agent A — keyword-researcher** (file: `agents/keyword-researcher.md`)
 - Scans Google Play with seed keywords from `references/seed-keywords.md`
 - Checks: result count, app quality, ratings, last update recency
 - Cross-references with Google Trends for rising queries
-- Returns: keyword opportunity map (high search volume × low competition)
+- Returns: keyword opportunity map + the list of queries run
 
 **Agent B — pain-point-miner** (file: `agents/pain-point-miner.md`)
 - Searches Reddit communities for "I wish there was an app", "Looking for an app", "Can't find an app"
 - Analyzes 1-3★ reviews of popular apps in the space
-- Returns: clustered pain points with frequency estimates
+- Returns: clustered pain points with evidence links + the list of queries run
 
-**How to launch subagents:**
-1. Read the agent's `.md` file to understand its input/output contract
-2. Launch as a `task` with the agent tool, passing context in the prompt
-3. Wait for both to complete before proceeding to Phase 2
+**How to run them** — pick by what the host offers, and say which you used:
+
+| Host capability | Do |
+|---|---|
+| Subagent / task tool available | Read each agent file, launch both as background subagents with the file's contents and `scope` in the prompt, wait for both |
+| No subagent tool | Run Agent A then Agent B **inline, in this order**, following each file as a checklist. Same output contract; only the wall-clock changes |
+
+Either way, each agent's final message must be its JSON object **plus** its `queries_run` list. Append both lists to `research-log.md` before Phase 2.
+
+**Research budget:** 5–8 seed keywords for Agent A, 8–10 Reddit queries + 3–5 apps for Agent B. Past that, more searching mostly produces more of the same; if the budget is exhausted with nothing found, that *is* the finding.
 
 ### Phase 2: (Optional) ASO Depth Check
 
@@ -153,16 +162,27 @@ Write `idea.md` to the current working directory with this structure:
 ## Output
 
 After all phases, the skill produces:
-- `idea.md` — 1 fully-described, evidence-backed app idea
+- `idea.md` — 1 fully-described, evidence-backed app idea (or nothing, if no candidate cleared the bar — see Phase 3)
+- `research-log.md` — every query run by both agents, with hit/miss and the source URL when there was one:
+
+  ```markdown
+  # Research log — scope: fitness — 2026-09-13
+  | # | Agent | Query | Result | Source |
+  |---|-------|-------|--------|--------|
+  | 1 | keyword | "habit tracker" site:play.google.com | 9 apps, top 4.6★ | https://… |
+  | 2 | pain | "I wish there was an app" site:reddit.com fitness | 0 relevant threads | — |
+  ```
+
 - Terminal summary with:
-  - The winning idea name and elevator pitch
+  - The winning idea name and elevator pitch (or the "no viable opportunity" statement)
   - Key evidence points
   - MVP estimate
+  - Which execution mode was used (parallel subagents / inline)
 
 ## Acceptance Criteria
 
-- [ ] Both research subagents complete successfully (or degrade gracefully)
-- [ ] At least 3 candidate opportunities are evaluated
+- [ ] Both research agents complete (parallel or inline) and `research-log.md` lists every query each ran
+- [ ] At least 3 candidate opportunities are evaluated — or the run ends with "no viable opportunity" and the log shows why
 - [ ] Opportunity matrix scores are documented
 - [ ] Winner is selected with clear rationale
 - [ ] `idea.md` exists with all required sections

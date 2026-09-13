@@ -3,7 +3,7 @@ name: flutter-init
 description: "Initialize a Flutter project from scratch: detect OS, install Flutter SDK + Android SDK (if missing), create the project scaffold with clean architecture folders, and init Git. Use when the user says 'flutter init', 'bắt đầu flutter', 'create flutter project', 'cài flutter'. Skip for existing Flutter projects or non-Flutter stacks."
 license: MIT
 metadata:
-  version: 2.0.0
+  version: 2.1.0
 ---
 
 # Flutter Init
@@ -34,15 +34,10 @@ Ask for a domain the user controls, or a unique identifier they are content to k
 ### Step 1 — Inspect the machine
 
 ```bash
-uname -s                                              # Linux / Darwin / MINGW*
-flutter --version 2>/dev/null || echo "flutter NOT_FOUND"
-java -version 2>&1 | head -1 || echo "java NOT_FOUND"
-echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
-ls ~/Android/Sdk ~/Library/Android/sdk 2>/dev/null
-adb version 2>/dev/null || echo "adb NOT_FOUND"
+bash <skill-dir>/scripts/inspect-toolchain.sh
 ```
 
-Report what exists before installing anything. `adb` matters beyond this skill — `flutter-store-metadata` needs it to capture real screenshots, so a missing `platform-tools` here becomes placeholder screenshots later.
+Prints a table plus a `Verdict:` list (Flutter version floor, JDK 17, SDK layout, platform 36, NDK r28+, adb) and emits JSON on stdout. It never installs. Report what exists before installing anything, and copy the verdict lines — do not re-derive them. `adb` matters beyond this skill — `flutter-store-metadata` needs it to capture real screenshots, so a missing `platform-tools` here becomes placeholder screenshots later.
 
 | Found | Action |
 |-------|--------|
@@ -85,19 +80,25 @@ If the directory already exists, ask: overwrite, abort, or use in place. Never d
 
 `flutter create` leaves `targetSdk`, `compileSdk`, and `ndkVersion` implicit (`flutter.targetSdkVersion`), which means they silently follow the Flutter SDK version. `flutter-build` reports those as "cannot verify", and `flutter-store-compliance` cannot audit them at all.
 
-Set them explicitly in `android/app/build.gradle{,.kts}`:
+Set them explicitly:
 
-```groovy
-compileSdk 36
-ndkVersion "28.0.13004108"     // r28+; older NDKs misalign .so for 16 KB pages
+```bash
+bash <skill-dir>/scripts/pin-android-config.sh --project "$PROJECT_NAME" [--min-sdk 23]
+```
+
+The script detects Groovy vs Kotlin DSL, replaces the `flutter.*Version` indirections with literals, picks the newest installed NDK r28+ (`$ANDROID_HOME/ndk`), keeps a `.bak`, and fails loudly if the file does not match the template rather than guessing. Result, in either DSL:
+
+```kotlin
+compileSdk = 36
+ndkVersion = "28.0.13004108"     // r28+; older NDKs misalign .so for 16 KB pages
 
 defaultConfig {
-    targetSdk 36
-    minSdk 23
+    minSdk = 23
+    targetSdk = 36
 }
 ```
 
-Use whichever NDK r28+ version `sdkmanager --list | grep ndk` shows as installed rather than copying the string above. `minSdk` is an engineering choice — 23 is a reasonable default; higher trades reach for fewer compatibility branches.
+(`key = value` is valid in both Groovy and Kotlin DSL; modern `flutter create` emits `build.gradle.kts`.) If no NDK r28+ is installed, the script leaves `ndkVersion` alone and says so — install one with `sdkmanager "ndk;28.0.13004108"` first. `minSdk` is an engineering choice — 23 is a reasonable default; higher trades reach for fewer compatibility branches.
 
 ### Step 6 — Scaffold
 
@@ -158,6 +159,11 @@ Report the application ID prominently. It is the one value from this step that c
 |------|-----------|
 | `references/toolchain.md` | Steps 2–3 — installing Flutter and the Android SDK per OS |
 | `references/scaffold.md` | Step 6 — folder layout and scaffold file contents |
+
+| Script | Run at |
+|--------|--------|
+| `scripts/inspect-toolchain.sh` | Step 1 — machine report + verdicts, JSON on stdout, never installs |
+| `scripts/pin-android-config.sh` | Step 5 — pin compileSdk/targetSdk/minSdk/ndkVersion in Groovy or Kotlin DSL |
 
 ## OS support
 

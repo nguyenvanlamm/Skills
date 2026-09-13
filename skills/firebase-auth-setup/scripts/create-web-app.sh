@@ -59,22 +59,27 @@ STORAGE_BUCKET=$(echo "$CONFIG_JSON" | jq -r '.storageBucket // .projectId + ".a
 MESSAGING_SENDER_ID=$(echo "$CONFIG_JSON" | jq -r '.messagingSenderId // .projectId // empty' 2>/dev/null)
 APP_URL="https://${PROJECT_ID}.web.app"
 
-# If API_KEY is still empty, try alternative extraction
-if [ -z "$API_KEY" ]; then
-  echo "  ⚠ SDK config extraction failed, trying direct API call..."
-  CI_TOKEN="${FIREBASE_TOKEN:-}"
-  CI_TOKEN_FILE="${FIREBASE_TOKEN_PATH:-$HOME/.config/firebase/ci-token}"
-  if [ -z "$CI_TOKEN" ] && [ -f "$CI_TOKEN_FILE" ]; then
-    CI_TOKEN="$(cat "$CI_TOKEN_FILE" | tr -d ' \n\r')"
+# If API_KEY is still empty, read the config straight from the Firebase
+# Management API with the ambient gcloud credential — the same identity the
+# rest of the scripts use. (The old fallback wanted a `firebase login:ci`
+# token, which nothing else needed.)
+if [ -z "$API_KEY" ] || [ "$API_KEY" = "null" ]; then
+  echo "  ⚠ SDK config extraction failed, trying the Management API..."
+  ACCESS_TOKEN=$(gcloud auth print-access-token 2>/dev/null || true)
+  if [ -n "$ACCESS_TOKEN" ]; then
+    API_RESP=$(curl -sS -H "Authorization: Bearer $ACCESS_TOKEN" \
+      "https://firebase.googleapis.com/v1beta1/projects/${PROJECT_ID}/webApps/${APP_ID}/config" 2>/dev/null || echo '{}')
+    API_KEY=$(echo "$API_RESP" | jq -r '.apiKey // empty' 2>/dev/null)
+    AUTH_DOMAIN=$(echo "$API_RESP" | jq -r '.authDomain // empty' 2>/dev/null)
+    STORAGE_BUCKET=$(echo "$API_RESP" | jq -r '.storageBucket // empty' 2>/dev/null)
+    MESSAGING_SENDER_ID=$(echo "$API_RESP" | jq -r '.messagingSenderId // empty' 2>/dev/null)
   fi
+fi
 
-  API_RESP=$(curl -s -H "Authorization: Bearer $CI_TOKEN" \
-    "https://firebase.googleapis.com/v1beta1/projects/${PROJECT_ID}/webApps/${APP_ID}/config" 2>/dev/null)
-
-  API_KEY=$(echo "$API_RESP" | jq -r '.apiKey // .apiKey' 2>/dev/null)
-  AUTH_DOMAIN=$(echo "$API_RESP" | jq -r '.authDomain // empty' 2>/dev/null)
-  STORAGE_BUCKET=$(echo "$API_RESP" | jq -r '.storageBucket // empty' 2>/dev/null)
-  MESSAGING_SENDER_ID=$(echo "$API_RESP" | jq -r '.messagingSenderId // empty' 2>/dev/null)
+if [ -z "$API_KEY" ] || [ "$API_KEY" = "null" ]; then
+  echo "❌ Could not obtain the web app apiKey. A client cannot initialise Firebase without it."
+  echo "   Try: firebase apps:sdkconfig WEB $APP_ID --project $PROJECT_ID"
+  exit 1
 fi
 
 # Set defaults for empty values
@@ -87,16 +92,10 @@ echo "  authDomain:       $AUTH_DOMAIN"
 echo "  storageBucket:    $STORAGE_BUCKET"
 
 # Write web config as separate file
-cat > "$OUTPUT_DIR/firebase-web-config.json" <<EOF
-{
-  "apiKey": "$API_KEY",
-  "authDomain": "$AUTH_DOMAIN",
-  "projectId": "$PROJECT_ID",
-  "storageBucket": "$STORAGE_BUCKET",
-  "messagingSenderId": "$MESSAGING_SENDER_ID",
-  "appId": "$APP_ID"
-}
-EOF
+jq -n --arg apiKey "$API_KEY" --arg authDomain "$AUTH_DOMAIN" --arg projectId "$PROJECT_ID" \
+      --arg storageBucket "$STORAGE_BUCKET" --arg messagingSenderId "$MESSAGING_SENDER_ID" --arg appId "$APP_ID" \
+  '{apiKey:$apiKey, authDomain:$authDomain, projectId:$projectId, storageBucket:$storageBucket, messagingSenderId:$messagingSenderId, appId:$appId}' \
+  > "$OUTPUT_DIR/firebase-web-config.json"
 
 # Merge into main output
 if [ -f "$OUTPUT_DIR/firebase-output.json" ]; then

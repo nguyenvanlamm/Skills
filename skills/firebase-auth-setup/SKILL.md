@@ -4,7 +4,7 @@ description: "Tự động tạo Firebase project, bật Email/Password Authenti
 license: MIT
 effort: medium
 metadata:
-  version: 2.0.0
+  version: 2.1.0
   author: "Nguyen Van Lam"
 ---
 
@@ -47,33 +47,37 @@ gcloud auth login
 firebase login
 ```
 
-Không cần `firebase login:ci` — script dùng ambient auth. Token CI vốn được đọc ở bản cũ nhưng **không dùng vào việc gì**; phần đó đã bỏ.
+Không cần `firebase login:ci` — script dùng ambient auth. Bản 2.0 nói vậy nhưng `check-prereqs.sh` vẫn **FAIL khi thiếu CI token**; 2.1 sửa dứt điểm, và fallback lấy web config giờ dùng `gcloud auth print-access-token`.
 
-**Hạn mức project:** tài khoản Google Cloud thường bị giới hạn ~10–12 project. Mỗi lần chạy skill này tạo **một project mới** — dùng nhiều lần sẽ chạm trần và phải xoá project cũ (xoá xong còn 30 ngày chờ mới giải phóng quota).
+**Hạn mức project:** tài khoản Google Cloud thường bị giới hạn ~10–12 project; xoá xong còn chờ 30 ngày mới giải phóng quota. Vì vậy có `--project-id <existing>`: dùng lại project sẵn có (thêm Firebase vào nếu là project GCP thuần) thay vì tạo mới. Dùng cờ này từ lần chạy thứ hai trở đi.
+
+**"Get started" thủ công không còn cần.** Bản cũ bắt user mở Console → Authentication → Get started khi API trả lỗi. Bản này gọi thẳng `identityPlatform:initializeAuth` (chính là lệnh nút đó gọi) trước khi bật provider.
 
 ## Tham số
 
 | Param | Bắt buộc | Mặc định | Mô tả |
 |-------|----------|----------|-------|
-| `--slug` | ✅ | — | Tên project; phải hợp lệ làm GCP project id |
+| `--slug` | ✅ (trừ khi có `--project-id`) | — | Tên project; phải hợp lệ làm GCP project id |
+| `--project-id` | ❌ | — | Dùng lại project sẵn có; bỏ qua bước tạo |
 | `--output` | ❌ | `$PWD/firebase-output` | Thư mục output |
-| `--region` | ❌ | `us-central` | Region |
-| `--google-client-id` | ❌ | — | OAuth client cho Google sign-in |
-| `--google-client-secret` | ❌ | — | Kèm theo client id |
+| `--region` | ❌ | `us-central` | Chỉ ghi vào output để downstream tham chiếu — `firebase projects:create` không nhận region |
+| `--google-client-id` | ❌ | — | OAuth client cho Google sign-in (hoặc env `GOOGLE_OAUTH_CLIENT_ID`) |
+| `--google-client-secret` | ❌ | — | Kèm theo client id (hoặc env `GOOGLE_OAUTH_CLIENT_SECRET`). Bản 2.0 mô tả hai cờ này nhưng `setup.sh` từ chối chúng — 2.1 truyền xuống `enable-auth.sh` |
 
 `--slug` sinh ra project id `<slug>-<rand4>`, phải khớp luật GCP: **6–30 ký tự, bắt đầu bằng chữ thường, chỉ a-z 0-9 và `-`**. Script kiểm tra trước khi gọi API thay vì để API trả lỗi khó hiểu.
 
 ## Chạy
 
 ```bash
-bash scripts/setup.sh --slug <slug> [--output <dir>] [--region <region>]
+bash scripts/setup.sh --slug <slug> [--output <dir>] [--google-client-id <id> --google-client-secret <secret>]
+bash scripts/setup.sh --project-id <existing> [--output <dir>]
 ```
 
 | Script | Việc |
 |--------|------|
 | `check-prereqs.sh` | Kiểm tra CLI và auth |
-| `create-project.sh` | Tạo project, validate id, retry khi trùng tên |
-| `enable-auth.sh` | Bật Identity Toolkit, Email/Password, Google (nếu có client) |
+| `create-project.sh` | Tạo project (validate id, retry khi trùng tên) **hoặc** dùng lại với `--project-id` |
+| `enable-auth.sh` | Bật Identity Toolkit, `initializeAuth`, Email/Password, Google (nếu có client) |
 | `create-web-app.sh` | Tạo web app, lấy config |
 | `create-service-account.sh` | Tạo service account + key |
 
@@ -90,6 +94,7 @@ bash scripts/setup.sh --slug <slug> [--output <dir>] [--region <region>]
 {
   "project_id": "task-manager-a1b2",
   "project_number": "123456789",
+  "created": true,
   "web_app": { "app_id": "...", "api_key": "...", "auth_domain": "..." },
   "service_account": { "email": "...", "key_path": "/abs/path/..." },
   "auth_providers": ["email"]
@@ -102,13 +107,9 @@ bash scripts/setup.sh --slug <slug> [--output <dir>] [--region <region>]
 
 `service-account-key.json` là **khoá riêng có quyền admin** trên Firebase project: đọc/ghi mọi dữ liệu, tạo custom token, mạo danh bất kỳ user nào. Không có cơ chế thu hồi nào ngoài việc xoá khoá.
 
-Bắt buộc, ngay sau khi chạy:
+`setup.sh` tự làm hai việc: `chmod 600` file khoá, và thêm `<output>/service-account-key.json` + `<output>/firebase-output.json` vào `.gitignore` của repo chứa thư mục output (nếu có). Không nằm trong repo nào → script cảnh báo, và việc gitignore ở nơi đích là của bạn.
 
-```bash
-echo "service-account-key.json" >> .gitignore
-echo "firebase-output.json"     >> .gitignore   # chứa key_path và api_key
-chmod 600 <output>/service-account-key.json
-```
+Service account được cấp **`roles/firebaseauth.admin` + `roles/iam.serviceAccountTokenCreator`** — đủ để verify/revoke token, quản lý user, tạo custom token. Bản cũ cấp `roles/firebase.admin` (toàn quyền Firestore/Storage/Hosting…) cho một skill chỉ làm Auth. Cần Firestore sau này thì thêm `roles/datastore.user` lúc đó.
 
 Lộ khoá thì xoá nó đi, đừng chỉ gỡ khỏi repo:
 
@@ -139,10 +140,14 @@ Rồi đọc `firebase-output.json`:
 | Slug không hợp lệ làm project id | Dừng trước khi gọi API, nêu luật |
 | Tên project đã bị chiếm | Đổi suffix ngẫu nhiên, tối đa 3 lần |
 | Hết quota project | Lỗi từ GCP; phải xoá project cũ |
-| Identity Platform chưa khởi tạo | HTTP lỗi ở bước Email/Password — mở Console → Authentication → Get started một lần rồi chạy lại |
+| Identity Platform chưa khởi tạo | Script gọi `initializeAuth` (retry 3 lần khi API đang propagate). Vẫn lỗi → hướng dẫn Console → Authentication → Get started |
+| `--project-id` là project GCP chưa có Firebase | `firebase projects:addfirebase` tự động |
+| `--project-id` không tồn tại / không có quyền | Dừng, gợi ý `gcloud projects list` |
+| Không lấy được `apiKey` của web app | Dừng — client không init được Firebase nếu thiếu; không ghi file config rỗng |
+| Cấp IAM role thất bại | Cảnh báo (tài khoản thiếu `setIamPolicy`), vẫn xuất key |
 | Không có OAuth client | Bỏ qua Google, ghi rõ, `auth_providers: ["email"]` |
 | Google IdP đã tồn tại | Chuyển từ POST sang PATCH |
 
 ## Không làm
 
-Dùng lại project Firebase có sẵn (luôn tạo mới); provider ngoài Email/Password và Google; Firestore, Storage, Hosting, App Check; và **không** tạo được OAuth client cho Google.
+Provider ngoài Email/Password và Google; Firestore, Storage, Hosting, App Check; và **không** tạo được OAuth client cho Google.
