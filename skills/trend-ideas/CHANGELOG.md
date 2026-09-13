@@ -4,7 +4,7 @@
 
 ### Added
 - `fetch_trends.py`: `--limit`, `--min-volume`, `--retries` (3× exponential backoff on network errors / 429 / 5xx), `--save-raw` and `--from-file` for offline, reproducible re-runs. `fetched_at` and `requested` in the output envelope.
-- **Per-idea output contract**: `ideas/<n>-<slug>/{idea.md, validate.md}`, and the winner copied to `<output_dir>/idea.md` + `validate.md` — exactly the pair `prd-generator` consumes. Orchestrators no longer re-extract the idea from prose or re-run `idea-validator`.
+- **Per-idea output contract**: `IDEAS_ROOT=<output_dir>/ideas` steers `idea-validator` (which creates its own dated folder and does not take an output dir) so each run lands in `ideas/YYYY_MM_DD_<slug>/`; the winner is copied to `<output_dir>/idea.md` + `validate.md` — exactly the pair `prd-generator` consumes. Orchestrators no longer re-extract the idea from prose or re-run `idea-validator`.
 - Input table (`output`, `output_dir`, `limit`, `from_file`).
 - Edge case: `validate.md` missing a rating → idea marked `incomplete`, excluded from selection, disclosed.
 - Edge case: existing `<output_dir>/idea.md` → ask before overwriting.
@@ -18,6 +18,7 @@
 - Script tolerates `growth` as a scalar or dict, `trends`/`data` envelope, non-numeric volume.
 
 ### Improved
+- Prompt notes for the sibling: skip its mandatory "Repo Sync" when the output dir has no git `origin` (otherwise it stops and asks mid-run); no user questions in its Phase 1.
 - Core principle stated: every number is copied from the script or from `idea-validator`; the skill never scores.
 - Report header carries `count/requested`, `source`, `fetched_at`; topic table carries `growth_basis` so a 100× misread is visible.
 

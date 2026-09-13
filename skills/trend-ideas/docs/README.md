@@ -11,7 +11,7 @@ Step 1: Fetch trending topics (scripts/fetch_trends.py, retries + --save-raw)
 Step 2: Analyze each topic (core need, audience, growth drivers)
 Step 3: Synthesize patterns → 3 opportunity spaces
 Step 4: Brainstorm 3 fully-fleshed ideas
-Step 5: Write ideas/<n>-<slug>/idea.md → idea-validator writes validate.md beside it
+Step 5: IDEAS_ROOT=<output_dir>/ideas → idea-validator creates YYYY_MM_DD_<slug>/{idea.md,validate.md} per idea
 Step 6: Select best idea (composite + tiebreakers) → copy winner to <output_dir>/idea.md + validate.md
 Step 7: Output structured markdown report
 ```
@@ -35,7 +35,7 @@ Exit 0 with `{"topics": [...]}`; exit 1 with `{"error": "..."}`. Diagnostics go 
 ## Output
 
 - `<output>` — markdown report (topics table with `growth_basis`, 3 ideas with scores, winner)
-- `<output_dir>/ideas/<n>-<slug>/{idea.md,validate.md}` — one pair per idea
+- `<output_dir>/ideas/YYYY_MM_DD_<slug>/{idea.md,validate.md}` — one folder per idea, created by idea-validator
 - `<output_dir>/idea.md` + `validate.md` — the winner, in the exact shape `prd-generator` consumes
 
 ### Score formula

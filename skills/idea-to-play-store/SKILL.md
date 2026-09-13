@@ -29,12 +29,12 @@ Commands written as `/skill --flag value` describe **intent**, not a CLI. Invoke
 
 | Skill | Reads | Writes |
 |-------|-------|--------|
-| `trend-ideas` (2.2+) | — | `trend-report.md`, `ideas/…`, **`idea.md` + `validate.md`** of the winner |
-| `idea-validator` | `idea.md` in a dir | `validate.md` beside it |
-| `brand-name-checker` | a name | risk level + Proceed/Modify/Abandon |
-| `prd-generator` | `idea.md` + `validate.md` in a dir | `prd.md` |
-| `tad-generator` | `prd.md` | `tad.md` |
-| `tasks-generator` | `prd.md` (+ `tad.md`) | `tasks.md` |
+| `trend-ideas` (2.2+) | `output`, `output_dir` | `trend-report.md`, `ideas/…`, **`idea.md` + `validate.md`** of the winner at `output_dir` |
+| `idea-validator` | the idea as text. **No output-dir argument** — creates `$IDEAS_ROOT/YYYY_MM_DD_<name>/` and echoes the path | `idea.md` + `validate.md` in that folder |
+| `brand-name-checker` | a name (`$ARGUMENTS`) | `RISK:` + `RECOMMEND: Proceed/Modify/Abandon` block |
+| `prd-generator` | **folder path** containing `idea.md` + `validate.md` | `prd.md` in that folder |
+| `tad-generator` | folder path containing `prd.md` | `tad.md` |
+| `tasks-generator` | **file path** to `prd.md`; finds `tad.md` beside it | `tasks.md` beside `prd.md` |
 | `flutter-init` | `project_name`, `org`, `platforms` | project dir, `applicationId` |
 | `firebase-auth-setup` | `--slug`, optional `--project-id` | `firebase-output.json` with **`auth_providers`** |
 | `flutter-build` | project | `build/release/app-release.aab`, `build/release/build-info.json` |
@@ -43,6 +43,8 @@ Commands written as `/skill --flag value` describe **intent**, not a CLI. Invoke
 | `flutter-publish` | AAB, `track`, `whats_new` | `publish-state.json`, `upload-checklist.md` |
 
 Check availability per phase by attempting the invocation — never by probing a filesystem path. If a phase's skill is missing, stop **before** the phase starts and name it.
+
+**Repo Sync trap.** `idea-validator`, `prd-generator`, `tad-generator` and `tasks-generator` each run a mandatory `git fetch origin && git pull --rebase` before writing, and **stop to ask the user when `origin` is missing**. `$PRODUCT_DIR` has no remote until the user chooses to push. Every planning invocation therefore says in its prompt: *"`$PRODUCT_DIR` is a local git repo with no remote — skip Repo Sync, commit locally, do not push."*
 
 ## Prerequisites
 
@@ -108,7 +110,7 @@ Phase 5 — Store & Publish  flutter-signing → flutter-build → flutter-store
 
 All files in `$PRODUCT_DIR/plan/`. Pass that directory to each skill; do not pass file contents.
 
-**1a — Idea.** If the user already has an idea: write `plan/idea.md` from their description and invoke `idea-validator` on `plan/` → `validate.md`. Otherwise:
+**1a — Idea.** If the user already has an idea: set `IDEAS_ROOT="$PRODUCT_DIR/plan"`, invoke `idea-validator` with the idea as `$ARGUMENTS`; it creates `plan/YYYY_MM_DD_<name>/{idea.md,validate.md}` and echoes the path — copy both files up to `plan/`. Otherwise:
 
 ```
 /trend-ideas --output "$PRODUCT_DIR/plan/trend-report.md" --output-dir "$PRODUCT_DIR/plan"
@@ -120,11 +122,11 @@ Extract `APP_NAME`, one-line description, features, audience into the state file
 
 **1b — Brand name.** `/brand-name-checker --name "$APP_NAME"` → `plan/brand-check.md`. `Abandon` → propose 3 alternatives, re-check the user's pick before continuing. `Modify` → surface the reason at the gate.
 
-**1c — PRD.** `/prd-generator` on `plan/` → `prd.md`. Add this orchestrator's constraints to the prompt: Flutter Android app, Riverpod + go_router, Firebase Auth if login, FastAPI on Render if a server is needed.
+**1c — PRD.** `/prd-generator "$PRODUCT_DIR/plan"` (folder path) → `plan/prd.md`. Add this orchestrator's constraints to the prompt: Flutter Android app, Riverpod + go_router, Firebase Auth if login, FastAPI on Render if a server is needed.
 
-**1d — TAD.** `/tad-generator` on `plan/` → `tad.md` (keep the name; `tasks-generator` looks for it).
+**1d — TAD.** `/tad-generator "$PRODUCT_DIR/plan"` → `plan/tad.md` (keep the name; `tasks-generator` looks for it).
 
-**1e — Tasks.** `/tasks-generator` on `plan/` → `tasks.md`.
+**1e — Tasks.** `/tasks-generator "$PRODUCT_DIR/plan/prd.md"` (**file** path) → `plan/tasks.md`.
 
 **1f — Derive flags** from `prd.md`, and record them in the state file:
 

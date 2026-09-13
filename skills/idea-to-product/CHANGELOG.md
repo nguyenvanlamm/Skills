@@ -3,6 +3,7 @@
 ## v2.1.0 — 2026-09-13
 
 ### Fixed
+- **Contract đối chiếu với SKILL.md thật của sibling** (đã cài): `idea-validator` không nhận thư mục output — điều hướng bằng `IDEAS_ROOT`; `tasks-generator` nhận đường dẫn *file* `prd.md`; `landing-page-generator` sinh copy, không sinh HTML. Bốn skill planning có "Repo Sync Before Edits" bắt buộc và dừng khi thiếu `origin` → orchestrator phải nói rõ repo local chưa có remote trong prompt.
 - **Sai contract skill con**: Phase 2 gọi `prd-generator --idea "<chuỗi>"` nhưng skill đó chỉ đọc `idea.md` + `validate.md` trong một thư mục. Giờ Phase 1 để lại đúng cặp file đó ở `$PRODUCT_DIR/` (từ `trend-ideas` v2.2 hoặc `idea-validator` trực tiếp) và Phase 2 truyền thư mục.
 - `architecture.md` → `tad.md`: `tasks-generator` tìm `tad.md` theo tên mặc định; tên cũ làm nó không thấy TAD.
 - `docs-generator` không tồn tại → `doc-manager`.

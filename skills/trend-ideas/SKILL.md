@@ -27,7 +27,7 @@ Analyze real-time trending topics from Exploding Topics and generate 3 novel bus
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `output` | ❌ | stdout | Path for the markdown report (e.g. `$PRODUCT_DIR/trend-report.md`) |
-| `output_dir` | ❌ | dir of `output`, else `.` | Where per-idea `idea.md` / `validate.md` files are written (see Step 5) |
+| `output_dir` | ❌ | dir of `output`, else `.` | Where per-idea folders land (`<output_dir>/ideas/` becomes `IDEAS_ROOT` for `idea-validator`) and where the winner's `idea.md` + `validate.md` are copied |
 | `limit` | ❌ | 15 | Topics to fetch |
 | `from_file` | ❌ | — | Reuse a saved raw API response (offline, or to reproduce a previous run) |
 
@@ -83,17 +83,21 @@ One per opportunity space, using the Idea Template in `references/idea-framework
 
 ### Step 5: Validate each idea with idea-validator
 
-`idea-validator` reads an `idea.md` and writes a `validate.md` beside it. Give each idea its own directory so the three runs do not overwrite each other, and so downstream skills (`prd-generator` needs exactly these two files) can consume the winner without re-extraction:
+`idea-validator` does **not** take an output directory. It resolves a storage root (`$IDEAS_ROOT` env → `~/.config/ideas-root.txt` → ask), creates `<root>/YYYY_MM_DD_<short_snake_name>/` there, writes `idea.md` + `validate.md` inside, and echoes the absolute folder path. Steer it with the env var so the three runs land where this skill can find them:
 
 ```
-<output_dir>/ideas/
-├── 1-<slug>/idea.md      ← written by this skill from Step 4
-│            validate.md  ← written by idea-validator
-├── 2-<slug>/…
-└── 3-<slug>/…
+<output_dir>/ideas/                         ← IDEAS_ROOT for the three invocations
+├── 2026_09_13_<idea_1_slug>/idea.md · validate.md
+├── 2026_09_13_<idea_2_slug>/…
+└── 2026_09_13_<idea_3_slug>/…
 ```
 
-Write `idea.md` first (the full idea package from Step 4), then invoke `idea-validator` on that directory. Its Phase 1 (Clarify) needs no user questions — the idea is already fully specified. For Phase 2 (Tech Context), state these assumptions rather than asking: web/mobile stack as fits the idea; 3–6 months to MVP with 2–3 devs; bootstrapped; standard startup constraints. Phases 3–5 (competitive landscape with live searches, critical evaluation, improvements) run as that skill instructs.
+Per idea: set `IDEAS_ROOT=<output_dir>/ideas`, invoke `idea-validator` with the full idea package from Step 4 as its `$ARGUMENTS`, and record the folder path it echoes. Two things to say in that prompt, because the sibling's defaults assume a synced `ideas` git repo:
+
+- Its Phase 1 (Clarify) needs no user questions — the idea is fully specified; Phase 2 (Tech Context) assumptions: web/mobile stack as fits the idea, 3–6 months to MVP with 2–3 devs, bootstrapped, standard startup constraints. Phases 3–5 (competitive landscape with live searches, critical evaluation, improvements) run as that skill instructs.
+- `<output_dir>` is a local directory — if it is not inside a git repo with an `origin`, **skip "Repo Sync Before Edits" and do not push**; write the files and stop. Otherwise its mandatory sync step stops and asks the user mid-run.
+
+Downstream (`prd-generator`) needs exactly these two files in one folder, so this layout is what it consumes without re-extraction.
 
 From each `validate.md` extract, verbatim:
 
@@ -104,7 +108,7 @@ From each `validate.md` extract, verbatim:
 
 Then compute `composite = (C + F + M + T) × 2.5` (0–100) and record `{ name, dir, composite, verdict, c, f, m, t }`.
 
-**If `idea-validator` is not invokable:** stop after writing the three `idea.md` files and report that validation could not run. Do not score the ideas yourself and label the result "validated" — that misrepresents where the numbers came from. The three `idea.md` files are still useful output; say so.
+**If `idea-validator` is not invokable:** write the three idea packages yourself as `<output_dir>/ideas/<slug>/idea.md` (same structure, so a later manual validation slots in), stop, and report that validation could not run. Do not score the ideas yourself and label the result "validated" — that misrepresents where the numbers came from. The three `idea.md` files are still useful output; say so.
 
 ---
 
@@ -116,7 +120,7 @@ Then compute `composite = (C + F + M + T) × 2.5` (0–100) and record `{ name, 
 4. Tie → higher Feasibility.
 5. Still tied → pick the first and say the tie was broken arbitrarily.
 
-Copy the winner's `idea.md` and `validate.md` to `<output_dir>/idea.md` and `<output_dir>/validate.md`. That pair is the contract downstream orchestrators (`idea-to-product`, `idea-to-play-store`) rely on.
+Copy the winner's `idea.md` and `validate.md` from its dated folder to `<output_dir>/idea.md` and `<output_dir>/validate.md`. That pair, in one folder, is what `prd-generator` reads and what the orchestrators (`idea-to-product`, `idea-to-play-store`) rely on.
 
 If all three are `Skip it`, still pick the highest — and put that fact in the first line of the Winning Idea section, not in a footnote.
 
@@ -139,7 +143,7 @@ If all three are `Skip it`, still pick the highest — and put that fact in the 
 
 | Idea | Creativity | Feasibility | Market | Technical | Composite | Verdict | Files |
 |------|-----------|-------------|--------|-----------|-----------|---------|-------|
-| Idea 1 | 8/10 | 7/10 | 9/10 | 6/10 | 75/100 | Build it | ideas/1-… |
+| Idea 1 | 8/10 | 7/10 | 9/10 | 6/10 | 75/100 | Build it | ideas/2026_09_13_… |
 
 *Composite = (Creativity + Feasibility + Market Impact + Technical Execution) × 2.5*
 
@@ -164,7 +168,7 @@ Write to `output` if given, else print.
 - [ ] `fetch_trends.py` exit 0; report shows `count`/`requested` and `source`
 - [ ] Every topic has a Core Need
 - [ ] 3 ideas, each with all template fields
-- [ ] 3 × `idea.md` written; 3 × `validate.md` present (or the run stopped with a clear "validation unavailable")
+- [ ] 3 dated folders under `<output_dir>/ideas/` each with `idea.md` + `validate.md` (or the run stopped with a clear "validation unavailable")
 - [ ] All 4 ratings per idea copied from `validate.md`, composite arithmetic correct
 - [ ] Winner chosen by composite + tiebreakers; `<output_dir>/idea.md` + `validate.md` are the winner's
 - [ ] No growth/volume/rating figure appears that is not in the script output or a `validate.md`

@@ -50,7 +50,7 @@ After a full run, you get:
 ```
 YYYY_MM_DD_<slug>/
 ├── trend-report.md · idea.md · validate.md · prd.md · tad.md · tasks.md
-├── ideas/<n>-<slug>/{idea.md,validate.md}     # all 3 candidates
+├── ideas/YYYY_MM_DD_<slug>/{idea.md,validate.md}  # all 3 candidates (created by idea-validator)
 ├── firebase-config/                            # only if the PRD needs login (gitignored)
 ├── <slug>-server/    # FastAPI — its own GitHub repo (Makefile, docs/, .github/workflows/)
 ├── <slug>-client/    # React + Vite — its own GitHub repo (landing/, docs/, .github/workflows/)

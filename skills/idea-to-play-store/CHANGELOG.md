@@ -3,6 +3,7 @@
 ## v2.1.0 — 2026-09-13
 
 ### Fixed
+- **Contracts re-checked against the installed siblings' SKILL.md**: `idea-validator` takes no output dir (steer with `IDEAS_ROOT`), `tasks-generator` takes the `prd.md` *file* path, and the four planning skills stop on a missing git `origin` unless told the repo is local-only.
 - **Non-existent skill/agent calls**: `/agent feature-gen-crud` (no such agent) → features are generated from `references/feature-templates.md`, optionally in parallel subagents. `social-poster` note kept.
 - **Wrong sibling contracts**: `prd-generator` was given a `validate.md` path; it needs `idea.md` + `validate.md` in one directory. `deploy-render --db postgres` (flag does not exist) → default DB, `--no-db` to opt out, `--health-path /api/health`. `flutter-init --platforms "android,ios"` on an Android-only pipeline → `android`.
 - Phase 1 ran `idea-validator` **again** after `trend-ideas` had already validated — a second, different score. Removed.

@@ -20,15 +20,17 @@ Stack: FastAPI (Python) + React (Vite/Tailwind/shadcn/ui) + SQLite (local) / Pos
 
 Các lệnh dạng `/skill-name --flag value` trong file này là **mô tả ý định**, không phải CLI thật. Trên mỗi host (Devin CLI, Claude Code, opencode) hãy gọi skill qua cơ chế của host (skill tool, `/name`, …) và truyền các giá trị đó trong prompt. Mỗi skill con có contract input/output riêng — bảng dưới ghi đúng contract đã đọc từ SKILL.md của chúng:
 
-| Skill | Đọc | Ghi |
+| Skill | Đọc (`$ARGUMENTS`) | Ghi |
 |-------|-----|-----|
-| `trend-ideas` | — | `trend-report.md`, `idea.md` + `validate.md` của idea thắng (v2.2+) |
-| `idea-validator` | `idea.md` trong thư mục | `validate.md` cùng thư mục |
-| `prd-generator` | **`idea.md` + `validate.md` cùng thư mục** — không nhận idea dạng chuỗi | `prd.md` cùng thư mục |
-| `tad-generator` | `prd.md` | `tad.md` |
-| `tasks-generator` | `prd.md` (+ `tad.md` nếu có, cùng thư mục) | `tasks.md` |
+| `trend-ideas` | `output`, `output_dir` | `trend-report.md`, `ideas/…`, và `idea.md` + `validate.md` của idea thắng tại `output_dir` (v2.2+) |
+| `idea-validator` | mô tả idea (chuỗi). **Không nhận thư mục output** — tự tạo `$IDEAS_ROOT/YYYY_MM_DD_<name>/` và echo path | `idea.md` + `validate.md` trong thư mục đó |
+| `prd-generator` | **đường dẫn thư mục** chứa `idea.md` + `validate.md` — không nhận idea dạng chuỗi | `prd.md` cùng thư mục |
+| `tad-generator` | đường dẫn thư mục chứa `prd.md` | `tad.md` cùng thư mục |
+| `tasks-generator` | **đường dẫn file `prd.md`**; tự tìm `tad.md` cùng thư mục | `tasks.md` cạnh `prd.md` |
 
 Vì vậy mọi file planning nằm **cùng một thư mục** `$PRODUCT_DIR/` — đừng đổi tên `tad.md` thành `architecture.md` hay tách thư mục, downstream tìm theo tên mặc định.
+
+**"Repo Sync Before Edits" của bốn skill planning.** `idea-validator`, `prd-generator`, `tad-generator`, `tasks-generator` đều có bước bắt buộc `git fetch origin && git pull --rebase` trước khi ghi file, và **dừng hỏi user nếu thiếu `origin`**. `$PRODUCT_DIR` chỉ có remote từ Phase 4. Vì thế mỗi lần gọi skill planning, ghi rõ trong prompt: *"`$PRODUCT_DIR` là repo git local chưa có remote — bỏ qua Repo Sync, commit local được, không push."* Thiếu câu này, Phase 1–2 đứng giữa chừng chờ một câu trả lời không cần thiết.
 
 **Kiểm tra skill có sẵn:** không dò đường dẫn. Trước mỗi phase, liệt kê skill phase đó cần; nếu host báo không có skill nào, dừng ở đầu phase và nêu tên — đừng chạy nửa phase rồi mới phát hiện.
 
@@ -129,7 +131,7 @@ Approval gates after Phase 1, 2, and 3: **must not advance** without explicit us
 
 ## Phase 1: Idea Generation & Validation
 
-**Nếu user đã có idea** → bỏ qua `trend-ideas`: viết `$PRODUCT_DIR/idea.md` từ mô tả của user, gọi `idea-validator` trên `$PRODUCT_DIR` để có `validate.md`, rồi sang gate.
+**Nếu user đã có idea** → bỏ qua `trend-ideas`: set `IDEAS_ROOT="$PRODUCT_DIR"`, gọi `idea-validator` với mô tả idea làm `$ARGUMENTS`. Nó tạo `$PRODUCT_DIR/YYYY_MM_DD_<name>/{idea.md,validate.md}` và echo path; copy hai file đó lên `$PRODUCT_DIR/` rồi sang gate.
 
 Ngược lại, invoke `trend-ideas` to fetch trends, brainstorm 3 ideas, validate each via `idea-validator`, and select the winning idea:
 
@@ -139,7 +141,7 @@ Ngược lại, invoke `trend-ideas` to fetch trends, brainstorm 3 ideas, valida
 
 **Output:**
 - `$PRODUCT_DIR/trend-report.md` — top topics, 3 ideas with composite scores, winner
-- `$PRODUCT_DIR/ideas/<n>-<slug>/{idea.md,validate.md}` — mỗi idea một cặp
+- `$PRODUCT_DIR/ideas/YYYY_MM_DD_<slug>/{idea.md,validate.md}` — mỗi idea một thư mục do `idea-validator` tạo
 - **`$PRODUCT_DIR/idea.md` + `$PRODUCT_DIR/validate.md`** — cặp của idea thắng; đây là input thật của Phase 2
 
 **Check:**
@@ -161,7 +163,7 @@ Ngược lại, invoke `trend-ideas` to fetch trends, brainstorm 3 ideas, valida
 
 ### GATE: Present winning idea to user for approval.
 
-If not approved, do not advance. User chọn idea khác trong `ideas/<n>-…/` → copy cặp `idea.md`/`validate.md` đó lên `$PRODUCT_DIR/` rồi gate lại; hoặc re-run Phase 1.
+If not approved, do not advance. User chọn idea khác trong `ideas/YYYY_MM_DD_…/` → copy cặp `idea.md`/`validate.md` đó lên `$PRODUCT_DIR/` rồi gate lại; hoặc re-run Phase 1.
 
 ---
 
@@ -172,7 +174,7 @@ Cả ba skill đọc/ghi trong **`$PRODUCT_DIR/`** theo tên file mặc định 
 ### Step 2a: Generate PRD
 
 ```
-/prd-generator  (project dir: $PRODUCT_DIR — đọc idea.md + validate.md, ghi prd.md)
+/prd-generator "$PRODUCT_DIR"      ← $ARGUMENTS = thư mục chứa idea.md + validate.md → ghi prd.md
 ```
 
 Thêm vào prompt ràng buộc stack của orchestrator này (FastAPI + React/Vite + SQLite/PostgreSQL, 2 repo, Firebase Auth nếu có đăng nhập) để PRD không đề xuất stack khác.
@@ -182,7 +184,7 @@ Thêm vào prompt ràng buộc stack của orchestrator này (FastAPI + React/Vi
 ### Step 2b: Generate Technical Architecture
 
 ```
-/tad-generator  (project dir: $PRODUCT_DIR — đọc prd.md, ghi tad.md)
+/tad-generator "$PRODUCT_DIR"      ← $ARGUMENTS = thư mục chứa prd.md → ghi tad.md
 ```
 
 **Output:** `$PRODUCT_DIR/tad.md` — data flow, component tree, API routes, DB schema. Giữ tên `tad.md`; `tasks-generator` tìm đúng tên này.
@@ -190,7 +192,7 @@ Thêm vào prompt ràng buộc stack của orchestrator này (FastAPI + React/Vi
 ### Step 2c: Generate Tasks
 
 ```
-/tasks-generator  (project dir: $PRODUCT_DIR — đọc prd.md + tad.md, ghi tasks.md)
+/tasks-generator "$PRODUCT_DIR/prd.md"   ← $ARGUMENTS = đường dẫn FILE prd.md; tự thấy tad.md cùng thư mục → ghi tasks.md cạnh prd.md
 ```
 
 **Output:** `$PRODUCT_DIR/tasks.md`.
@@ -506,11 +508,13 @@ API_URL=$(jq -r 'select(.verified==true) | .url // empty' "$PRODUCT_DIR/<slug>-s
 
 Sau khi có URL Netlify: thêm nó vào `ALLOWED_ORIGINS` của server (env trên Render Dashboard hoặc `render.yaml`) và redeploy server, nếu không mọi request từ client production bị CORS chặn. Đây là bước hay bị quên nhất của Phase 4 — kiểm tra bằng một request thật từ URL Netlify tới `/api/v1/health`.
 
-### Step 4g: Landing Page from README (client repo)
+### Step 4g: Landing Page copy (client repo)
 
 ```
-/landing-page-generator "$PRODUCT_DIR/<slug>-client/README.md" --output "$PRODUCT_DIR/<slug>-client/landing"
+/landing-page-generator  (brief từ README client → copy PAS/AIDA/StoryBrand)
 ```
+
+Skill này sinh **nội dung** (headline, hero, CTA, proof points), không sinh HTML. Lưu vào `$PRODUCT_DIR/<slug>-client/landing/copy.md`; muốn có trang thật thì đưa copy đó cho `frontend-design`, hoặc để user tự dựng.
 
 ### Step 4h: Release (cả 2 repo)
 
