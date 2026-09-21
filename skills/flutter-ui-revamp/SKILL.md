@@ -1,6 +1,7 @@
 ---
 name: flutter-ui-revamp
 description: Revamp the UI of an existing Flutter app or game with free assets — audit the codebase, lock a design direction, download licence-verified icons/fonts/illustrations/animations/game packs, optimize them, then refactor the real screens so the app actually looks different, builds, and ships with a credits file and a before/after report. Use when the user wants to refresh, replace or upgrade a Flutter interface — swap an icon set, change the font app-wide, replace illustrations, add a Rive/Lottie loader, drop in a game UI pack, wire sound effects, or rebuild the colour theme — or says things like "make my app look better", "my app looks ugly, revamp it", "swap in a new icon set", "add a loading animation", "make the game UI look nicer". Don't use for building a Flutter app from scratch (flutter-init), store listing art (flutter-store-metadata), or non-Flutter codebases.
+capabilities: [ui-revamp]
 license: MIT
 metadata:
   version: 1.1.0
