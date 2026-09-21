@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.2.0 — 2026-09-21
+
+Every review point now has a checklist that fits it.
+
+### Added
+- `qa` checklist rebuilt from 7 bundled bullets into 26 single-answer lines in four groups (Correctness, Performance, Security & data, Fidelity & clean code) with Flutter-specific checks: `BuildContext` after `await`/`mounted`, unawaited futures, disposal/`autoDispose`, money-as-double, isolates for heavy work, `android:exported`, `usesCleartextTraffic`, `debuggable`, R8, `flutter pub outdated` advisories, deep-link input validation.
+- **Lens tags** on every panel-stage line — `[sec]`/`[cor]` (qa), `[feas]`/`[fit]` (architecture), `[use]`/`[cons]` (design) — so each panel member knows which lines it owns; `reviewer-prompt.md` lens table uses the same ids.
+- **Self-checklists** for review points that have no reviewer: *implementation — per task* (recorded in `artifacts/implementation/tasks-log.md`), *bugfix cycle* (top of `fix-NNN.md`), *release* (`notes.md` §2).
+- Gaps filled in existing lists — idea: success signal, data sensitivity, IP/content rights · planning: data model sketch, external dependencies + failure mode, risks, test strategy · design: responsive breakpoints, back behaviour, destructive-action confirm, semantics labels, asset licences · architecture: error/logging strategy, offline/sync + migrations, test seams, CI · test: no real network/clock, flaky patterns, coverage figure quoted.
+
+### Changed
+- `SKILL.md` stage notes for implementation, bugfix and release point at their self-checklists.
+
 ## v2.1.0 — 2026-09-21
 
 Reviewer hardening — every change targets a way the v2.0 review loop could fail to converge or be rubber-stamped.

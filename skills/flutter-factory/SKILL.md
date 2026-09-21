@@ -23,7 +23,7 @@ capabilities:
   - skill-discovery
   - flutter
 metadata:
-  version: 2.1.0
+  version: 2.2.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -171,9 +171,12 @@ block `com.example.*`. Also fix: state management, routing, persistence,
 minSdk/targetSdk, and the dependency table (package · why · what breaks
 without it).
 
-**implementation** — execute `tasks.json` in order. After each task:
-`verify-gate --no-test` must be `ok`, then `git commit` with the task id in
-the message, then `pipeline-state.sh set task.<id> done`. If
+**implementation** — execute `tasks.json` in order. After each task run
+the *implementation — per task (self)* checklist in `review-checklists.md`:
+`verify-gate --no-test` `ok`, `task.verify` green, diff inside `files`, no
+new dependency without a table row, then `git commit` with the task id in
+the message, `pipeline-state.sh set task.<id> done`, and one line in
+`artifacts/implementation/tasks-log.md`. If
 `parallel_implementation: true`, delegate tasks whose `files` sets are
 disjoint to parallel `subagent_general` agents — each receives
 constitution + architecture + decisions + its task only, commits on its
@@ -191,7 +194,9 @@ recorded blocker.
 the bugfix loop depends on that numbering.
 
 **release** — `verify-gate --build <release_build> --release` must be `ok`
-(it also blocks on `com.example`, leaked secrets and a red test suite).
+(it also blocks on `com.example`, leaked secrets and a red test suite),
+and the *release (self)* checklist is answered in `notes.md` §2 before
+tagging.
 Then bump version in `pubspec.yaml`, write `notes.md` from
 `references/report-template.md`, commit, tag `v<version>`. Push only if the
 user says so (`auto-push` / `release-manager` if present). "Next steps"
@@ -233,8 +238,8 @@ reviewers (`timeout`, `wait`). No file after the limit → re-run once →
 still nothing → fall back to `subagent` for the rest of the run and log it.
 
 **Panel review** — for stages in `panel_stages` (default `[qa]`), spawn
-one reviewer per lens in parallel (`qa`: `security` + `correctness`; see
-`reviewer-prompt.md` for the other stages), each writing
+one reviewer per lens in parallel (`qa`: `[sec]` + `[cor]`; checklist lines
+carry their lens tag; see `reviewer-prompt.md` for the other stages), each writing
 `<stage>-vN-<lens>.md`. Merge into `<stage>-vN.md`: strictest verdict,
 union of findings de-duplicated and re-numbered, a regression item is
 `resolved` only if every member agrees. Lens diversity is the cheap
@@ -249,7 +254,8 @@ Handling (of the validated, merged file):
   ESCALATE.
   Exception — at `qa`, REVISE starts a **bugfix cycle** (QA produces no
   code): write `bugfix/fix-NNN.md` mapping each `F-nn` → change, fix the
-  code, re-run the `test` gate (must be `ok`), then re-review QA. Each loop
+  code, re-run the `test` gate (must be `ok`), answer the *bugfix cycle
+  (self)* checklist at the top of the file, then re-review QA. Each loop
   `bump bugfix_cycles`; exceeding `max_bugfix_cycles` → ESCALATE.
 - **BLOCK** → `set status blocked`, write `artifacts/<stage>/BLOCKED.md`
   with the reviewer's reason, stop.
@@ -342,7 +348,7 @@ otherwise stop a run mid-stage.
 
 | File | Read when |
 |------|-----------|
-| `references/review-checklists.md` | Building any reviewer prompt — per-stage checklist + severity scale |
+| `references/review-checklists.md` | Every review point — reviewer checklists (idea…qa, lens-tagged), self-checklists (per task, bugfix, release), severity scale |
 | `references/reviewer-prompt.md` | Spawning a reviewer — prompt template, regression list, panel lenses, report format, timeout/fallback |
 | `references/tasks-schema.md` | Planning — `tasks.json` schema, parallel-safety rules, example |
 | `references/sibling-contracts.md` | Before invoking a sibling skill — inputs, outputs, traps |
