@@ -58,7 +58,10 @@ if [ -f "$MAN" ]; then
   {
     echo "# $MAN"; echo "## uses-permission"; grep -n 'uses-permission' "$MAN" || echo "(none)"
     echo "## android:exported"; grep -n 'android:exported' "$MAN" || echo "(none declared)"
-    echo "## components without explicit exported"; awk '/<(activity|service|receiver|provider)[ >]/{blk=$0; ln=NR; inb=1; next} inb{blk=blk" "$0} inb && />/{ if (blk !~ /android:exported/) print ln": "blk; inb=0}' "$MAN" || true
+    echo "## components without explicit exported"; awk '
+      /<(activity|activity-alias|service|receiver|provider)[ >\/]/ {blk=$0; ln=NR; inb=1}
+      inb && !/<(activity|activity-alias|service|receiver|provider)[ >\/]/ {blk=blk" "$0}
+      inb && />/ { if (blk !~ /android:exported/) print ln": "blk; inb=0 }' "$MAN" || echo "(none)"
     echo "## usesCleartextTraffic"; grep -n 'usesCleartextTraffic' "$MAN" || echo "(not set — default false on API 28+)"
     echo "## debuggable"; grep -n 'android:debuggable' "$MAN" || echo "(not set)"
     echo "## intent-filter data"; grep -n '<data ' "$MAN" || echo "(none)"

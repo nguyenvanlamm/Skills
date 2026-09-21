@@ -9,7 +9,8 @@
 # exit 2 = usage.
 #
 # Checks: verdict line present & valid · finding ids F-nn unique · severities valid ·
-# REVISE/BLOCK need ≥1 finding · APPROVE forbids critical/major · every `unresolved`
+# REVISE/BLOCK need ≥1 finding and ≥1 critical/major · APPROVE forbids critical/major ·
+# ESCALATE may carry any number of findings (incl. none) · every `unresolved`
 # regression row also appears in Findings · required headings present.
 set -uo pipefail
 
@@ -52,7 +53,9 @@ case "$VERDICT" in
   REVISE|BLOCK) [ $N_FIND -ge 1 ] || err "$VERDICT with zero findings";;
   APPROVE) [ $((N_CRIT+N_MAJ)) -eq 0 ] || err "APPROVE with $N_CRIT critical / $N_MAJ major findings — verdict must be REVISE or BLOCK";;
 esac
-[ "$VERDICT" != "APPROVE" ] && [ $N_FIND -gt 0 ] && [ $((N_CRIT+N_MAJ)) -eq 0 ] && err "$VERDICT with only minor findings — should be APPROVE (or explain in an ESCALATE)"
+case "$VERDICT" in REVISE|BLOCK)
+  [ $N_FIND -gt 0 ] && [ $((N_CRIT+N_MAJ)) -eq 0 ] && err "$VERDICT with only minor findings — should be APPROVE (or ESCALATE with the reason in Summary)";;
+esac
 
 # Regression table (optional): unresolved rows must reappear in Findings
 N_UNRES=0

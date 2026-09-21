@@ -23,7 +23,7 @@ capabilities:
   - skill-discovery
   - flutter
 metadata:
-  version: 2.3.0
+  version: 2.3.1
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -193,8 +193,10 @@ recorded blocker.
 orchestrator builds an **evidence pack** first: `bash scripts/evidence-pack.sh
 --project <dir> --stage qa` (analyze, pub outdated, deps, secrets, manifest,
 gradle, risky Dart patterns → `artifacts/qa/evidence/`), then, if installed,
-`code-review mode:review` → `evidence/code-review-report.md` and, when
-`store_bound`, `flutter-store-compliance` → `evidence/compliance-report.json`.
+`code-review mode:review` (writes `<project>/CODE_REVIEW.md` — **move** it to
+`evidence/code-review-report.md`) and, when `store_bound`,
+`flutter-store-compliance` (copy `store-metadata/compliance-report.json` →
+`evidence/compliance-report.json`).
 The reviewer gets the evidence dir plus the skills' methodology files
 (`code-review/references/review-mode.md`, `code-smells.md`) and reads the
 code, `artifacts/test/report.md` and `verify.json`. Skill reports are inputs

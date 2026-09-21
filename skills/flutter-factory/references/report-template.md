@@ -9,7 +9,7 @@ blocker.
 ```markdown
 # <App name> v<version> — release report
 
-Run: <started_at> → <finished_at> · pipeline flutter-factory v2.0.0
+Run: <started_at> → <finished_at> · pipeline flutter-factory v<metadata.version from SKILL.md>
 Project: `<project_dir>` · applicationId `<org>.<slug>` · tag `v<version>`
 
 ## 1. What was built

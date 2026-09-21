@@ -34,9 +34,10 @@ so it cannot run `code-review`, `flutter-store-compliance` or
 1. **Evidence pack (facts).** Before the review the orchestrator runs
    `scripts/evidence-pack.sh --project <dir> --stage qa` (analyze, pub
    outdated, deps, secrets, manifest, gradle, risky Dart patterns) and, when
-   the skills are installed, `code-review mode:review` →
-   `evidence/code-review-report.md`, `flutter-store-compliance` →
-   `evidence/compliance-report.json` (only `store_bound`), and for `design`
+   the skills are installed, `code-review mode:review` (its
+   `<project>/CODE_REVIEW.md` moved to `evidence/code-review-report.md`),
+   `flutter-store-compliance` (its `store-metadata/compliance-report.json`
+   copied to `evidence/compliance-report.json`, only `store_bound`), and for `design`
    `dont-make-me-think` on `ux.md`/`ui.md` → `evidence/dmmt-report.md`.
    Everything lands in `artifacts/<stage>/evidence/`; `index.json` lists what
    exists. Missing skill → no file, and the reviewer is told so.

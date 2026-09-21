@@ -8,8 +8,8 @@ contract looks stale.
 ## The shared trap: "Repo Sync Before Edits"
 
 `idea-validator`, `prd-generator`, `tad-generator`, `tasks-generator`,
-`test-coverage`, `release-manager`, `code-review` (cleanup/clean modes) and
-`dont-make-me-think` (redesign mode) all run a mandatory
+`test-coverage`, `release-manager` and `code-review` (cleanup/clean modes)
+all run a mandatory
 `git fetch origin && git pull --rebase origin <branch>` and **stop to ask
 the user if `origin` is missing**. Most pipeline runs start in a local repo
 with no remote. Always add to their prompt:
@@ -19,7 +19,8 @@ with no remote. Always add to their prompt:
 
 Several of them also `git push origin <branch>` at the end. Same line covers
 it. If the repo *does* have a remote and the user has not asked to push,
-say so explicitly ("do not push").
+say so explicitly ("do not push"). The read-only modes used for evidence
+(`code-review mode:review`, `dont-make-me-think` steps 1–4) do not sync.
 
 ## Planning family
 
@@ -45,8 +46,8 @@ say so explicitly ("do not push").
 | `flutter-init` | `project_name` (snake_case), **`org` (required, no default)**, `platforms` = `android` \| `ios` \| both | project dir, clean-arch folders, git init, pinned SDK levels | Web is **not** in its contract — run `flutter create --platforms web .` afterwards if `release_build: web`. Placeholder org → downstream skills block. It may install Flutter/Android SDK — that is allowed here (task T01). |
 | `firebase-auth-setup` | Firebase project name, platforms | Firebase project, web config, service-account key | Needs network + gcloud/firebase CLI auth; only when `DECISION-*` says Firebase Auth. Google sign-in needs an extra OAuth client. Never commit `google-services.json` — `.gitignore` it. |
 | `test-coverage` | runnable project + coverage command (`flutter test --coverage`) | added tests on a `feat/test-coverage` branch | It creates a **branch**; merge it back to the working branch before the `test` gate. Write structure-defining tests yourself first — it fills gaps. Repo Sync trap applies. |
-| `code-review` | project path, `mode:review` (default) | findings report, **no code changes** | **Evidence for the QA review**: orchestrator runs `mode:review` → `artifacts/qa/evidence/code-review-report.md`; the reviewer confirms each hit at `file:line` before it becomes an `F-nn`. Pass `references/review-mode.md` + `code-smells.md` as methodology. `mode:cleanup` writes code — only during a bugfix cycle, and only when a QA finding asks for it. |
-| `flutter-store-compliance` | project dir (+ optional `features`, `target_audience`) | `compliance-report.json` + markdown | Only when `store_bound: true`. Orchestrator runs it before the QA review and copies the JSON to `artifacts/qa/evidence/compliance-report.json`; the reviewer treats its BLOCK rows as `critical` findings after confirming them. |
+| `code-review` | project path, `mode:review` (default) | `CODE_REVIEW.md` **in the project root**, no code changes | **Evidence for the QA review**: orchestrator runs `mode:review`, then `mv <project>/CODE_REVIEW.md .pipeline/artifacts/qa/evidence/code-review-report.md` — leaving it in the project pollutes the next bugfix diff and `git status`. The reviewer confirms each hit at `file:line` before it becomes an `F-nn`. Pass `references/review-mode.md` + `code-smells.md` as methodology. `mode:cleanup` writes code — only during a bugfix cycle, and only when a QA finding asks for it. |
+| `flutter-store-compliance` | project dir (+ optional `features`, `target_audience`) | `<project>/store-metadata/compliance-report.{json,md}` | Only when `store_bound: true`. Orchestrator runs it before the QA review and copies `store-metadata/compliance-report.json` to `artifacts/qa/evidence/compliance-report.json` (the `store-metadata/` folder may stay — `flutter-publish` gates on it later); the reviewer treats its BLOCK rows as `critical` findings after confirming them. |
 | `release-manager` | clean tree, version scheme, remote | version bump, changelog, tag, GitHub release, publish | Heavy for a first release; without a remote just do bump + tag yourself. Repo Sync trap applies. |
 | `auto-push` | committed changes, remote | pushed branch | Only if the user asked to push. |
 

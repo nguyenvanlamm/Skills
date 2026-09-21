@@ -36,8 +36,8 @@ case "$BUILD" in ""|none|apk|appbundle|web) ;; *) echo "--build must be apk|appb
 
 OUT="$ROOT/.pipeline/artifacts/$STAGE"; LOGS="$OUT/logs"; mkdir -p "$LOGS"
 REPORT="$OUT/verify.json"
-SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
-for cand in "$SDK" "$HOME/Android/Sdk" "$HOME/Library/Android/sdk"; do
+SDK=""
+for cand in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$HOME/Android/Sdk" "$HOME/Library/Android/sdk"; do
   [ -n "$cand" ] && [ -d "$cand/platforms" ] && { SDK="$cand"; break; }
 done
 

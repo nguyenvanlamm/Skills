@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.3.1 — 2026-09-21
+
+Script fixes found by exercising the v2.3 scripts against edge cases, plus contract drift against the installed sibling skills.
+
+### Fixed
+- `scripts/review-verdict.sh` rejected a valid `ESCALATE` that carried only minor (or zero) findings — the exact shape the Scope rule asks for when an upstream artifact is defective. The "only minor findings" check now applies to `REVISE`/`BLOCK` only; the orchestrator no longer burns its two re-runs and self-escalates for a format reason.
+- `scripts/evidence-pack.sh` — the "components without explicit `exported`" awk skipped every self-closing single-line component (`<activity … />`) and merged its block into the next tag, so the `[sec] [E]` manifest line could pass on a component that had no `android:exported`. Rewritten to evaluate the opening tag on the same line; `activity-alias` added; prints `(none)` instead of nothing.
+- `scripts/verify-gate.sh` — a stale `ANDROID_HOME`/`ANDROID_SDK_ROOT` (set but without `platforms/`) survived the candidate loop, so `--build apk` ran and reported `fail` instead of `skipped_env`. SDK is now empty unless a candidate actually exists.
+
+### Changed
+- `sibling-contracts.md`, `SKILL.md`, `reviewer-prompt.md`: `code-review mode:review` writes `<project>/CODE_REVIEW.md` — the orchestrator must **move** it into `evidence/`, otherwise it lands in the next bugfix diff. `flutter-store-compliance` output path named (`store-metadata/compliance-report.json`). `dont-make-me-think` removed from the Repo Sync trap list — only its Redesign mode syncs, and the pipeline never uses that mode.
+- `report-template.md` no longer hardcodes `v2.0.0` in the run header.
+
 ## v2.3.0 — 2026-09-21
 
 Review skills now actually take part in reviews. Until now `code-review`, `dont-make-me-think` and `flutter-store-compliance` were listed as "preferred skills" for the qa/design stages, but the reviewer runs as `subagent_explore` (no `skill` tool, no shell) and nobody was told to run them — so they never ran.
