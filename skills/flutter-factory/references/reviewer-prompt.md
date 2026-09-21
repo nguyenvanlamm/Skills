@@ -18,10 +18,39 @@ each). For `opencode` / `herdr`: same text as the prompt.
 | Approved upstream artifacts (as **context**) | Earlier reviews' Summary / Nits / checklist results |
 | **Previous revision's Findings table** (v ≥ 2, as a regression list) | Earlier reviews' reasoning, bugfix notes |
 | `verify.json` of the latest gate (test/qa) | Anything under `.pipeline/bugfix/` |
+| **Evidence pack** `artifacts/<stage>/evidence/` — tool output + reports from sibling skills the orchestrator ran | The orchestrator's interpretation of that evidence |
+| **Methodology files** of review skills (paths to `code-review/references/*.md`, `krug-principles.md`) | The skill tool itself — the reviewer is read-only and cannot invoke skills |
 
 Independence means *no shared reasoning*, not *no shared facts*. The
 previous Findings table is a fact about the artifact's history; passing it
 in is what makes revisions converge instead of drifting.
+
+## How review skills take part
+
+The reviewer profile (`subagent_explore`) has no `skill` tool and no shell,
+so it cannot run `code-review`, `flutter-store-compliance` or
+`dont-make-me-think` itself. They still contribute, in two read-only ways:
+
+1. **Evidence pack (facts).** Before the review the orchestrator runs
+   `scripts/evidence-pack.sh --project <dir> --stage qa` (analyze, pub
+   outdated, deps, secrets, manifest, gradle, risky Dart patterns) and, when
+   the skills are installed, `code-review mode:review` →
+   `evidence/code-review-report.md`, `flutter-store-compliance` →
+   `evidence/compliance-report.json` (only `store_bound`), and for `design`
+   `dont-make-me-think` on `ux.md`/`ui.md` → `evidence/dmmt-report.md`.
+   Everything lands in `artifacts/<stage>/evidence/`; `index.json` lists what
+   exists. Missing skill → no file, and the reviewer is told so.
+2. **Methodology (method).** The orchestrator resolves the installed skill
+   directories once (`skill search`) and passes the absolute paths of their
+   reference files — `code-review/references/review-mode.md`,
+   `code-review/references/code-smells.md`,
+   `dont-make-me-think/references/krug-principles.md` — for the reviewer to
+   read and apply as an extension of the checklist.
+
+The checklist remains the **verdict contract**: skill reports are inputs to
+its `[E]` lines (`→ file` hints in `review-checklists.md`), never a verdict
+to copy. A finding from `code-review-report.md` becomes an `F-nn` only after
+the reviewer has opened the `file:line` and confirmed it.
 
 ---
 
@@ -51,12 +80,27 @@ wrong, in which case report it anyway.
 - Project source: {{project_dir}}  (stage qa only — read lib/, test/, pubspec.yaml, android/app/build.gradle*)
 - Latest verify report: {{verify_json_path}}  — the ONLY acceptable evidence that analyze/test/build passed
 {{/if}}
+{{#if evidence_dir}}
+- Evidence pack: {{evidence_dir}}  (read index.json first; every file is tool output or a
+  sibling-skill report — facts to cite for [E] lines, not conclusions to copy)
+{{#each missing_evidence}}
+  - not available: {{this}} — answer the related lines by reading the source, and say so
+{{/each}}
+{{/if}}
+{{#if methodology_paths}}
+- Methodology to apply in addition to the checklist (read fully):
+{{#each methodology_paths}}
+  - {{this}}
+{{/each}}
+{{/if}}
 {{#if previous_findings}}
 - Previous findings (regression list, from v{{n_minus_1}}):
 {{previous_findings_table}}
 {{/if}}
 
 Do NOT read anything else under .pipeline/reviews/ or .pipeline/bugfix/.
+You cannot run commands or skills; if a check needs one, cite the evidence
+file that already contains its output or mark the line `fail — no evidence`.
 
 ## Scope
 Only the artifacts under review are the subject. Approved upstream
@@ -70,8 +114,11 @@ changes to upstream artifacts in Findings.
 
 ## Evidence
 Lines marked **[E]** in the checklist may only be `pass` with evidence:
-quote the file:line, the command output, or the verify.json step that
-proves it. A `pass` on an [E] line without evidence is `fail`.
+quote the file:line, the evidence-pack file and section, or the verify.json
+step that proves it. A `pass` on an [E] line without evidence is `fail`.
+A hit listed in the evidence pack is a *candidate*: open the source, confirm
+it, then report it with the real file:line. A skill report's own severity or
+verdict is not binding — apply this checklist's severity scale.
 
 ## Severity
 critical = violates constitution/decision, security hole, or makes the stage
@@ -155,6 +202,12 @@ audit.
 
 ## Orchestrator-side handling
 
+0. **Build the evidence pack** (stages `qa`, and `design` when
+   `dont-make-me-think` is installed): run `scripts/evidence-pack.sh`, then
+   the installed review skills with output redirected into
+   `artifacts/<stage>/evidence/`; resolve methodology paths with `skill
+   search`. Record missing skills in `fallbacks.*` and pass them as
+   `missing_evidence`. Never summarise the evidence for the reviewer.
 1. **Wait with a timeout.** `review_timeout_min` (default 15). `subagent`
    foreground: the tool blocks — no timer needed. `opencode`: wrap in
    `timeout <min>m`. `herdr`: `wait` with the same limit. Timed out or

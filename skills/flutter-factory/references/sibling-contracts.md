@@ -34,7 +34,7 @@ say so explicitly ("do not push").
 
 | Skill | Needs | Leaves | Notes |
 |-------|-------|--------|-------|
-| `dont-make-me-think` | screenshot / URL / HTML / **verbal description** | usability report | Use in **review** of the design stage, not generation: give the reviewer its principles or run it on `ux.md`. Redesign mode writes code — do not enable it here. |
+| `dont-make-me-think` | screenshot / URL / HTML / **verbal description** | usability report | **Evidence for the design review**: orchestrator runs it on `ux.md` + `ui.md` (description input, nothing to install) → `artifacts/design/evidence/dmmt-report.md`; pass `references/krug-principles.md` to the reviewer as methodology. Redesign mode writes code — never enable it here. |
 | `frontend-design` | a brief (product, audience, tone) | design direction + code | Web-oriented; keep the *direction* (tokens, type, colour), encode it into `design-system.md`, and implement in Flutter yourself. |
 | `logo-designer` | project context | 7 SVG variants + showcase | Optional; convert the chosen SVG to launcher icons in implementation. |
 
@@ -45,8 +45,8 @@ say so explicitly ("do not push").
 | `flutter-init` | `project_name` (snake_case), **`org` (required, no default)**, `platforms` = `android` \| `ios` \| both | project dir, clean-arch folders, git init, pinned SDK levels | Web is **not** in its contract — run `flutter create --platforms web .` afterwards if `release_build: web`. Placeholder org → downstream skills block. It may install Flutter/Android SDK — that is allowed here (task T01). |
 | `firebase-auth-setup` | Firebase project name, platforms | Firebase project, web config, service-account key | Needs network + gcloud/firebase CLI auth; only when `DECISION-*` says Firebase Auth. Google sign-in needs an extra OAuth client. Never commit `google-services.json` — `.gitignore` it. |
 | `test-coverage` | runnable project + coverage command (`flutter test --coverage`) | added tests on a `feat/test-coverage` branch | It creates a **branch**; merge it back to the working branch before the `test` gate. Write structure-defining tests yourself first — it fills gaps. Repo Sync trap applies. |
-| `code-review` | project path, `mode:review` (default) | findings report, **no code changes** | Use `mode:review` for QA. `mode:cleanup` writes code — only during a bugfix cycle, and only when a QA finding asks for it. |
-| `flutter-store-compliance` | project dir (+ optional `features`, `target_audience`) | `compliance-report.json` + markdown | Only when `store_bound: true`. Treat its BLOCK rows as `critical` QA findings. |
+| `code-review` | project path, `mode:review` (default) | findings report, **no code changes** | **Evidence for the QA review**: orchestrator runs `mode:review` → `artifacts/qa/evidence/code-review-report.md`; the reviewer confirms each hit at `file:line` before it becomes an `F-nn`. Pass `references/review-mode.md` + `code-smells.md` as methodology. `mode:cleanup` writes code — only during a bugfix cycle, and only when a QA finding asks for it. |
+| `flutter-store-compliance` | project dir (+ optional `features`, `target_audience`) | `compliance-report.json` + markdown | Only when `store_bound: true`. Orchestrator runs it before the QA review and copies the JSON to `artifacts/qa/evidence/compliance-report.json`; the reviewer treats its BLOCK rows as `critical` findings after confirming them. |
 | `release-manager` | clean tree, version scheme, remote | version bump, changelog, tag, GitHub release, publish | Heavy for a first release; without a remote just do bump + tag yourself. Repo Sync trap applies. |
 | `auto-push` | committed changes, remote | pushed branch | Only if the user asked to push. |
 

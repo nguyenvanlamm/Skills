@@ -23,7 +23,7 @@ capabilities:
   - skill-discovery
   - flutter
 metadata:
-  version: 2.2.0
+  version: 2.3.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -143,11 +143,11 @@ advance**.
 | 0 | `env` | `artifacts/env/env.md` | `flutter doctor -v` | — | — |
 | 1 | `idea` | `artifacts/idea/idea.md` (+ `validate.md`) | — | scope clarity, feasibility, market fit, MVP ≤ 6 features | `idea-validator` |
 | 2 | `planning` | `artifacts/planning/prd.md`, `tasks.json` | — | PRD covers the idea; tasks ordered, measurable, each with `verify` | `prd-generator`, `tasks-generator` |
-| 3 | `design` | `artifacts/design/{ux,ui,design-system,states}.md` | — | usability, consistency, tokens, loading/error/empty per screen, a11y | `dont-make-me-think`, `frontend-design`, `logo-designer` |
+| 3 | `design` | `artifacts/design/{ux,ui,design-system,states}.md` | — | usability, consistency, tokens, loading/error/empty per screen, a11y | generate: `frontend-design`, `logo-designer` · evidence for review: `dont-make-me-think` |
 | 4 | `architecture` | `artifacts/architecture/{architecture,folder-structure,coding-rules}.md`, `DECISION-001.md` (org, stack) | — | decisions vs PRD/constitution, dependency table, feasibility | `tad-generator` |
 | 5 | `implementation` | Flutter project at `project_dir` | `verify-gate --no-test` after **every** task | — (reviewed by QA) | `flutter-init` (task 1), `firebase-auth-setup`, `frontend-design`, matched per task |
 | 6 | `test` | `test/`, `artifacts/test/report.md` | `verify-gate` (analyze + test) | tests green, edge cases, primary flow covered | `test-coverage` |
-| 7 | `qa` | `reviews/qa-vN.md` | — | bugs, security, performance, clean code, secrets scan | `code-review`; + `flutter-store-compliance` when `store_bound` |
+| 7 | `qa` | `artifacts/qa/evidence/`, `reviews/qa-vN.md` | `evidence-pack.sh` | bugs, security, performance, clean code, secrets scan | evidence for review: `code-review` (`mode:review`), + `flutter-store-compliance` when `store_bound` |
 | 8 | `release` | tag, `artifacts/release/notes.md`, `verify.json` | `verify-gate --build <release_build> --release` | — | `release-manager`, `auto-push` |
 
 ### Stage notes
@@ -189,9 +189,19 @@ integration: the primary flow), then invoke `test-coverage` to fill gaps.
 Red → fix the cause, not the assertion; 3 rounds per failing test, then a
 recorded blocker.
 
-**qa** — the QA reviewer reads the code, `artifacts/test/report.md` and the
-`verify.json`. Findings are numbered (`F-01`, `F-02`, …) with severity —
-the bugfix loop depends on that numbering.
+**qa** — reviewers are read-only and cannot invoke skills, so the
+orchestrator builds an **evidence pack** first: `bash scripts/evidence-pack.sh
+--project <dir> --stage qa` (analyze, pub outdated, deps, secrets, manifest,
+gradle, risky Dart patterns → `artifacts/qa/evidence/`), then, if installed,
+`code-review mode:review` → `evidence/code-review-report.md` and, when
+`store_bound`, `flutter-store-compliance` → `evidence/compliance-report.json`.
+The reviewer gets the evidence dir plus the skills' methodology files
+(`code-review/references/review-mode.md`, `code-smells.md`) and reads the
+code, `artifacts/test/report.md` and `verify.json`. Skill reports are inputs
+to `[E]` checklist lines, never verdicts to copy. Findings are numbered
+(`F-01`, `F-02`, …) with severity — the bugfix loop depends on that numbering.
+Same pattern for `design`: run `dont-make-me-think` on `ux.md`/`ui.md` →
+`evidence/dmmt-report.md`, pass `krug-principles.md` as methodology.
 
 **release** — `verify-gate --build <release_build> --release` must be `ok`
 (it also blocks on `com.example`, leaked secrets and a red test suite),
@@ -210,6 +220,9 @@ Each review is run by an independent reviewer built from
 `references/review-checklists.md`. The reviewer receives only:
 
 - the stage artifact paths (and, for `qa`, the project dir + latest `verify.json`)
+- `artifacts/<stage>/evidence/` — tool output and sibling-skill reports the
+  orchestrator produced (facts), plus paths to the review skills'
+  methodology files; the reviewer itself cannot run skills or commands
 - `constitution.md` + `decisions/*.md`
 - approved upstream artifacts as **context, not subject** — a defect there
   → ESCALATE, never a REVISE of this stage
@@ -358,6 +371,7 @@ otherwise stop a run mid-stage.
 |--------|--------|
 | `scripts/pipeline-state.sh` | Every transition — `init · status · get · set · bump · log` |
 | `scripts/verify-gate.sh` | implementation (per task, `--no-test`), test, release (`--build … --release`) — writes `verify.json`, exit 1 on any `fail` |
+| `scripts/evidence-pack.sh` | Before the `qa` review — analyze, pub outdated, deps, secrets, manifest, gradle, risky-pattern greps → `artifacts/qa/evidence/` + `index.json`; never modifies the project |
 | `scripts/review-verdict.sh` | After every review — validates the report file, prints verdict + severity counts, exit 1 = malformed (re-run reviewer) |
 
 ## Scope

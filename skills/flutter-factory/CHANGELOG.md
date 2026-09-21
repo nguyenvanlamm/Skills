@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.3.0 — 2026-09-21
+
+Review skills now actually take part in reviews. Until now `code-review`, `dont-make-me-think` and `flutter-store-compliance` were listed as "preferred skills" for the qa/design stages, but the reviewer runs as `subagent_explore` (no `skill` tool, no shell) and nobody was told to run them — so they never ran.
+
+### Added
+- `scripts/evidence-pack.sh` — side-effect-free fact collection for the QA reviewer: `analyze.txt`, `outdated.json`, `deps.txt`, `secrets.txt`, `manifest.txt` (permissions, `exported`, cleartext, debuggable, deep-link data), `gradle.txt` (ids, SDK levels, minify), `patterns.txt` (context-after-await, bare `!`, print, `http://`, bare `CircularProgressIndicator` in features, `// ignore:`, `badCertificateCallback`, SharedPreferences+token, double-for-money, unawaited-looking calls) and `index.json`. Never modifies the project.
+- **Evidence pack contract**: the orchestrator runs the script plus the installed review skills (`code-review mode:review` → `code-review-report.md`; `flutter-store-compliance` → `compliance-report.json` when `store_bound`; `dont-make-me-think` on `ux.md`/`ui.md` → `dmmt-report.md`) into `artifacts/<stage>/evidence/` **before** spawning the reviewer.
+- **Methodology hand-off**: reviewer prompt receives absolute paths to `code-review/references/review-mode.md`, `code-smells.md`, `dont-make-me-think/references/krug-principles.md` to read and apply as an extension of the checklist.
+- `→ file` hints on every `[E]` qa line in `review-checklists.md` pointing at the evidence file/section that normally proves it.
+
+### Changed
+- Reviewer stays read-only. Rule made explicit: checklist = verdict contract; skill reports = inputs; a skill's finding becomes an `F-nn` only after the reviewer confirms the `file:line`; a skill's own severity/verdict is not binding.
+- `sibling-contracts.md` rows for the three review skills describe the evidence flow; pipeline table separates "generate" skills from "evidence for review" skills.
+
 ## v2.2.0 — 2026-09-21
 
 Every review point now has a checklist that fits it.

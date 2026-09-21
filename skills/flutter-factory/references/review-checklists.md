@@ -12,6 +12,7 @@ finding.
 | **[E]** | Evidence-required: a `pass` must quote the file:line, command output or `verify.json` step that proves it — otherwise the line counts as `fail`. These are the lines a reviewer is most likely to tick by habit. |
 | **[lens]** | Panel ownership (`panel_stages`). A panel member answers its own lens lines in full; lines of another lens may be `n.a.` unless something is obviously wrong. Untagged lines belong to every member. Lenses: `sec` `cor` (qa) · `feas` `fit` (architecture) · `use` `cons` (design). |
 | **(self)** | Self-checklist: no reviewer — the orchestrator answers it and records the result in the stage artifact. |
+| `→ file` | Where the evidence for an **[E]** line normally lives in `artifacts/<stage>/evidence/` (built by `scripts/evidence-pack.sh` and by sibling skills the orchestrator ran). The reviewer cites it, then confirms the `file:line` in the source itself — evidence files are inputs, never verdicts. Missing file → answer the line by reading the code, and say so. |
 
 Scope: approved upstream artifacts are context, not subject. A defect found
 there → ESCALATE naming the upstream artifact, never a REVISE of this stage.
@@ -64,6 +65,9 @@ without the user (conflicting constitution vs PRD, missing business input).
 ## design
 
 Lenses: `use` = usability & flows · `cons` = consistency, tokens, a11y.
+Methodology (read if present, apply as an extension of the `[use]` lines):
+`dont-make-me-think/references/krug-principles.md`; evidence, if the
+orchestrator ran the skill on `ux.md`/`ui.md`: `evidence/dmmt-report.md`.
 
 - [ ] **[use]** `ux.md`: one flow per MVP feature from app open to visible result; every flow ends in a success state.
 - [ ] **[use]** `states.md`: every list/detail/form screen has **loading, error, empty** defined (text + action).
@@ -113,16 +117,23 @@ Lenses: `feas` = buildability & dependencies · `fit` = constitution/PRD fit & s
 
 ## qa
 
-Read the project source, `artifacts/test/report.md`, `artifacts/test/verify.json`.
+Read the project source, `artifacts/test/report.md`, `artifacts/test/verify.json`,
+and everything in `artifacts/qa/evidence/` (`index.json` lists what was produced).
 Lenses: `sec` = security & data · `cor` = correctness, performance, fidelity.
 
+Methodology (read if present): `code-review/references/review-mode.md`,
+`code-review/references/code-smells.md`. Evidence from skills the
+orchestrator ran: `evidence/code-review-report.md` (findings to confirm,
+not to copy), `evidence/compliance-report.json` (`flutter-store-compliance`,
+only when `store_bound`).
+
 ### Correctness `[cor]`
-- [ ] **[cor] [E]** No `BuildContext` used after an `await` without a `mounted` check; no `setState` after dispose.
-- [ ] **[cor] [E]** No unawaited futures (`unawaited()` or awaited); no `!` null-assert without a preceding guard.
+- [ ] **[cor] [E]** No `BuildContext` used after an `await` without a `mounted` check; no `setState` after dispose. `→ patterns.txt` §context-after-await, `code-review-report.md`
+- [ ] **[cor] [E]** No unawaited futures (`unawaited()` or awaited); no `!` null-assert without a preceding guard. `→ patterns.txt` §null-assert, §unawaited; `analyze.txt` (`unawaited_futures` lint)
 - [ ] **[cor]** Providers/controllers/streams/`TextEditingController`s are disposed; `autoDispose` where appropriate.
 - [ ] **[cor]** List index math, empty-list paths and pagination boundaries handled.
-- [ ] **[cor]** Dates use explicit time zones/locale; money is not a `double`.
-- [ ] **[cor] [E]** Every list/detail/form screen renders loading, error, empty via the shared components (grep for bare `CircularProgressIndicator` in `features/`).
+- [ ] **[cor]** Dates use explicit time zones/locale; money is not a `double`. `→ patterns.txt` §double-for-money
+- [ ] **[cor] [E]** Every list/detail/form screen renders loading, error, empty via the shared components. `→ patterns.txt` §CircularProgressIndicator
 - [ ] **[cor]** Forms validate at the form **and** the repository; error messages are user-language, not exceptions.
 
 ### Performance `[cor]`
@@ -131,21 +142,21 @@ Lenses: `sec` = security & data · `cor` = correctness, performance, fidelity.
 - [ ] **[cor]** Providers are scoped so a keystroke does not rebuild the whole screen.
 
 ### Security & data `[sec]`
-- [ ] **[sec] [E]** Secrets grep clean (`verify.json` step `secrets` or equivalent grep quoted).
-- [ ] **[sec] [E]** Tokens/credentials only in `flutter_secure_storage`; nothing sensitive in `shared_preferences` or logs.
-- [ ] **[sec]** No `http://` outside debug; certificates not disabled (`badCertificateCallback`).
-- [ ] **[sec]** No `print`/`debugPrint`/`log` of user data or tokens in release paths.
-- [ ] **[sec] [E]** `AndroidManifest.xml`: every permission traces to an MVP feature; `android:exported` set explicitly on every component; `usesCleartextTraffic` not `true`; no `android:debuggable`.
-- [ ] **[sec]** Release build has R8/minify enabled or a `DECISION-*` says why not.
-- [ ] **[sec] [E]** `flutter pub outdated` shows no dependency with a known advisory; discontinued packages flagged.
-- [ ] **[sec]** Deep links / intent filters validate their input.
+- [ ] **[sec] [E]** Secrets grep clean. `→ secrets.txt` (must be empty), `verify.json` step `secrets`
+- [ ] **[sec] [E]** Tokens/credentials only in `flutter_secure_storage`; nothing sensitive in `shared_preferences` or logs. `→ patterns.txt` §SharedPreferences, §print; `deps.txt` (is `flutter_secure_storage` even present?)
+- [ ] **[sec]** No `http://` outside debug; certificates not disabled (`badCertificateCallback`). `→ patterns.txt` §http, §badCertificateCallback
+- [ ] **[sec]** No `print`/`debugPrint`/`log` of user data or tokens in release paths. `→ patterns.txt` §print
+- [ ] **[sec] [E]** `AndroidManifest.xml`: every permission traces to an MVP feature; `android:exported` set explicitly on every component; `usesCleartextTraffic` not `true`; no `android:debuggable`. `→ manifest.txt`, `compliance-report.json`
+- [ ] **[sec]** Release build has R8/minify enabled or a `DECISION-*` says why not. `→ gradle.txt`
+- [ ] **[sec] [E]** `flutter pub outdated` shows no dependency with a known advisory; discontinued packages flagged. `→ outdated.json`
+- [ ] **[sec]** Deep links / intent filters validate their input. `→ manifest.txt` §intent-filter data
 - [ ] **[sec]** Store policy (only when `store_bound: true`) — `flutter-store-compliance` output referenced; its BLOCK rows are `critical` here.
 
 ### Fidelity & clean code
 - [ ] **[E]** Architecture fidelity: folder layout and packages match `architecture.md`; every deviation has a `DECISION-*`.
 - [ ] Design fidelity: screens use tokens from `design-system.md`, not raw values.
-- [ ] **[E]** `flutter analyze` clean incl. infos (`verify.json` step `analyze`); no `// ignore:` without a reason comment.
-- [ ] No dead files, unused dependencies (`flutter pub deps --style=compact` vs imports), or duplicated business logic across features.
+- [ ] **[E]** `flutter analyze` clean incl. infos; no `// ignore:` without a reason comment. `→ analyze.txt`, `patterns.txt` §ignore, `verify.json` step `analyze`
+- [ ] No dead files, unused dependencies, or duplicated business logic across features. `→ deps.txt` vs imports; `code-review-report.md`; `code-smells.md` as method
 - [ ] No feature imports another feature's `presentation/`; platform imports confined to `core/platform/`.
 - [ ] `README` says how to run, test and build with the required `--dart-define`s.
 
