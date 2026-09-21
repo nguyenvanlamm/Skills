@@ -1,0 +1,84 @@
+# `tasks.json` schema
+
+Produced at `planning`, consumed at `implementation`. `tasks-generator`
+(if present) produces sprint markdown — convert its output into this JSON;
+the pipeline never executes from prose.
+
+```jsonc
+{
+  "version": 1,
+  "project_dir": "./spendly",              // relative to repo root; created by task T01
+  "tasks": [
+    {
+      "id": "T01",                          // unique, sortable
+      "title": "Scaffold Flutter project",
+      "feature": "infra",                   // MVP feature name from idea.md, or "infra"
+      "depends_on": [],                     // ids; graph must be acyclic
+      "files": ["pubspec.yaml", "lib/main.dart", "android/**", "ios/**"],
+      "skill": "flutter-init",              // preferred sibling skill or null
+      "steps": [
+        "flutter-init with project_name=spendly org=<DECISION-001> platforms=android,ios",
+        "pin compileSdk/targetSdk per architecture.md"
+      ],
+      "verify": "flutter analyze",          // shell command, exit 0 = done
+      "parallel_safe": false,
+      "status": "pending"                   // pending | in_progress | done | blocked
+    },
+    {
+      "id": "T04",
+      "title": "Expense model + repository",
+      "feature": "Add expense",
+      "depends_on": ["T01"],
+      "files": ["lib/features/expense/data/**", "test/features/expense/data/**"],
+      "skill": null,
+      "steps": ["Expense model (freezed only if JSON)", "ExpenseRepository interface + drift impl", "unit tests"],
+      "verify": "flutter test test/features/expense/data",
+      "parallel_safe": true,
+      "status": "pending"
+    }
+  ]
+}
+```
+
+## Rules
+
+1. **T01 is always the scaffold.** Nothing else may run first; its `verify`
+   is `flutter analyze`.
+2. **Every task has `verify`.** The reviewer rejects a plan with a task that
+   cannot prove itself. Prefer scoped commands (`flutter test <dir>`) so
+   failures point at the task.
+3. **`files` is the contract for parallelism.** Two tasks may run in
+   parallel only if both are `parallel_safe: true`, their `files` globs do not
+   overlap, and neither depends on the other transitively. Shared files
+   (`pubspec.yaml`, `router.dart`, `main.dart`) belong to serial tasks.
+4. **Order = data flow.** models → repositories → state/providers → screens
+   → platform adaptation → polish. A screen task depends on its repository
+   task.
+5. **Size.** ≤ ~1 day of work, ≤ ~10 files. Split anything bigger.
+6. **Feature traceability.** Every MVP feature in `idea.md` appears in ≥ 1
+   task's `feature`; a task whose feature is not in the PRD is a planning
+   finding.
+7. **Status is mirrored to state.** On completion the orchestrator sets
+   `status: done` here **and** `pipeline-state.sh set task.<id> done`, and
+   commits with message `feat(<feature>): <title> [<id>]`.
+
+## Orchestrator loop
+
+```
+for task in topological order:
+    discover skill (task.skill by name → capability search → inline)
+    implement steps
+    bash verify-gate.sh --project <project_dir> --no-test --stage implementation
+    run task.verify
+    both ok → commit → mark done
+    fail     → fix (max 3 rounds) → still failing → status: blocked, continue
+               with tasks that do not depend on it, then ESCALATE at stage end
+```
+
+With `parallel_implementation: true`, take the largest set of ready,
+`parallel_safe`, pairwise-disjoint tasks; give each to a `subagent_general`
+with constitution + architecture + decisions + **its task object only**;
+each works on branch `task/<id>` and commits there. Orchestrator merges in
+id order, running `verify-gate --no-test` after each merge; a red merge is
+fixed by the orchestrator, never by re-spawning the subagent with the
+conflict.
