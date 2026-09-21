@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.1.0 — 2026-09-21
+
+Reviewer hardening — every change targets a way the v2.0 review loop could fail to converge or be rubber-stamped.
+
+### Added
+- `scripts/review-verdict.sh` — validates a review report: verdict line, `F-nn` ids unique and well-formed, valid severities, REVISE/BLOCK need ≥ 1 finding, APPROVE forbids critical/major, unresolved regression rows must reappear in Findings, required headings. Prints `VERDICT critical= major= minor= …` (or `--json`); exit 1 lists every `MALFORMED:` reason for the reviewer re-run. Orchestrator no longer parses verdicts by hand.
+- **Regression list** — from revision v2 the reviewer receives the previous revision's Findings table (facts, not reasoning) and must return a `## Regression` table marking each `F-nn` resolved/unresolved. Finding ids continue across revisions so `bugfix/fix-NNN.md` references stay unambiguous.
+- **Panel review** — `panel_stages` (default `[qa]`): parallel reviewers with different lenses (`qa`: security + correctness; `architecture`: feasibility + constitution-fit; `design`: usability + consistency), merged by strictest verdict and union of findings. Cheap diversity when the backend is the same model.
+- **Timeout + fallback** for async backends — `review_timeout_min` (default 15): no report file → re-run once → fall back to `subagent`, logged.
+- **Scope rule** — approved upstream artifacts are context, not subject; a defect found there → ESCALATE naming it, never a REVISE of the current stage.
+- **`[E]` evidence-required lines** in `review-checklists.md` (11 lines: security, tests exist, architecture fidelity, org, secrets path, tasks schema …) — a `pass` without quoted file:line / command / `verify.json` step counts as `fail`.
+- Human-gate question now carries the reviewer Summary + artifact paths so the user judges the artifact, not the chat.
+
+### Changed
+- `reviewer-prompt.md` rewritten around a "given / withheld" table; `report-template.md` records panel stages, malformed re-runs and severity totals.
+
 ## v2.0.0 — 2026-09-21
 
 ### Added

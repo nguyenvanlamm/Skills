@@ -45,7 +45,8 @@ Project: `<project_dir>` · applicationId `<org>.<slug>` · tag `v<version>`
 | qa | 3 (2 bugfix cycles) | APPROVE | — |
 | release | — | — | approved |
 
-Reviewer backend: <subagent | opencode | herdr> (<fallback note if any>)
+Reviewer backend: <subagent | opencode | herdr> (<fallback note if any>) · Panel stages: <qa: security, correctness>
+Malformed reports re-run: <n> · Findings total: <critical>/<major>/<minor>
 
 ## 4. Decisions
 | # | Decision | Why |

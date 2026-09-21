@@ -39,6 +39,8 @@ max_revisions: 3                         # per stage; then ESCALATE
 max_bugfix_cycles: 8                     # QA REVISE → fix → test → re-QA loops
 parallel_implementation: false           # true → disjoint tasks via parallel subagents
 reviewer_backend: subagent               # subagent | opencode | herdr
+review_timeout_min: 15                   # async backends: no report by then → retry once → subagent
+panel_stages: [qa]                       # multi-lens panel stages (references/reviewer-prompt.md)
 release_build: apk                       # apk | appbundle | web | none
 store_bound: false                       # true → QA also runs flutter-store-compliance
 EOF

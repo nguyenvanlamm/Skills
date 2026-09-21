@@ -23,7 +23,7 @@ capabilities:
   - skill-discovery
   - flutter
 metadata:
-  version: 2.0.0
+  version: 2.1.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -51,8 +51,9 @@ interrupted run resumes exactly where it stopped.
 Three consequences:
 
 - **Reviewer independence** — the reviewer receives artifact paths, the
-  constitution, decisions and the stage checklist. Never the draft
-  discussion, never previous attempts' reasoning.
+  constitution, decisions, the stage checklist and (from v2) the previous
+  Findings table. Never the draft discussion, never previous attempts'
+  reasoning. Reports are machine-validated before they count.
 - **Verified transitions** — `scripts/verify-gate.sh` (pub get → analyze →
   test → optional build) must pass before `test`, `qa` and `release`
   advance. A step the environment cannot run is `skipped_env`, reported as
@@ -101,6 +102,8 @@ max_revisions: 3                         # per stage; then ESCALATE
 max_bugfix_cycles: 8                     # QA REVISE → fix → test → re-QA loops
 parallel_implementation: false           # true → disjoint tasks via parallel subagents
 reviewer_backend: subagent               # subagent | opencode | herdr
+review_timeout_min: 15                   # async backends: no report file by then → retry once → subagent
+panel_stages: [qa]                       # stages reviewed by a multi-lens panel (see reviewer-prompt.md)
 release_build: apk                       # apk | appbundle | web | none — built by verify-gate at release
 store_bound: false                       # true → QA also runs flutter-store-compliance
 ```
@@ -201,25 +204,49 @@ Each review is run by an independent reviewer built from
 `references/reviewer-prompt.md` with the stage checklist from
 `references/review-checklists.md`. The reviewer receives only:
 
-- the stage artifact paths (and, for `qa`, the project dir)
+- the stage artifact paths (and, for `qa`, the project dir + latest `verify.json`)
 - `constitution.md` + `decisions/*.md`
-- the checklist for that stage
+- approved upstream artifacts as **context, not subject** — a defect there
+  → ESCALATE, never a REVISE of this stage
+- for revision v ≥ 2: the previous revision's **Findings table only**, as a
+  regression list (each `F-nn` must come back `resolved` / `unresolved`)
+- the checklist for that stage; `[E]` lines pass only with quoted evidence
+
+Never: the drafting reasoning, chat history, earlier reviews' Summary/Nits,
+or anything in `bugfix/`. Independence = no shared reasoning, not no shared
+facts.
 
 Every backend has the same contract: the reviewer writes
 `reviews/<stage>-vN.md` starting with a verdict line and numbered
-findings, then returns a completion signal. **The file is the durable
-callback** — if the return value is lost or truncated, read the file.
+findings (ids continue across revisions — v1 ends at F-05, v2 starts at
+F-06), then returns a completion signal. **The file is the durable
+callback**; validate it, never parse it by hand:
 
-```
-## Verdict: APPROVE | REVISE | BLOCK | ESCALATE
+```bash
+bash scripts/review-verdict.sh .pipeline/reviews/<stage>-vN.md
+# stdout: REVISE critical=0 major=2 minor=1 findings=3 regression_unresolved=1   (exit 0)
+# exit 1: MALFORMED: <reason>  → re-run the reviewer once quoting the reason; twice → ESCALATE
 ```
 
-Handling:
+Waiting: `review_timeout_min` (default 15) bounds `opencode` / `herdr`
+reviewers (`timeout`, `wait`). No file after the limit → re-run once →
+still nothing → fall back to `subagent` for the rest of the run and log it.
+
+**Panel review** — for stages in `panel_stages` (default `[qa]`), spawn
+one reviewer per lens in parallel (`qa`: `security` + `correctness`; see
+`reviewer-prompt.md` for the other stages), each writing
+`<stage>-vN-<lens>.md`. Merge into `<stage>-vN.md`: strictest verdict,
+union of findings de-duplicated and re-numbered, a regression item is
+`resolved` only if every member agrees. Lens diversity is the cheap
+substitute for model diversity when the backend is `subagent`.
+
+Handling (of the validated, merged file):
 
 - **APPROVE** → `set gates.<stage> approved`, log, advance (via human gate if listed)
-- **REVISE** → redo the stage with every numbered finding as a requirement,
-  `bump revisions.<stage>`, re-review. After `max_revisions` failed cycles
-  → treat as ESCALATE.
+- **REVISE** → redo the stage with the Findings table as the requirements
+  list, `bump revisions.<stage>`, re-review with that table as
+  `previous_findings`. After `max_revisions` failed cycles → treat as
+  ESCALATE.
   Exception — at `qa`, REVISE starts a **bugfix cycle** (QA produces no
   code): write `bugfix/fix-NNN.md` mapping each `F-nn` → change, fix the
   code, re-run the `test` gate (must be `ok`), then re-review QA. Each loop
@@ -244,10 +271,13 @@ across backends — only the transport differs.
 ## Human gates
 
 For each stage in `human_gates`, after its review approves, `set status
-waiting_user` and call `ask_user_question`: **approve** (continue) /
-**reject** (revision loop with the user's note as the only finding) /
-**stop**. Record the answer as `gates.<stage>: approved|rejected|stopped`.
-`human_gates: []` = fully autonomous.
+waiting_user` and call `ask_user_question`. The question text carries the
+reviewer's Summary, the Nits count and the artifact paths — the user judges
+the artifact, not the chat. Options: **approve** (continue) / **reject**
+(revision loop with the user's note as the only finding, id continuing the
+sequence) / **stop**. Record the answer as
+`gates.<stage>: approved|rejected|stopped`. `human_gates: []` = fully
+autonomous.
 
 ## Skill discovery
 
@@ -313,7 +343,7 @@ otherwise stop a run mid-stage.
 | File | Read when |
 |------|-----------|
 | `references/review-checklists.md` | Building any reviewer prompt — per-stage checklist + severity scale |
-| `references/reviewer-prompt.md` | Spawning a reviewer — prompt template + required report format |
+| `references/reviewer-prompt.md` | Spawning a reviewer — prompt template, regression list, panel lenses, report format, timeout/fallback |
 | `references/tasks-schema.md` | Planning — `tasks.json` schema, parallel-safety rules, example |
 | `references/sibling-contracts.md` | Before invoking a sibling skill — inputs, outputs, traps |
 | `references/report-template.md` | Release — `notes.md` skeleton, filled from `verify.json` + state |
@@ -322,6 +352,7 @@ otherwise stop a run mid-stage.
 |--------|--------|
 | `scripts/pipeline-state.sh` | Every transition — `init · status · get · set · bump · log` |
 | `scripts/verify-gate.sh` | implementation (per task, `--no-test`), test, release (`--build … --release`) — writes `verify.json`, exit 1 on any `fail` |
+| `scripts/review-verdict.sh` | After every review — validates the report file, prints verdict + severity counts, exit 1 = malformed (re-run reviewer) |
 
 ## Scope
 
