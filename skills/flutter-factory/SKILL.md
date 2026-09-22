@@ -145,7 +145,7 @@ advance**.
 | 2 | `planning` | `artifacts/planning/prd.md`, `tasks.json` | — | PRD covers the idea; tasks ordered, measurable, each with `verify` | `prd-generator`, `tasks-generator` |
 | 3 | `design` | `artifacts/design/{ux,ui,design-system,states}.md` | — | usability, consistency, tokens, loading/error/empty per screen, a11y | generate: `frontend-design`, `logo-designer` · evidence for review: `dont-make-me-think` |
 | 4 | `architecture` | `artifacts/architecture/{architecture,folder-structure,coding-rules}.md`, `DECISION-001.md` (org, stack) | — | decisions vs PRD/constitution, dependency table, feasibility | `tad-generator` |
-| 5 | `implementation` | Flutter project at `project_dir` | `verify-gate --no-test` after **every** task | — (reviewed by QA) | `flutter-init` (task 1), `firebase-auth-setup`, `frontend-design`, matched per task |
+| 5 | `implementation` | Flutter project at `project_dir` | `verify-gate --no-test` after **every** task | — (reviewed by QA) | `flutter-init` (task 1), `firebase-auth-setup`, `frontend-design`, matched per task, `flutter-ui-revamp` (last task) |
 | 6 | `test` | `test/`, `artifacts/test/report.md` | `verify-gate` (analyze + test) | tests green, edge cases, primary flow covered | `test-coverage` |
 | 7 | `qa` | `artifacts/qa/evidence/`, `reviews/qa-vN.md` | `evidence-pack.sh` | bugs, security, performance, clean code, secrets scan | evidence for review: `code-review` (`mode:review`), + `flutter-store-compliance` when `store_bound` |
 | 8 | `release` | tag, `artifacts/release/notes.md`, `verify.json` | `verify-gate --build <release_build> --release` | — | `release-manager`, `auto-push` |
@@ -163,8 +163,18 @@ assumption you state, never ask: "English (default); additional locales:
 <none | list from the idea>" (rule 9).
 
 **planning** — `tasks.json` follows `references/tasks-schema.md`. Task 1 is
-always the scaffold (`flutter-init` or inline `flutter create`). Every task
-has a `verify` command; a task without one is a planning REVISE finding.
+always the scaffold (`flutter-init` or inline `flutter create`); the last
+task is always UI polish (`flutter-ui-revamp`, after every screen task —
+schema rule 9). Every task has a `verify` command; a task without one is a
+planning REVISE finding.
+
+**design** — `design-system.md` must open with two machine-readable
+lines, `style: <minimal-modern | playful-rounded | neo-brutalism |
+casual-game | dark-premium>` and `seed: #RRGGBB` — the exact inputs
+`flutter-ui-revamp` takes at the last implementation task, so it never
+has to ask the user again. Pick the recipe from
+`flutter-ui-revamp/references/style-recipes.md` when that skill is
+installed; otherwise name the closest one.
 
 **architecture** — this is where **`org`** (reverse-domain, e.g. `com.acme`)
 is asked via `ask_user_question` and recorded as `DECISION-001.md`. No

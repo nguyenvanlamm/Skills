@@ -2,7 +2,7 @@
 
 What each preferred skill really expects, what it leaves behind, and the
 trap that stops a pipeline run if you forget it. Verified against the
-installed skills on 2026-09-21 — re-check the sibling's `SKILL.md` when a
+installed skills on 2026-09-22 — re-check the sibling's `SKILL.md` when a
 contract looks stale.
 
 ## The shared trap: "Repo Sync Before Edits"
@@ -36,7 +36,7 @@ say so explicitly ("do not push"). The read-only modes used for evidence
 | Skill | Needs | Leaves | Notes |
 |-------|-------|--------|-------|
 | `dont-make-me-think` | screenshot / URL / HTML / **verbal description** | usability report | **Evidence for the design review**: orchestrator runs it on `ux.md` + `ui.md` (description input, nothing to install) → `artifacts/design/evidence/dmmt-report.md`; pass `references/krug-principles.md` to the reviewer as methodology. Redesign mode writes code — never enable it here. |
-| `frontend-design` | a brief (product, audience, tone) | design direction + code | Web-oriented; keep the *direction* (tokens, type, colour), encode it into `design-system.md`, and implement in Flutter yourself. |
+| `frontend-design` | a brief (product, audience, tone) | design direction + code | Web-oriented; keep the *direction* (tokens, type, colour), encode it into `design-system.md`, and implement in Flutter yourself. Map the direction onto one `flutter-ui-revamp` recipe (`style:` + `seed:` header lines) so the last implementation task has its inputs. |
 | `logo-designer` | project context | 7 SVG variants + showcase | Optional; convert the chosen SVG to launcher icons in implementation. |
 
 ## Flutter family
@@ -44,6 +44,7 @@ say so explicitly ("do not push"). The read-only modes used for evidence
 | Skill | Needs | Leaves | Trap |
 |-------|-------|--------|------|
 | `flutter-init` | `project_name` (snake_case), **`org` (required, no default)**, `platforms` = `android` \| `ios` \| both | project dir, clean-arch folders, git init, pinned SDK levels | Web is **not** in its contract — run `flutter create --platforms web .` afterwards if `release_build: web`. Placeholder org → downstream skills block. It may install Flutter/Android SDK — that is allowed here (task T01). |
+| `flutter-ui-revamp` | `project`, `style`, `seed`, `scope`, `keep` — pass all of them from `design-system.md` (`style:`/`seed:` header lines) so its Step 2 never asks; **clean git tree** | branch `ui-revamp/<date>`, `lib/theme/*`, `lib/widgets/*`, `assets/**` + `assets/CREDITS.md`, `.revamp/{audit,design-direction,report}.md`, grouped English commits | **Last implementation task only** (schema rule 9). Step 0 **STOPs on a dirty tree** — run it right after the previous task's commit, and if `.pipeline/` lives inside the project repo make sure it is committed or ignored first. Step 3 waits for licence approval — pre-answer it in the prompt: "accept only CC0 / MIT / ISC / OFL / Apache-2.0, reject anything attribution-required or GPL / CC-BY-NC without asking"; if a needed asset is attribution-only, `ask_user_question` (it will also add an About/Credits screen — allowed). Step 5 may **rebuild `lib/theme/`** — pass `keep: "extend the existing lib/theme tokens and l10n setup, do not replace them"`. New strings it adds (empty states, credits) must go to `app_en.arb` (rule 9). Afterwards: merge `ui-revamp/*` into the working branch (keep its commits — they are English), `verify-gate --no-test`, copy `.revamp/report.md` → `artifacts/implementation/evidence/revamp-report.md` and `.revamp/audit.md` → `evidence/revamp-audit.md`, then delete or `.gitignore` `.revamp/`; `assets/CREDITS.md` stays in the project — QA `[sec] [E]` checks it. |
 | `firebase-auth-setup` | Firebase project name, platforms | Firebase project, web config, service-account key | Needs network + gcloud/firebase CLI auth; only when `DECISION-*` says Firebase Auth. Google sign-in needs an extra OAuth client. Never commit `google-services.json` — `.gitignore` it. |
 | `test-coverage` | runnable project + coverage command (`flutter test --coverage`) | added tests on a `feat/test-coverage` branch | It creates a **branch**; merge it back to the working branch before the `test` gate. Write structure-defining tests yourself first — it fills gaps. Repo Sync trap applies. |
 | `code-review` | project path, `mode:review` (default) | `CODE_REVIEW.md` **in the project root**, no code changes | **Evidence for the QA review**: orchestrator runs `mode:review`, then `mv <project>/CODE_REVIEW.md .pipeline/artifacts/qa/evidence/code-review-report.md` — leaving it in the project pollutes the next bugfix diff and `git status`. The reviewer confirms each hit at `file:line` before it becomes an `F-nn`. Pass `references/review-mode.md` + `code-smells.md` as methodology. `mode:cleanup` writes code — only during a bugfix cycle, and only when a QA finding asks for it. |

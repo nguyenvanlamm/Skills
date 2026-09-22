@@ -35,6 +35,22 @@ the pipeline never executes from prose.
       "verify": "flutter test test/features/expense/data",
       "parallel_safe": true,
       "status": "pending"
+    },
+    {
+      "id": "T12",                          // always the LAST task — see rule 9
+      "title": "UI polish and licensed assets",
+      "feature": "infra",
+      "depends_on": ["T05", "T08", "T11"],  // every screen task
+      "files": ["lib/theme/**", "lib/widgets/**", "lib/features/**/presentation/**", "assets/**", "pubspec.yaml"],
+      "skill": "flutter-ui-revamp",
+      "steps": [
+        "flutter-ui-revamp with style/seed/keep taken from artifacts/design/design-system.md (never ask the user again)",
+        "merge its ui-revamp/* branch back, re-run verify-gate --no-test",
+        "copy .revamp/report.md + audit.md to artifacts/implementation/evidence/"
+      ],
+      "verify": "flutter analyze && flutter build apk --debug",
+      "parallel_safe": false,
+      "status": "pending"
     }
   ]
 }
@@ -65,6 +81,16 @@ the pipeline never executes from prose.
    the commit message, and every commit the pipeline makes is in English
    (SKILL.md rule 8) — even when `idea.md`/`prd.md` are written in another
    language. Translate when converting `tasks-generator` output.
+9. **The last task is always UI polish** (`skill: flutter-ui-revamp`,
+   `feature: infra`, `parallel_safe: false`), depending on every screen
+   task. It runs on a working app with a clean tree — which is exactly the
+   state after the previous task's commit — and never before the screens
+   exist. `style`, `seed` and `keep` come from the approved
+   `design-system.md`; the skill's own "ask the user" steps are answered
+   from that artifact. Its `ui-revamp/*` branch is merged back and the gate
+   re-run before the task is marked done. If the skill is missing → inline
+   fallback (theme tokens + empty/loading states by hand), logged as
+   `fallbacks.flutter-ui-revamp: inline`.
 
 ## Orchestrator loop
 

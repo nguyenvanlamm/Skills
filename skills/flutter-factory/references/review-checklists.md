@@ -57,6 +57,7 @@ without the user (conflicting constitution vs PRD, missing business input).
 - [ ] Test strategy stated: what is unit / widget / integration tested; coverage target.
 - [ ] **[E]** `tasks.json` validates against `tasks-schema.md` (ids unique, `depends_on` acyclic, every task has `verify`).
 - [ ] Task 1 is the scaffold; no task edits code before it.
+- [ ] Last task is UI polish (`skill: flutter-ui-revamp`) and depends on every screen task; no task runs after it.
 - [ ] Each task is ≤ ~1 day of work and touches a bounded `files` set.
 - [ ] Tasks marked `parallel_safe: true` have pairwise-disjoint `files`.
 - [ ] Task order respects data flow: models → repositories → state → screens.
@@ -76,6 +77,7 @@ orchestrator ran the skill on `ux.md`/`ui.md`: `evidence/dmmt-report.md`.
 - [ ] **[use]** Don't-Make-Me-Think pass: no screen needs explanation to be used; primary action is visually first.
 - [ ] **[use]** Responsive: breakpoints stated (compact < 600 dp, medium 600–1200, expanded ≥ 1200) and each screen says what changes — or the app is declared phone-only in a `DECISION-*`.
 - [ ] **[cons]** `design-system.md`: colour tokens, type scale, spacing, radius, elevation — no raw hex in `ui.md`.
+- [ ] **[cons]** `design-system.md` opens with `style: <minimal-modern | playful-rounded | neo-brutalism | casual-game | dark-premium>` and `seed: #RRGGBB`; tokens below are consistent with that recipe (these two lines drive `flutter-ui-revamp` at the last implementation task).
 - [ ] **[cons]** Light + dark palettes; body-text contrast ≥ 4.5:1 stated or computed.
 - [ ] **[cons]** Touch targets ≥ 48 dp; text scales with system font size; icon-only buttons have a semantics label.
 - [ ] **[cons]** All copy in `ui.md`/`states.md` is written in English (the default locale) and consistent (same verb for the same action everywhere); translations, if any, are a separate section keyed by the English string.
@@ -152,6 +154,7 @@ only when `store_bound`).
 - [ ] **[sec]** Release build has R8/minify enabled or a `DECISION-*` says why not. `→ gradle.txt`
 - [ ] **[sec] [E]** `flutter pub outdated` shows no dependency with a known advisory; discontinued packages flagged. `→ outdated.json`
 - [ ] **[sec]** Deep links / intent filters validate their input. `→ manifest.txt` §intent-filter data
+- [ ] **[sec] [E]** Asset licences: every file under `assets/` (fonts, icons, illustrations, animations, audio) has a row in `assets/CREDITS.md` with source + licence; none is GPL / CC-BY-NC / all-rights-reserved / third-party IP; every attribution-required asset has a visible credit (`showLicensePage` or an About screen) and bundled fonts are registered in `LicenseRegistry`. `→ assets/CREDITS.md`, `evidence/revamp-report.md`
 - [ ] **[sec]** Store policy (only when `store_bound: true`) — `flutter-store-compliance` output referenced; its BLOCK rows are `critical` here.
 
 ### Fidelity & clean code
