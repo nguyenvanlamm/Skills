@@ -43,14 +43,14 @@ without the user (conflicting constitution vs PRD, missing business input).
 - [ ] One measurable success signal for the MVP (e.g. "user logs 5 expenses in week 1").
 - [ ] Data sensitivity named: does it touch health, finance, location, children, contacts? (drives privacy, store policy, `store_bound`).
 - [ ] No feature depends on content the project has no right to use (brand names, copyrighted media, scraped data).
-- [ ] `## Assumptions` lists every gap the author filled.
+- [ ] `## Assumptions` lists every gap the author filled — including "UI language: English (default); additional locales: …".
 - [ ] Nothing in the idea contradicts `constitution.md`.
 
 ## planning
 
 - [ ] Every MVP feature in `idea.md` maps to ≥ 1 requirement in `prd.md`; no requirement lacks a source feature.
 - [ ] Each requirement has an acceptance criterion someone could test by hand.
-- [ ] Non-functional requirements present: offline behaviour, performance budget, min OS versions, accessibility baseline, locale/language.
+- [ ] Non-functional requirements present: offline behaviour, performance budget, min OS versions, accessibility baseline, locale/language — English is the default locale; any other locale is listed as additional, with a task that adds its ARB.
 - [ ] Data model sketch: entities, key fields, relationships — enough for architecture to pick persistence.
 - [ ] External dependencies listed with their cost: APIs needing keys, backend, accounts, paid services — and what happens when each is unavailable.
 - [ ] Risks section: top 3 with mitigation or explicit acceptance.
@@ -78,7 +78,7 @@ orchestrator ran the skill on `ux.md`/`ui.md`: `evidence/dmmt-report.md`.
 - [ ] **[cons]** `design-system.md`: colour tokens, type scale, spacing, radius, elevation — no raw hex in `ui.md`.
 - [ ] **[cons]** Light + dark palettes; body-text contrast ≥ 4.5:1 stated or computed.
 - [ ] **[cons]** Touch targets ≥ 48 dp; text scales with system font size; icon-only buttons have a semantics label.
-- [ ] **[cons]** Copy is in the product's language and consistent (same verb for the same action everywhere).
+- [ ] **[cons]** All copy in `ui.md`/`states.md` is written in English (the default locale) and consistent (same verb for the same action everywhere); translations, if any, are a separate section keyed by the English string.
 - [ ] **[cons]** Assets: icon set / fonts / illustrations named with licence; none require attribution the app does not give.
 - [ ] Nothing requires a component the architecture stage could not build in Flutter without a paid package.
 
@@ -92,6 +92,7 @@ Lenses: `feas` = buildability & dependencies · `fit` = constitution/PRD fit & s
 - [ ] **[fit]** No layer (domain/use-case/DI) the PRD cannot justify.
 - [ ] **[fit]** `folder-structure.md` is feature-first and matches `tasks.json` `files` paths.
 - [ ] **[fit]** Every PRD non-functional requirement (offline, perf, locale) has a named mechanism.
+- [ ] **[fit]** Localisation: `flutter gen-l10n` with `lib/l10n/app_en.arb` as template, `en` first in `supportedLocales`; additional ARBs only for locales the PRD lists; no user-facing string literals outside ARB.
 - [ ] **[feas]** Dependency table: package · why · what breaks without it. Every `pubspec` package has a row; each is null-safe, maintained, and licence-compatible.
 - [ ] **[feas]** minSdk / targetSdk / Dart SDK constraints stated and compatible with `env.md`.
 - [ ] **[feas]** Platform-specific code has a named home (`lib/core/platform/`) or is declared absent.
@@ -134,7 +135,8 @@ only when `store_bound`).
 - [ ] **[cor]** List index math, empty-list paths and pagination boundaries handled.
 - [ ] **[cor]** Dates use explicit time zones/locale; money is not a `double`. `→ patterns.txt` §double-for-money
 - [ ] **[cor] [E]** Every list/detail/form screen renders loading, error, empty via the shared components. `→ patterns.txt` §CircularProgressIndicator
-- [ ] **[cor]** Forms validate at the form **and** the repository; error messages are user-language, not exceptions.
+- [ ] **[cor]** Forms validate at the form **and** the repository; error messages are localised strings (from ARB, English default), not exceptions.
+- [ ] **[cor]** No hardcoded user-facing text in `lib/` outside `l10n/`; `app_en.arb` is complete (every key used) and `en` is the first supported locale.
 
 ### Performance `[cor]`
 - [ ] **[cor]** No heavy work in `build()`; lists use `.builder`; images sized/cached; `const` constructors where possible.
@@ -175,7 +177,8 @@ Answered by the orchestrator after every task, recorded as a line in
 - [ ] Changed files (`git diff --name-only`) fall inside the task's `files` globs; anything outside is either moved to the right task or recorded as a nit.
 - [ ] No new `pubspec` dependency without a row in the architecture dependency table (add the row + `DECISION-*` if it is new).
 - [ ] No secret literal introduced (grep the diff).
-- [ ] Commit message `feat(<feature>): <title> [<id>]`; `pipeline-state.sh set task.<id> done`.
+- [ ] New user-facing strings went into `app_en.arb` (English), not into widget code; identifiers and comments are English.
+- [ ] Commit message `feat(<feature>): <title> [<id>]`, written in English; `pipeline-state.sh set task.<id> done`.
 - [ ] Parallel mode: branch `task/<id>` merged in id order and gate re-run after the merge.
 
 ## bugfix cycle (self)
@@ -187,6 +190,7 @@ Answered before re-running the QA review; recorded at the top of
 - [ ] Fixes stay inside the finding's scope — no unrelated refactors mixed in.
 - [ ] No new dependency without a dependency-table row.
 - [ ] A regression test was added for every `critical`/`major` bug fix.
+- [ ] Fix commit message in English — `fix(<feature>): <summary> [F-nn, …]`.
 - [ ] `verify-gate` (analyze + test) is `ok` after the fixes; `verify.json` path recorded.
 - [ ] `bugfix_cycles` bumped; the next QA prompt receives this cycle's Findings table as `previous_findings`.
 
@@ -198,6 +202,7 @@ Answered before tagging; recorded in `artifacts/release/notes.md` §2.
 - [ ] Every stage in `gates.*` is `approved`; latest `qa-vN.md` is APPROVE.
 - [ ] Working tree clean; on the intended branch.
 - [ ] `pubspec.yaml` version bumped (semver + build number); tag `v<version>` does not already exist.
+- [ ] Release commit message in English (`chore(release): v<version>`); `git log` shows no non-English commit from this run.
 - [ ] `CHANGELOG`/`notes.md` filled from `verify.json`, `state.yaml`, `events.log`, `reviews/`, `tasks.json` only.
 - [ ] `notes.md` §6 lists every blocked task and unresolved finding — nothing dropped.
 - [ ] `notes.md` §7 hands off to `flutter-signing → flutter-build → flutter-store-metadata → flutter-store-compliance → flutter-publish`.

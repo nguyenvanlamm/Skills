@@ -23,7 +23,7 @@ capabilities:
   - skill-discovery
   - flutter
 metadata:
-  version: 2.3.1
+  version: 2.3.2
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -158,7 +158,9 @@ choice is impossible here, ask before continuing.
 
 **idea** — one sentence from the user is enough. Fill gaps with
 assumptions and list them in `idea.md` under `## Assumptions`. Do not ask
-the user to complete a brief.
+the user to complete a brief. The app's UI language is always an
+assumption you state, never ask: "English (default); additional locales:
+<none | list from the idea>" (rule 9).
 
 **planning** — `tasks.json` follows `references/tasks-schema.md`. Task 1 is
 always the scaffold (`flutter-init` or inline `flutter create`). Every task
@@ -168,14 +170,16 @@ has a `verify` command; a task without one is a planning REVISE finding.
 is asked via `ask_user_question` and recorded as `DECISION-001.md`. No
 default, ever: `flutter-init`, `flutter-build` and `flutter-publish` all
 block `com.example.*`. Also fix: state management, routing, persistence,
-minSdk/targetSdk, and the dependency table (package · why · what breaks
-without it).
+minSdk/targetSdk, localisation (`gen-l10n`, `app_en.arb` first, extra
+locales per PRD — rule 9), and the dependency table (package · why · what
+breaks without it).
 
 **implementation** — execute `tasks.json` in order. After each task run
 the *implementation — per task (self)* checklist in `review-checklists.md`:
 `verify-gate --no-test` `ok`, `task.verify` green, diff inside `files`, no
 new dependency without a table row, then `git commit` with the task id in
-the message, `pipeline-state.sh set task.<id> done`, and one line in
+the message (`feat(<feature>): <title> [<id>]`, **in English** — see rule
+8), `pipeline-state.sh set task.<id> done`, and one line in
 `artifacts/implementation/tasks-log.md`. If
 `parallel_implementation: true`, delegate tasks whose `files` sets are
 disjoint to parallel `subagent_general` agents — each receives
@@ -210,7 +214,8 @@ Same pattern for `design`: run `dont-make-me-think` on `ux.md`/`ui.md` →
 and the *release (self)* checklist is answered in `notes.md` §2 before
 tagging.
 Then bump version in `pubspec.yaml`, write `notes.md` from
-`references/report-template.md`, commit, tag `v<version>`. Push only if the
+`references/report-template.md`, commit (`chore(release): v<version>`,
+English), tag `v<version>`. Push only if the
 user says so (`auto-push` / `release-manager` if present). "Next steps"
 lists `flutter-signing → flutter-build → flutter-store-metadata →
 flutter-store-compliance → flutter-publish`.
@@ -345,6 +350,22 @@ otherwise stop a run mid-stage.
    exhausted revisions or bugfix cycles, or explicit user interrupt.
 7. Smallest architecture that stays testable — no `domain/` layers, DI
    containers or use-cases the PRD cannot justify.
+8. **Every git commit message is written in English** — subject and body,
+   whatever language the user, the idea or the artifacts use. This applies
+   to every commit the pipeline makes (scaffold, per-task, bugfix, release)
+   and to commits made by sibling skills or parallel subagents on its
+   behalf; pass the English message explicitly when delegating. Task
+   `title`/`feature` in `tasks.json` are English for the same reason.
+9. **The app speaks English first.** Every generated app ships with
+   English (`en`) as its default and first locale: all user-facing copy
+   (UI strings, error messages, empty states, store-facing text) is
+   written in English, lives in `lib/l10n/app_en.arb` (`flutter gen-l10n`,
+   `flutter_localizations`), and `supportedLocales` lists `en` first.
+   Other locales — including the user's own language — are **additional**
+   ARB files added only when the PRD asks for them, never in place of
+   English. Dart identifiers, comments and log messages are English too.
+   Pipeline artifacts (`idea.md`, `prd.md`, reviews, `notes.md`) stay in
+   the user's language; this rule is about the product, not the paperwork.
 
 ## Definition of done
 

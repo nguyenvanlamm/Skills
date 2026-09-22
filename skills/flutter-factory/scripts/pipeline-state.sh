@@ -50,7 +50,9 @@ EOF
 Project rules that outrank every later decision, task and skill.
 Fill in with the user (or derive from the repo) before the idea stage.
 
-- Language of artifacts and UI:
+- Language of pipeline artifacts (idea, PRD, reviews, notes):
+- App UI language: English (default, `app_en.arb`, first in supportedLocales) — additional locales:
+- Git commit messages and code identifiers: English
 - Target platforms / min OS:
 - Non-negotiables (privacy, offline-first, no paid packages, ...):
 - Definition of "done" for a feature:

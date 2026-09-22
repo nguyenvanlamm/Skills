@@ -11,7 +11,7 @@ the pipeline never executes from prose.
   "tasks": [
     {
       "id": "T01",                          // unique, sortable
-      "title": "Scaffold Flutter project",
+      "title": "Scaffold Flutter project",  // English — it becomes the commit subject
       "feature": "infra",                   // MVP feature name from idea.md, or "infra"
       "depends_on": [],                     // ids; graph must be acyclic
       "files": ["pubspec.yaml", "lib/main.dart", "android/**", "ios/**"],
@@ -61,6 +61,10 @@ the pipeline never executes from prose.
 7. **Status is mirrored to state.** On completion the orchestrator sets
    `status: done` here **and** `pipeline-state.sh set task.<id> done`, and
    commits with message `feat(<feature>): <title> [<id>]`.
+8. **English only in `title` and `feature`.** Both are interpolated into
+   the commit message, and every commit the pipeline makes is in English
+   (SKILL.md rule 8) — even when `idea.md`/`prd.md` are written in another
+   language. Translate when converting `tasks-generator` output.
 
 ## Orchestrator loop
 
@@ -78,7 +82,9 @@ for task in topological order:
 With `parallel_implementation: true`, take the largest set of ready,
 `parallel_safe`, pairwise-disjoint tasks; give each to a `subagent_general`
 with constitution + architecture + decisions + **its task object only**;
-each works on branch `task/<id>` and commits there. Orchestrator merges in
+each works on branch `task/<id>` and commits there with the English
+message `feat(<feature>): <title> [<id>]` (state it in the subagent
+prompt). Orchestrator merges in
 id order, running `verify-gate --no-test` after each merge; a red merge is
 fixed by the orchestrator, never by re-spawning the subagent with the
 conflict.

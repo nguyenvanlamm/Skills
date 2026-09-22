@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.3.2 — 2026-09-22
+
+### Added
+- **Rule 9 — the app speaks English first.** Every generated app ships English as its default and first locale: user-facing copy is authored in English in `lib/l10n/app_en.arb` (`flutter gen-l10n`), `en` is first in `supportedLocales`, and other locales — including the user's own — are additional ARBs added only when the PRD lists them. Dart identifiers/comments are English. Pipeline artifacts stay in the user's language. Wired through: `idea` assumption line, planning NFR check, design `[cons]` copy check, architecture `[fit]` l10n line, qa `[cor]` no-hardcoded-strings line, per-task self-check, and the constitution template (`pipeline-state.sh init`).
+- **Rule 8 — English commit messages.** Every commit the pipeline makes (scaffold, per-task, bugfix, release) or delegates to sibling skills / parallel subagents is written in English, regardless of the language of the user, `idea.md` or the PRD. `tasks.json` `title`/`feature` are English because they are interpolated into `feat(<feature>): <title> [<id>]`; `tasks-schema.md` rule 8 says to translate when converting `tasks-generator` output. Self-checklists (per task, bugfix, release) each gained a line; release commit is `chore(release): v<version>`, bugfix commits `fix(<feature>): <summary> [F-nn, …]`.
+
 ## v2.3.1 — 2026-09-21
 
 Script fixes found by exercising the v2.3 scripts against edge cases, plus contract drift against the installed sibling skills.
