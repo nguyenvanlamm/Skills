@@ -4,7 +4,7 @@ description: Revamp the UI of an existing Flutter app or game with free assets �
 capabilities: [ui-revamp]
 license: MIT
 metadata:
-  version: 1.3.0
+  version: 1.4.0
 ---
 
 # Flutter UI Revamp
@@ -103,7 +103,7 @@ Get explicit agreement. This file is what Step 6 is checked against — a change
 
 Read `references/sources-ui.md` (app) or `references/sources-game.md` (game), and `references/licensing.md`.
 
-Pick from the locked direction, then present the list **before downloading**. For each asset, also note how it will be fetched. Each sources file has a **Direct download URLs** section, which gives verified file-URL patterns (Kenney, Game-icons, Google Fonts, Fontshare, Mixkit, ambientCG, Poly Haven, …) and lists the sources that must be downloaded by hand and imported with `--local`. Do not guess URLs: a landing page returns HTML, and the script refuses it.
+Pick from the locked direction, then present the list **before downloading**. For each asset, also note how it will be fetched. Each sources file has a **Direct download URLs** section, which gives verified file-URL patterns (Kenney, Game-icons, Google Fonts, Fontshare, GitHub font releases, Fluent/Noto emoji, Mixkit, ambientCG, Poly Haven, …). It also lists the sources that must be downloaded by hand and imported with `--local`, and `sources-ui.md` has a **Checked and rejected** list. Do not guess URLs: a landing page returns HTML, and the script refuses it. For an icon set, check the package's API shape too. `apply_icons.py` swaps only to const `IconData`, so `font_awesome_flutter` (`FaIconData`), `iconoir_flutter` (widgets) and `hugeicons` (path data) need a widget-level refactor.
 
 | Asset | Source | Licence | Credit | Size | Why this one |
 |---|---|---|---|---|---|
@@ -123,12 +123,13 @@ python3 <skill>/scripts/fetch_asset.py --url <url> --dest assets/<kind> \
 python3 <skill>/scripts/optimize_flutter.py --project . --dir assets --apply --replace
 ```
 
-`fetch_asset.py` does five things:
+`fetch_asset.py` does six things:
 
 - **Normalises filenames** to `lower_snake_case`, because Dart asset paths become Dart identifiers under `flutter_gen`. `Satoshi-Regular.ttf` becomes `satoshi_regular.ttf`, and `OFL.txt` becomes `ofl.txt`. **Write pubspec paths from the names the script printed**, not from the vendor's zip listing. A mismatched font path is the silent fall-back-to-Roboto failure.
 - **Refuses HTML.** If a URL returns an HTML page (a JS download button or a login wall), the script writes nothing. Find the direct file URL instead.
 - **Respects no-script sites.** unDraw, Storyset/Freepik and Flaticon forbid downloading through a tool, and the script refuses their URLs. Download those files by hand in a browser, then import each one with `--local <file> --source <page>`. The same normalisation and CREDITS row apply (`licensing.md` trap 9).
 - **Prints every LICENSE/README** it finds inside a zip. **Read them.**
+- **Names single files sensibly.** Some URLs end in a generic basename: Noto `…/<cp>/lottie.json`, Material Symbols `…/24px.svg`, DiceBear `…/svg?seed=x`. Pass `--filename rocket.json` for these, or each download overwrites the last; the script warns when it sees one. A URL with no extension gets one sniffed from the content.
 - **Writes the `assets/CREDITS.md` row** at download time, the only moment the metadata is reliably known. Re-downloading an asset replaces its row instead of adding a duplicate.
 
 `optimize_flutter.py` handles each asset type differently:

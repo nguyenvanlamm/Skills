@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.4.0 — 2026-09-23
+
+More sources, each checked the same way as in 1.3.0. The licence was read from the live page or the upstream repo, every URL pattern was fetched, and pub packages were checked by downloading their archives. Testing the new URLs exposed two `fetch_asset.py` bugs.
+
+### Added — sources
+- **Icons** (`sources-ui.md`): Fluent UI System Icons, Heroicons, Bootstrap Icons, Iconoir, Eva, Remix Icon, MingCute, Material Symbols variable (`material_symbols_icons`), Font Awesome Free, Pictogrammers MDI, Carbon, Octicons, Boxicons, Pixelarticons. Each entry has its licence, Flutter package and direct SVG URL, and says whether the package exposes const `IconData`, which is what `apply_icons.py` can swap to.
+- **Emoji and avatars** (new section): Fluent Emoji (MIT), Noto Emoji (new `2D/`/`3D/` layout), Noto Animated Emoji (CC BY 4.0, direct Lottie JSON), Twemoji (jdecked fork), OpenMoji (flagged BY-SA), DiceBear (licence varies by style, bundle rather than fetch at runtime), Boring Avatars.
+- **Illustrations**: Open Doodles (CC0, direct S3 links) and 3dicons (CC0, hand download).
+- **Fonts**: OFL font releases on GitHub (Geist, Inter, IBM Plex, JetBrains Mono, Monaspace, League of Moveable Type), with a tested `--only` filter.
+- **Backgrounds**: fffuel, including its no-redistribution clause.
+- **Games** (`sources-game.md`): Pixel Frog *Pixel Adventure*, 0x72 *DungeonTileset II*, Screaming Brain Studios (all CC0), the itch.io CC0 tag, Juhani Junkala 512 SFX (CC0, direct zip), incompetech (CC BY 4.0), jsfxr, and Sonniss GDC bundles. BBC Sound Effects is explicitly rejected (RemArc licence is non-commercial only).
+- **Checked and rejected** list: ManyPixels, Solar icons, Iconsax, Simple Icons, Feather, each with the reason.
+- `licensing.md` traps **11** (a pub package's licence is not the art's licence) and **12** (Remix Icon License forbids use as a logo or app icon). Trap 10 gains the Font Awesome SVG-vs-font case.
+
+### Fixed — `fetch_asset.py`
+- **Generic filenames collided.** A single-file download was named from the URL basename, so every Noto Animated Emoji became `lottie.json` and each download overwrote the last. A DiceBear avatar became `svg`, with no extension. Added `--filename`. Also added a warning for known generic basenames and a content sniff that adds `.svg`/`.png`/`.webp`/`.json` when the URL has no extension.
+- **`OFL.txt` was not seen as a licence.** A Geist zip containing `OFL.txt` printed "no LICENSE/README inside the archive". Notice detection now also matches `ofl`, `ffl` and `notice`.
+- `manypixels.co` added to the no-scripted-download hosts.
+
 ## v1.3.0 — 2026-09-23
 
 The skill named ~50 asset sites but no fetchable URLs, so every run had to rediscover them. That is how an agent ends up fetching a Mixkit 35 KB preview instead of the sound, or guessing a Poly Haven filename that does not exist.

@@ -230,7 +230,7 @@ def update_credits(project: Path, row: str, name: str, apply: bool) -> None:
 
 # Sites whose terms forbid downloading through a script or tool (licensing.md
 # trap 9). Download these by hand in a browser and import with --local.
-NO_SCRIPTED_DOWNLOAD = ("undraw.co", "storyset.com", "freepik.com", "flaticon.com")
+NO_SCRIPTED_DOWNLOAD = ("undraw.co", "storyset.com", "freepik.com", "flaticon.com", "manypixels.co")
 
 
 def scripted_download_banned(url: str) -> str | None:

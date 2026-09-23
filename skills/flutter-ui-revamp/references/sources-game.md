@@ -14,6 +14,10 @@ Read at Step 3 when `audit.json → derived.app_type` is `flame_game`, or when t
 | **CraftPix free** | craftpix.net/freebies | custom — free-with-restrictions | ✅ | Free section forbids redistribution and some resale scenarios. Read the licence page, not the tag. |
 | **Game-icons.net** | game-icons.net | **CC BY 3.0** | ✅ 4000+ one style | Attribution mandatory → the game needs a Credits screen. SVG, recolourable, single visual voice. |
 | **Glitch** | opengameart.org/content/glitch-sprite-assets-huge-collection (+ github.com/tinyspeck, archived) | **CC0** | ✅ | The entire art library of a shut-down MMO. Distinctive, hand-painted, huge. The original glitchthegame.com page now redirects to slack.com; use the OpenGameArt PNG uploads, since much of the Tiny Speck source is Flash `.fla`. |
+| **Pixel Frog** — *Pixel Adventure 1/2* | pixelfrog-assets.itch.io/pixel-adventure-1 | **CC0** (stated on the page) | ✅ | Complete 32px platformer: characters, enemies, terrain, items, UI buttons, 20 FPS animation strips. Do not confuse it with Pixel Frog's *Tiny Swords*, which has its own terms. |
+| **0x72** — *16x16 DungeonTileset II* | 0x72.itch.io/dungeontileset-ii | assets **CC0**, code MIT | ✅ | The standard free roguelike tileset, with heroes, monsters, weapons and UI hearts. |
+| **Screaming Brain Studios** | screamingbrainstudios.itch.io | **CC0** (all assets, per the studio page) | ✅ per pack | Isometric tiles, procedural planets, space backgrounds, textures. |
+| **itch.io, CC0 filter** | itch.io/game-assets/free/tag-cc0 | CC0 as tagged, **still confirm on the page** | varies | The tag is set by the author and is not audited. It turns itch.io from "read every readme" into "confirm one line". |
 
 ### Kenney UI Pack — why it is the default answer for game UI
 
@@ -69,6 +73,12 @@ In Flame, prefer generating particles from one small sprite over importing an an
 | **Mixkit SFX** | mixkit.co/free-sound-effects | Mixkit free licence | No attribution; **no redistribution as a sound pack**. |
 | **Pixabay** | pixabay.com/music | Pixabay Content Licence | No attribution required. Cannot be used in a *music-focused* product. |
 | **Uppbeat** | uppbeat.io | free tier **requires credit**; no-credit needs a paid plan | Read the trap in `licensing.md`. |
+| **Juhani Junkala** — *512 Sound Effects (8-bit style)* | opengameart.org/content/512-sound-effects-8-bit-style | **CC0** | 512 retro SFX in categorised folders (coins, jumps, explosions, menus). One 20 MB zip with a direct link (below). |
+| **Kevin MacLeod / incompetech** | incompetech.com | **CC BY 4.0** for the free tier | Large library of music loops. The free tier needs an on-screen credit in the exact form the site gives; a paid licence removes it. The download pages are JS, so download by hand. |
+| **jsfxr** | sfxr.me (github.com/chr15m/jsfxr) | tool: Unlicense | A generator, not a library. You synthesise 8-bit SFX in the browser and export WAV. The output is your own work, so there is no third-party licence to track. Record it in CREDITS.md as "generated with jsfxr". |
+| **Sonniss GDC Game Audio Bundle** | sonniss.com/gameaudiogdc | sonniss.com/gdc-bundle-license: royalty-free, commercial, no attribution; **no resale as raw files**; no AI/ML training | Several GB of professional SFX each year (7.47 GB in 2026; over 200 GB in the archive). Hand download only: the site returns 403 to scripts, and the bundle is too large for `fetch_asset.py`. Take the few files you need. |
+
+**Not allowed: BBC Sound Effects.** The 16 000 BBC archive sounds are under the RemArc licence, which permits only non-commercial, personal, research or formal-education use. Any monetised or ad-funded app needs a paid licence from Pro Sound Effects. They appear in many "free SFX" lists, so reject them explicitly.
 
 Format targets for a Flutter game. `optimize_flutter.py` produces these, and flags any SFX over 50 KB or music file over 1 MB:
 
@@ -92,7 +102,9 @@ Mono for SFX is not a compromise — game SFX are positioned by the engine, and 
 | **Mixkit SFX** | `https://assets.mixkit.co/active_storage/sfx/<id>/<id>.wav` | WAV, full quality | The `<id>` is in the page's download link (`/free-sound-effects/download/<id>/`). **Not** `<id>-preview.mp3`, which is a 35 KB low-bitrate preview; `fetch_asset.py` refuses it and prints the `.wav` URL. |
 | **ambientCG** | `https://ambientcg.com/get?file=<AssetId>_<res>-<fmt>.zip`, e.g. `Bricks090_1K-PNG.zip` | zip of PBR maps | The asset ID must exist at that resolution/format; a wrong one is a plain 404. Take `1K` for mobile. |
 | **Poly Haven** | Ask the API: `https://api.polyhaven.com/files/<id>` → JSON → `Diffuse.1k.png.url` (or `Normal`, `Rough`, …) | PNG per map | Map file names are not guessable (`…_diffuse_1k.png`), so always read them from the API. |
-| **OpenGameArt** | `https://opengameart.org/sites/default/files/<filename>` from the item's "File(s)" list | whatever the uploader attached | The licence is **per submission**. Read it on the item page. |
+| **OpenGameArt** | `https://opengameart.org/sites/default/files/<filename>` from the item's "File(s)" list | whatever the uploader attached | The licence is **per submission**. Read it on the item page. The server is slow: a 20 MB zip takes about a minute. |
+| **Juhani Junkala 512 SFX** | `https://opengameart.org/sites/default/files/The%20Essential%20Retro%20Video%20Game%20Sound%20Effects%20Collection%20%5B512%20sounds%5D.zip` | zip, 20 MB of WAV | There is no licence file inside; the CC0 is stated on the item page, so pass that page as `--source`. Filter by folder, e.g. `--only '(?i)/coins/' --flatten`. |
+| **Pixelarticons** (pixel UI icons) | `https://raw.githubusercontent.com/halfmage/pixelarticons/master/svg/<name>.svg` | SVG | MIT. Matches pixel-art HUDs better than any app icon set. |
 
 Filter large packs down to what the screen actually uses:
 
@@ -115,7 +127,9 @@ Kenney audio packs (Interface Sounds, UI Audio, …) ship **OGG only**. On a pro
 | Glitch (OpenGameArt) | The link works, but it is a **185 MB `.7z`**. `fetch_asset.py` cannot unpack 7z/rar/tar.gz and refuses them before downloading. Extract by hand, then zip the subset you need |
 | Freesound | Needs a login or OAuth token (a plain request gets 401) |
 | Pixabay, Uppbeat, Sketchfab | Bot-blocked (403/429) or login-gated |
-| Poly Pizza | Not verified for direct links; treat as manual |
+| Poly Pizza | Its API (`api.poly.pizza`) returns 401 without an API key. Download models from the site |
+| Pixel Frog, 0x72, Screaming Brain Studios | itch.io download button (JS) |
+| incompetech, Sonniss | JS download page / 403 to scripts |
 
 ## Sprite hygiene, before the assets touch the project
 

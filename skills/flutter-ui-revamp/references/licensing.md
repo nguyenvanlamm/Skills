@@ -85,13 +85,23 @@ Recolouring a CC BY-SA illustration to your seed colour produces a derivative th
 
 ### 9. Some "free" sites forbid scripted downloads
 
-The asset licence and the *site's* terms are two separate documents. unDraw's licence forbids "automated and non-automated ways to link, embed, scrape, search or download the assets … without our consent". Storyset / Freepik's terms forbid downloads made through "robots, spiders or any other mechanism, mobile application, program or tool". For these sources, download by hand in a browser, then record the licence yourself. `fetch_asset.py` is for sources that publish direct file URLs meant to be fetched, such as Kenney, GitHub releases, Google Fonts, and the OpenGameArt file links.
+The asset licence and the *site's* terms are two separate documents. unDraw's licence forbids "automated and non-automated ways to link, embed, scrape, search or download the assets … without our consent". Storyset / Freepik's terms forbid downloads made through "robots, spiders or any other mechanism, mobile application, program or tool". ManyPixels' licence has the same "automated and non-automated ways to link, embed" clause and also discourages use inside an app, so it is listed as rejected in `sources-ui.md`. For these sources, download by hand in a browser, then record the licence yourself. `fetch_asset.py` is for sources that publish direct file URLs meant to be fetched, such as Kenney, GitHub releases, Google Fonts, and the OpenGameArt file links.
 
 The same trap exists for no-derivatives terms. Lordicon's free tier is a modified CC BY-ND 4.0, so recolouring an animation to your seed colour breaches it.
 
 ### 10. An icon *font* licence is not the icon *set* licence
 
 Some sets publish the SVGs under MIT and the compiled webfont under different terms; some aggregate fonts bundle glyphs from several sets. When building a custom font via fluttericon.com, the licence you must satisfy is the one on each **source SVG** — which is why mixing sets into one font requires clearing every set involved.
+
+Font Awesome Free is the common case. The SVG/JS icons are **CC BY 4.0**, which needs on-screen credit, and the font files are **OFL**, which needs only the licence page. Shipping `font_awesome_flutter` (a font) is `--license OFL-1.1`. Copying FA SVGs into `assets/icons/` is `--license CC-BY-4.0`.
+
+### 11. A pub package's licence is not the licence of the art inside it
+
+`solar_icons` and `iconsax_flutter` are BSD-3 on pub.dev, but that covers the Dart wrapper. The glyphs come from upstream repos that publish no licence at all, and no licence means all-rights-reserved. Before adding an icon or emoji package, find the **upstream** set and read its licence. Examples: `fluentui_system_icons` → `microsoft/fluentui-system-icons` (MIT); `animated_emoji` → Noto Animated Emoji (CC BY 4.0, so the package needs an on-screen credit even though pub lists BSD).
+
+### 12. Some permissive licences forbid use as a logo or app icon
+
+The **Remix Icon License v1.0** (January 2026) allows app use, with attribution optional, but forbids using any icon, even modified, "as a logo, brand mark, app icon, or identity symbol". Keep such glyphs out of `flutter_launcher_icons`, the splash screen and the store icon. `fetch_asset.py` does not recognise this licence, so it defaults to `on-screen`. Pass `--credit none` only after reading §2.4 of the licence yourself.
 
 ## Preference order
 
