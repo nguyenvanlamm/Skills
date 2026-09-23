@@ -9,6 +9,20 @@ For `subagent` backend: `run_subagent` with `profile: subagent_explore`,
 `is_background: false` (or `true` for panel members, then `read_subagent`
 each). For `opencode` / `herdr`: same text as the prompt.
 
+## Backends (`reviewer_backend`)
+
+| Backend | How | Result delivery | Model diversity |
+|---|---|---|---|
+| `subagent` (default) | `run_subagent` profile `subagent_explore` (read-only), foreground | synchronous | none — same model as the session |
+| `opencode` | `opencode run "<review prompt>"`; set up via the `opencode-runner` skill | stdout when the command exits | yes — free cloud models |
+| `herdr` | spawn a pane via the `herdr-agent` skill, send the prompt, `wait` + capture | async — orchestrator waits + captures | yes — whatever the pane runs |
+
+If the backend is not `subagent`, check it exists before the first review
+(`command -v opencode`, herdr CLI/socket). Missing → fall back to
+`subagent`, `pipeline-state.sh set reviewer_backend subagent`, log the
+fallback. Reviewer rules are identical across backends — only the
+transport differs.
+
 ## What the reviewer may and may not see
 
 | Given | Withheld |
@@ -202,9 +216,11 @@ Merge into `<stage>-vN.md`: verdict = **strictest** across members
 (BLOCK > ESCALATE > REVISE > APPROVE); Findings = union, de-duplicated by
 `Where`+`Finding`, re-numbered continuing from the previous revision;
 Regression = a finding is `resolved` only if **every** member says so.
-Header line `Panel: security, correctness` after the verdict. The merged
-file is what the bugfix loop and the report read; member files stay for
-audit.
+Header line `Panel: security, correctness` after the verdict. Validate
+each member file and the merged file (`--prev` from v2). The merged file
+is what `advance`, the bugfix loop and the report read; member files stay
+for audit. Lens diversity is the cheap substitute for model diversity when
+the backend is `subagent`.
 
 ## Orchestrator-side handling
 

@@ -14,7 +14,8 @@
 #
 # state.yaml is FLAT: dotted keys such as `revisions.planning`, `review.idea`, `gates.idea`, `task.T04`.
 # Stage order: env idea planning design architecture implementation test qa release → done.
-# `advance` checks: latest reviews/<stage>-vN.md validates as APPROVE (reviewed stages) · gates.<stage>
+# `advance` checks: latest reviews/<stage>-vN.md validates as APPROVE (reviewed stages; from v2 with
+# --prev <stage>-v(N-1)[-gate].md) and no stage artifact is newer than it · gates.<stage>
 # = approved (stages in config human_gates) · verify.json passed, for a clean tree at the project's
 # current HEAD (implementation, test, qa, release) · stage-specific artifacts (see check_stage).
 # --override bypasses the checks ONLY on the user's explicit instruction; it is logged as OVERRIDE.
@@ -22,7 +23,7 @@
 # --root defaults to $PWD (the dir that contains .pipeline/). Exit 2 on usage error. Bash 3.2 compatible.
 set -uo pipefail
 
-usage() { sed -n '2,24p' "$0" >&2; exit 2; }
+usage() { sed -n '2,23p' "$0" >&2; exit 2; }
 SELF_DIR=$(cd "$(dirname "$0")" && pwd)
 ROOT="$PWD"; PROJECT=""; OVERRIDE=""; ARGS=()
 while [ $# -gt 0 ]; do
@@ -33,7 +34,7 @@ while [ $# -gt 0 ]; do
     --root) ROOT="$2"; shift 2;;
     --project) PROJECT="$2"; shift 2;;
     --override) OVERRIDE="$2"; shift 2;;
-    -h|--help) sed -n '2,24p' "$0"; exit 0;;
+    -h|--help) sed -n '2,23p' "$0"; exit 0;;
     *) ARGS+=("$1"); shift;;
   esac
 done
@@ -73,11 +74,23 @@ latest_review() { # stage → path of highest reviews/<stage>-vN.md (panel membe
   done
   printf '%s' "$best"
 }
-review_ok() {
-  local f v; f=$(latest_review "$1")
+review_ok() { # latest review must validate as APPROVE — from v2 on with --prev, like the orchestrator ran it
+  local f v n prev="" stale args
+  f=$(latest_review "$1")
   [ -n "$f" ] || { block "$1: no reviews/$1-vN.md — run the independent review"; return; }
-  v=$(bash "$SELF_DIR/review-verdict.sh" "$f" 2>/dev/null | awk '{print $1}')
-  [ "$v" = APPROVE ] || block "$1: latest review $(basename "$f") is ${v:-MALFORMED}, not APPROVE"
+  n=${f##*-v}; n=${n%.md}; args=("$f")
+  if [ "$n" -ge 2 ]; then
+    prev="$P/reviews/$1-v$((n-1))-gate.md"; [ -f "$prev" ] || prev="$P/reviews/$1-v$((n-1)).md"
+    [ -f "$prev" ] || { block "$1: $(basename "$f") has no $1-v$((n-1))[-gate].md — its regression list cannot be checked"; return; }
+    args+=(--prev "$prev")
+  fi
+  v=$(bash "$SELF_DIR/review-verdict.sh" "${args[@]}" 2>/dev/null | awk '{print $1}')
+  [ "$v" = APPROVE ] || block "$1: latest review $(basename "$f") is ${v:-MALFORMED}, not APPROVE — reasons: review-verdict.sh ${prev:+--prev $(basename "$prev") }$(basename "$f")"
+  # an artifact edited after the approving review was never reviewed
+  stale=$( { find "$P/artifacts/$1" -type f -newer "$f" ! -path '*/evidence/*' ! -path '*/logs/*' ! -name verify.json 2>/dev/null
+             [ "$1" = planning ] && find "$P/tasks.json" -newer "$f" 2>/dev/null
+             [ "$1" = architecture ] && find "$P/decisions" -type f -newer "$f" 2>/dev/null; } | sed "s|^$P/||" | tr '\n' ' ' | sed 's/ $//')
+  [ -z "$stale" ] || block "$1: edited after $(basename "$f") was written — re-review: $stale"
 }
 human_gate_ok() {
   local gates g
@@ -107,8 +120,9 @@ check_stage() { # stage
     env)
       need_file artifacts/env/env.md env; need_file constitution.md env
       if [ -f "$P/constitution.md" ]; then
-        while IFS= read -r f; do block "env: constitution.md field left empty — '$f' (fill it; mark guesses '(assumed)')"; done \
-          < <(grep -E '^- [^:]+:[[:space:]]*$' "$P/constitution.md")
+        # any `- …:` line whose last label has no value (also "additional locales:" — write "none" if there are none)
+        while IFS= read -r f; do block "env: constitution.md value left empty — '$f' (fill it; mark guesses '(assumed)')"; done \
+          < <(grep -E '^- .*:[[:space:]]*$' "$P/constitution.md")
       fi;;
     idea) need_file artifacts/idea/idea.md idea;;
     planning) need_file artifacts/planning/prd.md planning; need_file tasks.json planning;;
@@ -160,7 +174,7 @@ Filled at the env stage: derive from the repo and the user's request; a value
 you had to guess ends with "(assumed)". `advance` refuses an empty field.
 
 - Language of pipeline artifacts (idea, PRD, reviews, notes):
-- App UI language: English (default, `app_en.arb`, first in supportedLocales) — additional locales:
+- App UI language: English (default, `app_en.arb`, first in supportedLocales) — additional locales (or "none"):
 - Git commit messages and code identifiers: English
 - Target platforms / min OS:
 - Non-negotiables (privacy, offline-first, no paid packages, ...):

@@ -58,7 +58,7 @@ without the user (conflicting constitution vs PRD, missing business input).
 - [ ] Test strategy stated: what is unit / widget / flow tested (primary flow as a headless widget flow test in `test/flows/`; device `integration_test/` optional); coverage target as a number (it becomes `--min-coverage`).
 - [ ] **[E]** `tasks.json` validates against `tasks-schema.md` (ids unique, `depends_on` acyclic, every task has `verify`).
 - [ ] Task 1 is the scaffold; no task edits code before it.
-- [ ] Last task is UI polish (`skill: flutter-ui-revamp`) and depends on every screen task; no task runs after it.
+- [ ] Last task is UI polish (`skill: flutter-ui-revamp`) and depends on every screen task; no task runs after it. Its `files` include the app shell, router, `lib/l10n/**`, `assets/**`, `pubspec.{yaml,lock}` and `test/**`; its `verify` matches `release_build` and `env.md` (`tasks-schema.md` rule 9).
 - [ ] Each task is ≤ ~1 day of work and touches a bounded `files` set.
 - [ ] Tasks marked `parallel_safe: true` have pairwise-disjoint `files`.
 - [ ] Task order respects data flow: models → repositories → state → screens.
@@ -185,6 +185,7 @@ Answered by the orchestrator after every task, recorded as a line in
 - [ ] Commit message `feat(<feature>): <title> [<id>]`, written in English; `pipeline-state.sh set task.<id> done`.
 - [ ] T01 only: `pipeline-state.sh init --project <dir>` re-run (`project_dir` set, `.pipeline/` excluded); no nested git repo when the workspace is already a repo.
 - [ ] Parallel mode: task ran in its own worktree `../wt-<id>` on `task/<id>`; merged in id order, gate re-run after the merge, worktree removed and branch deleted.
+- [ ] UI-polish task (`flutter-ui-revamp`): every package it added has a dependency-table row + `DECISION-*`; `unmapped`/`DROPPED`/`COLLISION` lines from its icon scripts resolved; widget tests using old icon finders updated; `ui-revamp/*` merged as `feat(infra): <title> [<id>]` with `.revamp/` untracked; revamp report + audit copied to `artifacts/implementation/evidence/`.
 - [ ] Last task: `verify-gate --no-test --stage implementation` re-run on the final committed tree (`dirty: false`, `git_sha` = HEAD).
 
 ## bugfix cycle (self)

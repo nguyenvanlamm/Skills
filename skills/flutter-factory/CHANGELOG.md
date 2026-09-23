@@ -1,5 +1,25 @@
 # Changelog
 
+## v2.5.0 — 2026-09-23
+
+An audit of v2.4.0 found that `advance` checked less than the SKILL.md said it did, and that the contract with `flutter-ui-revamp` v1.2.0 had drifted. The last implementation task could not pass its own self-check. The scripts were re-run against a real `flutter create` project (Flutter 3.47.4).
+
+### Fixed
+- **`advance` skipped the regression check.** `review_ok` validated the latest review without `--prev`, so a v2 APPROVE that silently dropped a previous finding's Regression row still advanced the stage. From v2 on it now passes `--prev <stage>-v(N-1)-gate.md` (after a human rejection) or `<stage>-v(N-1).md`. A missing previous file blocks.
+- **Artifacts edited after APPROVE advanced unreviewed.** `advance` now blocks when any file under `artifacts/<stage>/` is newer than the approving review. That excludes `evidence/`, `logs/` and `verify.json`, and adds `tasks.json` for planning and `decisions/` for architecture.
+- **Constitution check missed empty trailing values.** A value left blank after a label (e.g. "additional locales:") passed as filled. Now any `- …:` line that ends with no value blocks. The template asks for "none" explicitly.
+- **`evidence-pack.sh`**: an option given without its value died with "unbound variable" (exit 1). It now exits 2 with usage, like the other scripts.
+- **The UI-polish task (T12) could not pass its self-check** (`tasks-schema.md` rule 9):
+  - Its `files` globs omitted things `flutter-ui-revamp` must touch: the app shell (`theme:` wiring, `RiveNative.init()`), the router/About screen, `lib/l10n/**`, `pubspec.lock` and `test/**`.
+  - Its `verify` always built an APK, so the task went `blocked` on machines without an Android SDK. `verify` now follows `release_build` and `env.md`.
+  - Its commits carried no task id. The task commit is now the `--no-ff` merge of `ui-revamp/*` with `feat(infra): <title> [<id>]`, and `.revamp/` is untracked in that commit.
+- **`flutter-ui-revamp` v1.2 stopped the run for the user.** Its contract row now pre-answers every stop: Step 1 scope proposal (explicit `scope`), Step 2 design-direction agreement, Step 3 licences, and Step 6 dry-run diff (the orchestrator resolves `unmapped`/`DROPPED`/`COLLISION` itself and authorises `--apply --yes`). It also names the packages the skill adds (`lucide_icons_flutter`, `rive` 0.14, `flutter_gen` ≥ 5.15), each of which needs a dependency-table row + `DECISION-*`. Widget tests with icon finders are updated in the same task. Step 7 `--analyze-size` without an SDK counts as `skipped_env`.
+- **`store_bound` QA could never advance.** Committing `store-metadata/` moved HEAD away from the test `verify.json`. The test gate is now re-run on that commit before the QA review.
+
+### Changed
+- The planning checklist checks the T12 `files`/`verify`. The per-task self-checklist gained a UI-polish line.
+- `SKILL.md` is under 500 lines (498). The parallel-worktree procedure and the panel merge rules had been written out in both `SKILL.md` and the references; they now live only in `tasks-schema.md` / `reviewer-prompt.md`. The reviewer-backend table moved to `reviewer-prompt.md`, and the `state.yaml` example is now a one-paragraph key list.
+
 ## v2.4.0 — 2026-09-23
 
 The core principle ("a stage never advances on a claim") was prose only; the scripts now enforce it. Every fix below was found by exercising the v2.3.2 scripts and exercised again against a real `flutter create` project.

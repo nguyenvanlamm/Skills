@@ -23,7 +23,7 @@ capabilities:
   - skill-discovery
   - flutter
 metadata:
-  version: 2.4.0
+  version: 2.5.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -113,19 +113,12 @@ release_build: apk                       # apk | appbundle | web | none — buil
 store_bound: false                       # true → QA also runs flutter-store-compliance
 ```
 
-`state.yaml` (flat, dotted keys — written only through the script):
-
-```yaml
-status: running          # running | waiting_user | blocked | done
-stage: planning          # stage currently in progress — changed ONLY by `advance`
-project_dir: ./spendly   # Flutter project root (set right after T01)
-revisions.planning: 1
-bugfix_cycles: 0
-review.idea: approved    # validated reviewer APPROVE (informational; advance re-reads the file)
-gates.idea: approved     # human gate answer: approved | rejected | stopped
-fallbacks.idea-validator: inline   # skill missing → done natively
-reviewer_backend: subagent         # effective backend after fallback
-```
+`state.yaml` is flat, dotted keys, written only through the script:
+`status` (running | waiting_user | blocked | done) · `stage` (changed ONLY
+by `advance`) · `project_dir` (set after T01) · `revisions.<stage>` ·
+`bugfix_cycles` · `review.<stage>` (informational — `advance` re-reads the
+file) · `gates.<stage>` (approved | rejected | stopped) ·
+`fallbacks.<skill>: inline` · `reviewer_backend` (effective) · `task.<id>`.
 
 ```bash
 bash scripts/pipeline-state.sh status                 # print state + last 10 events
@@ -137,7 +130,8 @@ bash scripts/pipeline-state.sh log "design-v2 REVISE: 3 findings"
 
 `advance` requires, for the stage being left: the latest
 `reviews/<stage>-vN.md` validating as APPROVE (idea, planning, design,
-architecture, test, qa) · `gates.<stage>: approved` when the stage is in
+architecture, test, qa — from v2 with `--prev <stage>-v(N-1)[-gate].md`)
+and no stage artifact edited after it · `gates.<stage>: approved` when the stage is in
 `human_gates` · a passing `verify.json` for a clean tree at the project's
 current HEAD (implementation, test, qa — the test gate re-run after the
 last bugfix — and release) · the stage's key artifacts (filled
@@ -244,22 +238,16 @@ one line in `artifacts/implementation/tasks-log.md`. After the last task
 (and its merge) run `verify-gate --no-test --stage implementation` once
 more on the committed tree — that is the `verify.json` `advance` checks.
 
+The last task (`flutter-ui-revamp`) stops for the user four times unless
+its prompt pre-answers them, adds packages that need dependency-table
+rows, and lands as a merge commit — follow `tasks-schema.md` rule 9 and
+its `sibling-contracts.md` row exactly.
+
 If `parallel_implementation: true`, delegate tasks whose `files` sets are
 disjoint to parallel `subagent_general` agents, **one git worktree per
-task** — a single checkout cannot hold several branches at once:
-
-```bash
-git -C <project_dir> worktree add ../wt-<id> -b task/<id>   # from the current working-branch HEAD
-# subagent works only inside ../wt-<id>: flutter pub get, implement, task.verify, commit
-git -C <project_dir> merge --no-ff task/<id>                # orchestrator, in id order
-git -C <project_dir> worktree remove ../wt-<id> && git -C <project_dir> branch -d task/<id>
-```
-
-Each subagent receives constitution + architecture + decisions + its task
-object + the absolute worktree path, and is told to touch nothing outside
-it and never to merge. The orchestrator merges in id order and re-runs
-`verify-gate --no-test` after each merge; a red merge is fixed by the
-orchestrator.
+task**, merged by the orchestrator in id order with `verify-gate
+--no-test` after each merge — procedure in `tasks-schema.md` →
+Orchestrator loop.
 
 **test** — write tests yourself first (unit: models/validators/repos;
 widget: each design-system component + each form + loading/error/empty;
@@ -281,7 +269,8 @@ gradle, risky Dart patterns → `artifacts/qa/evidence/`), then, if installed,
 `code-review mode:review` (writes `<project>/CODE_REVIEW.md` — **move** it to
 `evidence/code-review-report.md`) and, when `store_bound`,
 `flutter-store-compliance` (copy `store-metadata/compliance-report.json` →
-`evidence/compliance-report.json`).
+`evidence/compliance-report.json`, commit `store-metadata/`, then re-run
+`verify-gate --stage test --coverage` — the commit moved HEAD).
 The reviewer gets the evidence dir plus the skills' methodology files
 (`code-review/references/review-mode.md`, `code-smells.md`) and reads the
 code, `artifacts/test/report.md` and `verify.json`. Skill reports are inputs
@@ -352,19 +341,11 @@ previous round ended in a human rejection. The validator also requires
 `- [pass|fail|n.a.] …` lines under Checklist results and a finding for
 every `[fail]` (except on ESCALATE).
 
-Waiting: `review_timeout_min` (default 15) bounds `opencode` / `herdr`
-reviewers (`timeout`, `wait`). No file after the limit → re-run once →
-still nothing → fall back to `subagent` for the rest of the run and log it.
-
-**Panel review** — for stages in `panel_stages` (default `[qa]`), spawn
-one reviewer per lens in parallel (`qa`: `[sec]` + `[cor]`; checklist lines
-carry their lens tag; see `reviewer-prompt.md` for the other stages), each writing
-`<stage>-vN-<lens>.md` (each validated, with `--prev` from v2). Merge into
-`<stage>-vN.md`: strictest verdict, union of findings de-duplicated and
-re-numbered, a regression item is `resolved` only if every member agrees;
-validate the merged file too — it is the one `advance` reads. Lens
-diversity is the cheap substitute for model diversity when the backend is
-`subagent`.
+Async backends are bounded by `review_timeout_min` (no file → re-run once
+→ fall back to `subagent`). **Panel review** — for stages in
+`panel_stages` (default `[qa]`), one reviewer per lens in parallel, each
+writing `<stage>-vN-<lens>.md`, merged into `<stage>-vN.md` (the file
+`advance` reads). Timeout, lenses and merge rules: `reviewer-prompt.md`.
 
 Handling (of the validated, merged file):
 
@@ -384,18 +365,10 @@ Handling (of the validated, merged file):
   with the reviewer's reason, stop.
 - **ESCALATE** → `set status waiting_user`, ask the user (see human gates).
 
-### Reviewer backends (`reviewer_backend`)
-
-| Backend | How | Result delivery | Model diversity |
-|---|---|---|---|
-| `subagent` (default) | `run_subagent` profile `subagent_explore` (read-only), foreground | synchronous | none — same model as the session |
-| `opencode` | `opencode run "<review prompt>"`; set up via the `opencode-runner` skill | stdout when the command exits | yes — free cloud models |
-| `herdr` | spawn a pane via the `herdr-agent` skill, send the prompt, `wait` + capture | async — orchestrator waits + captures | yes — whatever the pane runs |
-
-If the backend is not `subagent`, check it exists first (`command -v
-opencode`, herdr CLI/socket). Missing → fall back to `subagent`, `set
-reviewer_backend subagent`, log the fallback. Reviewer rules are identical
-across backends — only the transport differs.
+**Reviewer backends** (`reviewer_backend`): `subagent` (default,
+`subagent_explore`, read-only), `opencode`, `herdr` — table and
+availability check in `reviewer-prompt.md`. Missing backend → `subagent`,
+logged. Rules are identical across backends; only the transport differs.
 
 ## Human gates
 
@@ -503,14 +476,14 @@ otherwise stop a run mid-stage.
 | File | Read when |
 |------|-----------|
 | `references/review-checklists.md` | Every review point — reviewer checklists (idea…qa, lens-tagged), self-checklists (per task, bugfix, release), severity scale |
-| `references/reviewer-prompt.md` | Spawning a reviewer — prompt template, regression list, panel lenses, report format, timeout/fallback |
-| `references/tasks-schema.md` | Planning — `tasks.json` schema, parallel-safety rules, example |
+| `references/reviewer-prompt.md` | Spawning a reviewer — backends, prompt template, regression list, panel lenses + merge, report format, timeout/fallback |
+| `references/tasks-schema.md` | Planning + implementation — `tasks.json` schema, UI-polish task (rule 9), parallel worktrees, example |
 | `references/sibling-contracts.md` | Before invoking a sibling skill — inputs, outputs, traps |
 | `references/report-template.md` | Release — `notes.md` skeleton, filled from `verify.json` + state |
 
 | Script | Run at |
 |--------|--------|
-| `scripts/pipeline-state.sh` | Every transition — `init · status · get · set · bump · log · check · advance`; `advance` refuses while a gate is unmet |
+| `scripts/pipeline-state.sh` | Every transition — `init · status · get · set · bump · log · check · advance`; `advance` refuses while a gate is unmet (review re-validated with `--prev`, stale artifacts, verify sha) |
 | `scripts/verify-gate.sh` | implementation (per task + final, `--no-test`), test (`--coverage [--min-coverage n]`), release (`--build … --release`) — writes `verify.json` with `git_sha`, `dirty`, test counts, coverage; exit 1 on any `fail` |
 | `scripts/evidence-pack.sh` | Before the `qa` review — analyze, pub outdated, deps, secrets, manifest, gradle, risky-pattern greps → `artifacts/qa/evidence/` + `index.json`; never modifies the project |
 | `scripts/review-verdict.sh` | After every review (`--prev` from v2) — validates the report file and its regression list, prints verdict + severity counts, exit 1 = malformed (re-run reviewer) |
@@ -519,11 +492,7 @@ All scripts are bash 3.2-compatible (macOS `/bin/bash`).
 
 ## Scope
 
-Does: orchestrate idea → release with independent reviews, human gates,
-resumable state, and build-verified transitions for a Flutter project.
-
 Does not: sign for upload, generate store assets, check store policy
-(unless `store_bound`), or publish — hand off to `flutter-signing`,
-`flutter-build`, `flutter-store-metadata`, `flutter-store-compliance`,
-`flutter-publish`. Does not install Flutter (that is `flutter-init`'s job
-inside task 1) or claim an iOS build off macOS.
+(unless `store_bound`), or publish — hand off to the flutter-* store
+skills (release notes §7). Does not install Flutter (`flutter-init`'s job
+in T01) or claim an iOS build off macOS.

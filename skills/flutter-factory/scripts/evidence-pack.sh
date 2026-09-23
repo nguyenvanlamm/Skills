@@ -18,8 +18,12 @@
 # script, decide the verdict. `skipped_env` marks a fact a tool could not produce here.
 set -uo pipefail
 
+usage() { sed -n '2,18p' "$0" >&2; exit 2; }
 PROJECT=""; ROOT="$PWD"; STAGE="qa"
 while [ $# -gt 0 ]; do
+  case "$1" in
+    --project|--root|--stage) [ $# -ge 2 ] || usage;;
+  esac
   case "$1" in
     --project) PROJECT="$2"; shift 2;;
     --root) ROOT="$2"; shift 2;;

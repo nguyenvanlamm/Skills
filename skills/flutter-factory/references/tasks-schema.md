@@ -42,14 +42,21 @@ the pipeline never executes from prose.
       "title": "UI polish and licensed assets",
       "feature": "infra",
       "depends_on": ["T05", "T08", "T11"],  // every screen task
-      "files": ["lib/theme/**", "lib/widgets/**", "lib/features/**/presentation/**", "assets/**", "pubspec.yaml"],
+      "files": [                            // app-shell / router paths: take them from folder-structure.md
+        "lib/theme/**", "lib/widgets/**", "lib/features/**/presentation/**", "lib/features/about/**",
+        "lib/main.dart", "lib/app.dart", "lib/core/router/**", "lib/l10n/**",
+        "assets/**", "pubspec.yaml", "pubspec.lock", "test/**", ".gitignore"
+      ],
       "skill": "flutter-ui-revamp",
       "steps": [
-        "flutter-ui-revamp with style/seed/keep taken from artifacts/design/design-system.md (never ask the user again)",
-        "merge its ui-revamp/* branch back, re-run verify-gate --no-test",
-        "copy .revamp/report.md + audit.md to artifacts/implementation/evidence/"
+        "flutter-ui-revamp with project/style/seed/scope/keep from design-system.md + ux.md and every question pre-answered (sibling-contracts.md)",
+        "dependency-table row + DECISION-NNN for each package it added (lucide_icons_flutter, rive, flutter_gen, …)",
+        "update widget tests whose finders used the old icons (find.byIcon)",
+        "copy .revamp/report.md + audit.md to artifacts/implementation/evidence/",
+        "git merge --no-ff --no-commit ui-revamp/*; add .revamp/ to .gitignore (git rm -r --cached .revamp if committed); git commit -m 'feat(infra): UI polish and licensed assets [T12]'",
+        "re-run verify-gate --no-test on the merge commit"
       ],
-      "verify": "flutter analyze && flutter build apk --debug",
+      "verify": "flutter analyze && flutter build apk --debug",  // chosen per rule 9 from release_build + env.md
       "parallel_safe": false,
       "status": "pending"
     }
@@ -93,6 +100,22 @@ the pipeline never executes from prose.
    re-run before the task is marked done. If the skill is missing → inline
    fallback (theme tokens + empty/loading states by hand), logged as
    `fallbacks.flutter-ui-revamp: inline`.
+   - **`files`** must cover everything the revamp legitimately touches:
+     theme/widgets/presentation, the app shell that wires `theme:` /
+     `darkTheme:` and holds `RiveNative.init()` (`lib/main.dart`,
+     `lib/app.dart`), the router and an About/Credits feature when
+     attribution is needed, `lib/l10n/**` (its new strings go to
+     `app_en.arb`), `assets/**`, `pubspec.{yaml,lock}` and `test/**`
+     (icon-based finders break after the swap). Use the real paths from
+     `folder-structure.md`.
+   - **`verify`** follows `release_build` and `env.md`: `apk`/`appbundle`
+     with an Android SDK → `flutter analyze && flutter build apk --debug`;
+     `web` → `flutter analyze && flutter build web`; `none` or no SDK →
+     `flutter analyze` (the release gate then reports the build `skipped_env`).
+   - The task commit is the **merge commit** of its `ui-revamp/*` branch
+     (`git merge --no-ff --no-commit`, `.revamp/` added to `.gitignore` and
+     untracked, then `git commit -m "feat(infra): <title> [<id>]"`); the
+     skill's grouped commits stay underneath it.
 
 ## Orchestrator loop
 
