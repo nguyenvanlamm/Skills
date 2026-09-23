@@ -78,8 +78,9 @@ wrong, in which case report it anyway.
   - {{this}}
 {{/each}}
 {{#if project_dir}}
-- Project source: {{project_dir}}  (stage qa only — read lib/, test/, pubspec.yaml, android/app/build.gradle*)
+- Project source: {{project_dir}}  (stages test and qa — read lib/, test/, pubspec.yaml, android/app/build.gradle*)
 - Latest verify report: {{verify_json_path}}  — the ONLY acceptable evidence that analyze/test/build passed
+  (`tests` = pass/skip/fail counts, `coverage.percent` = line coverage, `git_sha` = the commit it verified)
 {{/if}}
 {{#if evidence_dir}}
 - Evidence pack: {{evidence_dir}}  (read index.json first; every file is tool output or a
@@ -162,7 +163,11 @@ Format (keep headings verbatim; the file is machine-validated):
 `Where` = file + heading or file:line; empty table only if verdict is APPROVE)
 
 ## Checklist results
-<every checklist line with pass / fail / n.a.; [E] passes include evidence>
+- [pass] <checklist line> — <evidence: file:line / evidence file § / verify.json step>
+- [fail] <checklist line> — F-07
+- [n.a.] <checklist line> — <why it does not apply>
+(one bullet per checklist line, status in square brackets exactly as above;
+[E] passes include evidence; every [fail] names its finding)
 
 ## Nits
 <minor items that do not affect the verdict>
@@ -216,13 +221,18 @@ audit.
    `subagent` for this and later reviews, `set reviewer_backend subagent`,
    log the reason.
 2. **Validate, don't parse by hand:**
-   `bash scripts/review-verdict.sh .pipeline/reviews/<stage>-vN.md`
-   prints the verdict and counts on stdout, exit 0. Exit 1 = malformed
-   (missing verdict, REVISE/BLOCK with no findings, APPROVE with
-   major/critical, bad finding ids, unresolved regression not in Findings)
+   `bash scripts/review-verdict.sh .pipeline/reviews/<stage>-vN.md --prev <previous>`
+   (`--prev` from v2 on: the previous merged report, or `<stage>-v(N-1)-gate.md`
+   after a human rejection) prints the verdict and counts on stdout, exit
+   0. Exit 1 = malformed (missing verdict, REVISE/BLOCK with no findings,
+   APPROVE with major/critical, bad or reused finding ids, a previous
+   finding without exactly one Regression row, a `resolved` id still in
+   Findings, unresolved regression not in Findings, Checklist results not
+   in `- [status]` form, more `[fail]` lines than findings)
    → re-run once with the note *"Your previous report was rejected by the
    validator: <reason>"* (allowed: it is about format, not content). Second
-   malformed report → ESCALATE.
+   malformed report → ESCALATE. Panel: validate each member file, then the
+   merged file.
 3. `pipeline-state.sh log "<stage>-v<n> <VERDICT>: <critical>/<major>/<minor> findings"`.
 4. On REVISE, the next generator pass receives the **Findings table only**
    as its requirements list, together with the original stage inputs. The

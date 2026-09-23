@@ -23,7 +23,7 @@ capabilities:
   - skill-discovery
   - flutter
 metadata:
-  version: 2.3.2
+  version: 2.4.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -48,16 +48,21 @@ interrupted run resumes exactly where it stopped.
 > and exited 0. Missing sibling skills lower the ceiling — they never stop
 > the run.
 
-Three consequences:
+Four consequences:
 
 - **Reviewer independence** — the reviewer receives artifact paths, the
   constitution, decisions, the stage checklist and (from v2) the previous
   Findings table. Never the draft discussion, never previous attempts'
   reasoning. Reports are machine-validated before they count.
 - **Verified transitions** — `scripts/verify-gate.sh` (pub get → analyze →
-  test → optional build) must pass before `test`, `qa` and `release`
-  advance. A step the environment cannot run is `skipped_env`, reported as
-  ⚠️ — never ✅, never a failure.
+  test → optional build) must pass before `implementation`, `test`, `qa`
+  and `release` advance, on a clean tree at the commit being advanced
+  (`verify.json` records `git_sha` + `dirty`). A step the environment
+  cannot run is `skipped_env`, reported as ⚠️ — never ✅, never a failure.
+- **Transitions are enforced, not narrated** — the stage only changes via
+  `pipeline-state.sh advance`, which re-validates the latest review file,
+  the human gate and `verify.json` and refuses (exit 1) while anything is
+  missing. `pipeline-state.sh check` lists the blockers without moving.
 - **`.pipeline/` tells the whole story** — every verdict, gate answer, skill
   fallback and decision is on disk. Someone reading only that folder can
   reconstruct the run.
@@ -83,11 +88,11 @@ On start, run `bash <skill-dir>/scripts/pipeline-state.sh init [--project <dir>]
 ```
 .pipeline/
   config.yaml          # human_gates, max_revisions, … (defaults below)
-  constitution.md      # project rules — ask the user or derive from the repo
+  constitution.md      # project rules — filled at the env stage (derive, mark guesses "(assumed)")
   state.yaml           # resume point — ALWAYS read first if it exists
   events.log           # append-only: every transition, verdict, fallback
   artifacts/<stage>/   # stage outputs (+ verify.json where a gate ran)
-  reviews/             # <stage>-vN.md review reports
+  reviews/             # <stage>-vN.md review reports (+ -<lens>.md panel members, -gate.md human rejections)
   bugfix/              # fix-NNN.md — one file per bugfix cycle
   decisions/           # DECISION-NNN.md — binding choices made mid-run
   tasks.json           # implementation task list (references/tasks-schema.md)
@@ -112,49 +117,92 @@ store_bound: false                       # true → QA also runs flutter-store-c
 
 ```yaml
 status: running          # running | waiting_user | blocked | done
-stage: planning          # stage currently in progress
-project_dir: ./spendly   # Flutter project root (set at implementation)
+stage: planning          # stage currently in progress — changed ONLY by `advance`
+project_dir: ./spendly   # Flutter project root (set right after T01)
 revisions.planning: 1
 bugfix_cycles: 0
-gates.idea: approved
+review.idea: approved    # validated reviewer APPROVE (informational; advance re-reads the file)
+gates.idea: approved     # human gate answer: approved | rejected | stopped
 fallbacks.idea-validator: inline   # skill missing → done natively
 reviewer_backend: subagent         # effective backend after fallback
 ```
 
 ```bash
 bash scripts/pipeline-state.sh status                 # print state + last 10 events
-bash scripts/pipeline-state.sh set stage design       # update a key
+bash scripts/pipeline-state.sh check                  # what still blocks leaving the current stage
+bash scripts/pipeline-state.sh advance                # move to the next stage — refused while check fails
 bash scripts/pipeline-state.sh bump revisions.design  # +1
 bash scripts/pipeline-state.sh log "design-v2 REVISE: 3 findings"
 ```
 
-Resume rule: if `state.yaml` exists, read it and continue from `stage`.
-Never restart a finished stage; never delete `.pipeline/` or the project
-directory without a fresh, explicit yes.
+`advance` requires, for the stage being left: the latest
+`reviews/<stage>-vN.md` validating as APPROVE (idea, planning, design,
+architecture, test, qa) · `gates.<stage>: approved` when the stage is in
+`human_gates` · a passing `verify.json` for a clean tree at the project's
+current HEAD (implementation, test, qa — the test gate re-run after the
+last bugfix — and release) · the stage's key artifacts (filled
+constitution + `env.md`; `idea.md`; `prd.md` + `tasks.json`; valid
+`style:`/`seed:` lines; `architecture.md` + `DECISION-001.md`; no
+pending task; QA `evidence/index.json`; release notes + `v*` tag on HEAD).
+`--override "<reason>"` exists **only** for an explicit user instruction;
+it is logged as `OVERRIDE` and listed in the release report.
+
+Resume rule: if `state.yaml` exists, run `status` then `check`, and
+continue from `stage`. Never restart a finished stage; never delete
+`.pipeline/` or the project directory without a fresh, explicit yes. When
+the session's context is near its limit, finish the current step, make
+sure its result is on disk, and resume from `.pipeline/` — never from
+memory.
+
+### Git layout
+
+- The Flutter project's repo is the **only** repo the pipeline commits
+  to, and `.pipeline/` is **never** committed to it.
+- Fresh run (default): `.pipeline/` at the workspace root, project at
+  `./<slug>` — T01 creates it and its git repo.
+- Existing Flutter repo (`pubspec.yaml` at the root): `project_dir: .`.
+- The workspace is already inside a git repo (monorepo): the project is a
+  sub-folder of that repo — tell `flutter-init` / `flutter create` **not**
+  to `git init` a nested repo.
+- `pipeline-state.sh init` adds `.pipeline/` to `.git/info/exclude` of the
+  repo containing the root and the project (local, no tracked file
+  changes). **Re-run `init --project <dir>` right after T01** so the new
+  repo gets the exclude too and `project_dir` is recorded.
+- Gates run on committed code: commit first, then `verify-gate` —
+  `advance` rejects a `verify.json` whose `git_sha` is not HEAD or whose
+  tree was dirty.
 
 ## Pipeline
 
 Track stages with `todo_write`. For each stage: **discover skills → produce
-artifacts → verify gate (where listed) → review → human gate (if listed) →
-advance**.
+artifacts → commit (code stages) → verify gate (where listed) → review →
+human gate (if listed) → `pipeline-state.sh advance`**. If `advance`
+refuses, fix what it lists — never `set stage` by hand.
 
 | # | Stage | Produces | Verify gate | Reviewer checks | Preferred skills |
 |---|-------|----------|-------------|-----------------|------------------|
-| 0 | `env` | `artifacts/env/env.md` | `flutter doctor -v` | — | — |
+| 0 | `env` | `artifacts/env/env.md`, filled `constitution.md` | `flutter doctor -v` | — | — |
 | 1 | `idea` | `artifacts/idea/idea.md` (+ `validate.md`) | — | scope clarity, feasibility, market fit, MVP ≤ 6 features | `idea-validator` |
 | 2 | `planning` | `artifacts/planning/prd.md`, `tasks.json` | — | PRD covers the idea; tasks ordered, measurable, each with `verify` | `prd-generator`, `tasks-generator` |
 | 3 | `design` | `artifacts/design/{ux,ui,design-system,states}.md` | — | usability, consistency, tokens, loading/error/empty per screen, a11y | generate: `frontend-design`, `logo-designer` · evidence for review: `dont-make-me-think` |
 | 4 | `architecture` | `artifacts/architecture/{architecture,folder-structure,coding-rules}.md`, `DECISION-001.md` (org, stack) | — | decisions vs PRD/constitution, dependency table, feasibility | `tad-generator` |
-| 5 | `implementation` | Flutter project at `project_dir` | `verify-gate --no-test` after **every** task | — (reviewed by QA) | `flutter-init` (task 1), `firebase-auth-setup`, `frontend-design`, matched per task, `flutter-ui-revamp` (last task) |
-| 6 | `test` | `test/`, `artifacts/test/report.md` | `verify-gate` (analyze + test) | tests green, edge cases, primary flow covered | `test-coverage` |
+| 5 | `implementation` | Flutter project at `project_dir` | `verify-gate --no-test` after **every** task, and once more on the final commit | — (reviewed by QA) | `flutter-init` (task 1), `firebase-auth-setup`, `frontend-design`, matched per task, `flutter-ui-revamp` (last task) |
+| 6 | `test` | `test/`, `artifacts/test/report.md` | `verify-gate --coverage [--min-coverage <PRD target>]` (analyze + test + counts + coverage) | tests green, edge cases, primary flow covered | `test-coverage` |
 | 7 | `qa` | `artifacts/qa/evidence/`, `reviews/qa-vN.md` | `evidence-pack.sh` | bugs, security, performance, clean code, secrets scan | evidence for review: `code-review` (`mode:review`), + `flutter-store-compliance` when `store_bound` |
-| 8 | `release` | tag, `artifacts/release/notes.md`, `verify.json` | `verify-gate --build <release_build> --release` | — | `release-manager`, `auto-push` |
+| 8 | `release` | release commit, `artifacts/release/notes.md`, `verify.json`, tag | `verify-gate --build <release_build> --release` on the release commit | — | `release-manager`, `auto-push` |
 
 ### Stage notes
 
 **env** — record Flutter/Dart version, Android SDK, JDK, Chrome, OS. This
 decides which `release_build` values are even possible; if the user's
-choice is impossible here, ask before continuing.
+choice is impossible here, ask before continuing. Then fill
+`constitution.md` — this is its only moment, and reviewers treat a
+contradiction with it as `critical`. Derive each field from the user's
+request, the repo (`README`, `AGENTS.md`, `analysis_options.yaml`, an
+existing `pubspec.yaml`) and `env.md`; where you had to guess, write the
+default and end the line with `(assumed)`. Do not ask the user unless a
+rule they stated conflicts with rules 8–9. `advance` refuses a field left
+empty.
 
 **idea** — one sentence from the user is enough. Fill gaps with
 assumptions and list them in `idea.md` under `## Assumptions`. Do not ask
@@ -184,24 +232,47 @@ minSdk/targetSdk, localisation (`gen-l10n`, `app_en.arb` first, extra
 locales per PRD — rule 9), and the dependency table (package · why · what
 breaks without it).
 
-**implementation** — execute `tasks.json` in order. After each task run
-the *implementation — per task (self)* checklist in `review-checklists.md`:
-`verify-gate --no-test` `ok`, `task.verify` green, diff inside `files`, no
-new dependency without a table row, then `git commit` with the task id in
-the message (`feat(<feature>): <title> [<id>]`, **in English** — see rule
-8), `pipeline-state.sh set task.<id> done`, and one line in
-`artifacts/implementation/tasks-log.md`. If
-`parallel_implementation: true`, delegate tasks whose `files` sets are
-disjoint to parallel `subagent_general` agents — each receives
-constitution + architecture + decisions + its task only, commits on its
-own branch `task/<id>`, and the orchestrator merges in task order and
-re-runs the gate after each merge.
+**implementation** — execute `tasks.json` in order. Right after T01,
+re-run `pipeline-state.sh init --project <dir>` (records `project_dir`,
+excludes `.pipeline/` from the new repo — see Git layout). After each task
+run the *implementation — per task (self)* checklist in
+`review-checklists.md`: `verify-gate --no-test` `ok`, `task.verify` green,
+diff inside `files`, no new dependency without a table row, then `git
+commit` with the task id in the message (`feat(<feature>): <title> [<id>]`,
+**in English** — see rule 8), `pipeline-state.sh set task.<id> done`, and
+one line in `artifacts/implementation/tasks-log.md`. After the last task
+(and its merge) run `verify-gate --no-test --stage implementation` once
+more on the committed tree — that is the `verify.json` `advance` checks.
+
+If `parallel_implementation: true`, delegate tasks whose `files` sets are
+disjoint to parallel `subagent_general` agents, **one git worktree per
+task** — a single checkout cannot hold several branches at once:
+
+```bash
+git -C <project_dir> worktree add ../wt-<id> -b task/<id>   # from the current working-branch HEAD
+# subagent works only inside ../wt-<id>: flutter pub get, implement, task.verify, commit
+git -C <project_dir> merge --no-ff task/<id>                # orchestrator, in id order
+git -C <project_dir> worktree remove ../wt-<id> && git -C <project_dir> branch -d task/<id>
+```
+
+Each subagent receives constitution + architecture + decisions + its task
+object + the absolute worktree path, and is told to touch nothing outside
+it and never to merge. The orchestrator merges in id order and re-runs
+`verify-gate --no-test` after each merge; a red merge is fixed by the
+orchestrator.
 
 **test** — write tests yourself first (unit: models/validators/repos;
 widget: each design-system component + each form + loading/error/empty;
-integration: the primary flow), then invoke `test-coverage` to fill gaps.
-Red → fix the cause, not the assertion; 3 rounds per failing test, then a
-recorded blocker.
+flow: the primary flow from `ux.md` as a **widget-level flow test in
+`test/flows/`** that pumps the app with fakes — it runs headless, so the
+gate actually executes it), then invoke `test-coverage` to fill gaps.
+`integration_test/` on a device is optional; without
+`--integration-device` the gate reports it `skipped_env`. Red → fix the
+cause, not the assertion; 3 rounds per failing test, then a recorded
+blocker. Commit the tests, then run `verify-gate --stage test --coverage`
+(add `--min-coverage <n>` with the PRD target) — `verify.json` then
+carries the pass/skip/fail counts and the coverage figure the reviewer
+and the report quote.
 
 **qa** — reviewers are read-only and cannot invoke skills, so the
 orchestrator builds an **evidence pack** first: `bash scripts/evidence-pack.sh
@@ -219,16 +290,26 @@ to `[E]` checklist lines, never verdicts to copy. Findings are numbered
 Same pattern for `design`: run `dont-make-me-think` on `ux.md`/`ui.md` →
 `evidence/dmmt-report.md`, pass `krug-principles.md` as methodology.
 
-**release** — `verify-gate --build <release_build> --release` must be `ok`
-(it also blocks on `com.example`, leaked secrets and a red test suite),
-and the *release (self)* checklist is answered in `notes.md` §2 before
-tagging.
-Then bump version in `pubspec.yaml`, write `notes.md` from
-`references/report-template.md`, commit (`chore(release): v<version>`,
-English), tag `v<version>`. Push only if the
-user says so (`auto-push` / `release-manager` if present). "Next steps"
-lists `flutter-signing → flutter-build → flutter-store-metadata →
-flutter-store-compliance → flutter-publish`.
+**release** — the build that gets verified is the commit that gets
+tagged, so the order is fixed:
+
+1. Bump `version:` in `pubspec.yaml` (+ project `CHANGELOG.md` if any),
+   commit `chore(release): v<version>` (English).
+2. `verify-gate --build <release_build> --release --stage release` on that
+   clean commit — must be `ok` (it also blocks on `com.example`, leaked
+   secrets and a red test suite).
+3. Write `notes.md` from `references/report-template.md` (it lives in
+   `.pipeline/`, so writing it does not dirty the project) and answer the
+   *release (self)* checklist in its §2.
+4. **Human gate** (`release` is in `human_gates` by default): ask with the
+   notes path, version and the §2/§6 summary. Reject → fix, new commits,
+   back to step 2.
+5. Approved → `git tag v<version>` on that commit → `pipeline-state.sh
+   advance` (checks verify.json sha = HEAD = tagged commit).
+
+Push only if the user says so (`auto-push` / `release-manager` if
+present). "Next steps" lists `flutter-signing → flutter-build →
+flutter-store-metadata → flutter-store-compliance → flutter-publish`.
 
 ## Review loop
 
@@ -258,10 +339,18 @@ F-06), then returns a completion signal. **The file is the durable
 callback**; validate it, never parse it by hand:
 
 ```bash
-bash scripts/review-verdict.sh .pipeline/reviews/<stage>-vN.md
+bash scripts/review-verdict.sh .pipeline/reviews/<stage>-vN.md [--prev .pipeline/reviews/<stage>-v(N-1)[-gate].md]
 # stdout: REVISE critical=0 major=2 minor=1 findings=3 regression_unresolved=1   (exit 0)
 # exit 1: MALFORMED: <reason>  → re-run the reviewer once quoting the reason; twice → ESCALATE
 ```
+
+`--prev` is **mandatory from v2 on** — it is what proves the regression
+list was honoured: one Regression row per previous finding, no invented
+rows, no `resolved` id still in Findings, new ids above the previous
+maximum. Pass the previous merged report, or the `-gate.md` file when the
+previous round ended in a human rejection. The validator also requires
+`- [pass|fail|n.a.] …` lines under Checklist results and a finding for
+every `[fail]` (except on ESCALATE).
 
 Waiting: `review_timeout_min` (default 15) bounds `opencode` / `herdr`
 reviewers (`timeout`, `wait`). No file after the limit → re-run once →
@@ -270,23 +359,27 @@ still nothing → fall back to `subagent` for the rest of the run and log it.
 **Panel review** — for stages in `panel_stages` (default `[qa]`), spawn
 one reviewer per lens in parallel (`qa`: `[sec]` + `[cor]`; checklist lines
 carry their lens tag; see `reviewer-prompt.md` for the other stages), each writing
-`<stage>-vN-<lens>.md`. Merge into `<stage>-vN.md`: strictest verdict,
-union of findings de-duplicated and re-numbered, a regression item is
-`resolved` only if every member agrees. Lens diversity is the cheap
-substitute for model diversity when the backend is `subagent`.
+`<stage>-vN-<lens>.md` (each validated, with `--prev` from v2). Merge into
+`<stage>-vN.md`: strictest verdict, union of findings de-duplicated and
+re-numbered, a regression item is `resolved` only if every member agrees;
+validate the merged file too — it is the one `advance` reads. Lens
+diversity is the cheap substitute for model diversity when the backend is
+`subagent`.
 
 Handling (of the validated, merged file):
 
-- **APPROVE** → `set gates.<stage> approved`, log, advance (via human gate if listed)
+- **APPROVE** → `set review.<stage> approved`, log, then the human gate if
+  the stage is listed, then `advance`
 - **REVISE** → redo the stage with the Findings table as the requirements
   list, `bump revisions.<stage>`, re-review with that table as
   `previous_findings`. After `max_revisions` failed cycles → treat as
   ESCALATE.
   Exception — at `qa`, REVISE starts a **bugfix cycle** (QA produces no
   code): write `bugfix/fix-NNN.md` mapping each `F-nn` → change, fix the
-  code, re-run the `test` gate (must be `ok`), answer the *bugfix cycle
-  (self)* checklist at the top of the file, then re-review QA. Each loop
-  `bump bugfix_cycles`; exceeding `max_bugfix_cycles` → ESCALATE.
+  code, commit, re-run `verify-gate --stage test` on that commit (must be
+  `ok`), answer the *bugfix cycle (self)* checklist at the top of the
+  file, then re-review QA. Each loop `bump bugfix_cycles`; exceeding
+  `max_bugfix_cycles` → ESCALATE.
 - **BLOCK** → `set status blocked`, write `artifacts/<stage>/BLOCKED.md`
   with the reviewer's reason, stop.
 - **ESCALATE** → `set status waiting_user`, ask the user (see human gates).
@@ -309,11 +402,23 @@ across backends — only the transport differs.
 For each stage in `human_gates`, after its review approves, `set status
 waiting_user` and call `ask_user_question`. The question text carries the
 reviewer's Summary, the Nits count and the artifact paths — the user judges
-the artifact, not the chat. Options: **approve** (continue) / **reject**
-(revision loop with the user's note as the only finding, id continuing the
-sequence) / **stop**. Record the answer as
-`gates.<stage>: approved|rejected|stopped`. `human_gates: []` = fully
+the artifact, not the chat. Options: **approve** (continue) / **reject** /
+**stop**. Record the answer as `gates.<stage>: approved|rejected|stopped`
+— `advance` refuses anything but `approved`. `human_gates: []` = fully
 autonomous.
+
+- **reject** → write `reviews/<stage>-vN-gate.md` (N = the approved
+  review's number) in the reviewer format: `## Verdict: REVISE`, Summary
+  "Rejected at the human gate", one `major` finding holding the user's
+  note verbatim with the next free id, and `- [fail] human gate`
+  under Checklist results. Redo the stage with it as the requirements
+  list; the next review is v(N+1) with that file as `previous_findings`
+  and `--prev`.
+- **stop** → keep `status: waiting_user`, log `gate <stage> stopped`, end
+  the run; resume only when the user says so.
+- **`release` has no reviewer** — its gate is asked after `verify-gate
+  --release` passed on the release commit and `notes.md` is written, and
+  **before** the tag (see the release stage note).
 
 ## Skill discovery
 
@@ -356,6 +461,9 @@ otherwise stop a run mid-stage.
    greps for them at release).
 5. Every verdict, gate answer, fallback and decision goes through
    `pipeline-state.sh` — the `.pipeline/` dir must tell the whole story.
+   The stage changes only through `advance`; `--override` only when the
+   user explicitly tells you to bypass a named blocker, and every override
+   appears in `notes.md` §6.
 6. Keep going end to end: stop only on BLOCK, a rejected/stopped gate,
    exhausted revisions or bugfix cycles, or explicit user interrupt.
 7. Smallest architecture that stays testable — no `domain/` layers, DI
@@ -381,12 +489,12 @@ otherwise stop a run mid-stage.
 
 ```
 .pipeline/
-  state.yaml            status: done, every gates.<stage>: approved
-  reviews/              one APPROVE per gated stage, qa-vN APPROVE last
-  artifacts/release/    notes.md + verify.json (analyze ok · test ok · build ok|skipped_env)
+  state.yaml            status: done, stage: done (reached via `advance`), gates.<h>: approved for every human gate
+  reviews/              one APPROVE per reviewed stage, qa-vN APPROVE last
+  artifacts/release/    notes.md + verify.json (analyze ok · test ok · build ok|skipped_env · dirty false)
 <project_dir>/
-  lib/ test/            flutter analyze clean, flutter test green
-  pubspec.yaml          version bumped, git tag v<version> on the release commit
+  lib/ test/            flutter analyze clean, flutter test green (test/flows/ covers the primary flow)
+  pubspec.yaml          version bumped, git tag v<version> on the commit verify.json names
   android/app/build.gradle*   applicationId = <org>.<slug>, not com.example
 ```
 
@@ -402,10 +510,12 @@ otherwise stop a run mid-stage.
 
 | Script | Run at |
 |--------|--------|
-| `scripts/pipeline-state.sh` | Every transition — `init · status · get · set · bump · log` |
-| `scripts/verify-gate.sh` | implementation (per task, `--no-test`), test, release (`--build … --release`) — writes `verify.json`, exit 1 on any `fail` |
+| `scripts/pipeline-state.sh` | Every transition — `init · status · get · set · bump · log · check · advance`; `advance` refuses while a gate is unmet |
+| `scripts/verify-gate.sh` | implementation (per task + final, `--no-test`), test (`--coverage [--min-coverage n]`), release (`--build … --release`) — writes `verify.json` with `git_sha`, `dirty`, test counts, coverage; exit 1 on any `fail` |
 | `scripts/evidence-pack.sh` | Before the `qa` review — analyze, pub outdated, deps, secrets, manifest, gradle, risky-pattern greps → `artifacts/qa/evidence/` + `index.json`; never modifies the project |
-| `scripts/review-verdict.sh` | After every review — validates the report file, prints verdict + severity counts, exit 1 = malformed (re-run reviewer) |
+| `scripts/review-verdict.sh` | After every review (`--prev` from v2) — validates the report file and its regression list, prints verdict + severity counts, exit 1 = malformed (re-run reviewer) |
+
+All scripts are bash 3.2-compatible (macOS `/bin/bash`).
 
 ## Scope
 

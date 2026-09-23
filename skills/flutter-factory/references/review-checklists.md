@@ -2,8 +2,9 @@
 
 One checklist per review point. The orchestrator pastes the relevant block
 verbatim into the reviewer prompt (`reviewer-prompt.md`). A reviewer answers
-every line with **pass / fail / n.a.** and turns every *fail* into a numbered
-finding.
+every line as `- [pass] …` / `- [fail] …` / `- [n.a.] …` under
+`## Checklist results` and turns every `[fail]` into a numbered finding —
+`review-verdict.sh` rejects a report with more `[fail]` lines than findings.
 
 ## Markers
 
@@ -54,7 +55,7 @@ without the user (conflicting constitution vs PRD, missing business input).
 - [ ] Data model sketch: entities, key fields, relationships — enough for architecture to pick persistence.
 - [ ] External dependencies listed with their cost: APIs needing keys, backend, accounts, paid services — and what happens when each is unavailable.
 - [ ] Risks section: top 3 with mitigation or explicit acceptance.
-- [ ] Test strategy stated: what is unit / widget / integration tested; coverage target.
+- [ ] Test strategy stated: what is unit / widget / flow tested (primary flow as a headless widget flow test in `test/flows/`; device `integration_test/` optional); coverage target as a number (it becomes `--min-coverage`).
 - [ ] **[E]** `tasks.json` validates against `tasks-schema.md` (ids unique, `depends_on` acyclic, every task has `verify`).
 - [ ] Task 1 is the scaffold; no task edits code before it.
 - [ ] Last task is UI polish (`skill: flutter-ui-revamp`) and depends on every screen task; no task runs after it.
@@ -106,17 +107,17 @@ Lenses: `feas` = buildability & dependencies · `fit` = constitution/PRD fit & s
 
 ## test
 
-- [ ] **[E]** `verify.json` in `artifacts/test/` shows `analyze: ok` and `test: ok` from **this** run.
+- [ ] **[E]** `verify.json` in `artifacts/test/` shows `analyze: ok` and `test: ok`, `dirty: false`, and `tests.failed: 0`; quote `tests` and `git_sha`.
 - [ ] **[E]** Unit tests exist for every model, validator and repository.
 - [ ] Widget tests cover each design-system component and each form (valid + invalid input).
 - [ ] Loading / error / empty states each have a widget test.
-- [ ] **[E]** One integration test drives the primary flow from `ux.md`.
+- [ ] **[E]** A flow test in `test/flows/` drives the primary flow from `ux.md` end to end with fakes (headless — the gate runs it). `integration_test/` is optional; its `skipped_env` row is not a fail.
 - [ ] Edge cases: empty input, max length, offline/failed repository, rapid double-tap.
 - [ ] Unit tests hit no real network, file system or clock — fakes/injected `Clock` only.
 - [ ] No flaky patterns: `pumpAndSettle` on screens with infinite animations, real `Future.delayed`, order-dependent tests.
 - [ ] No test asserts on implementation details (private method names, exact widget tree depth).
-- [ ] Coverage meets the PRD target (or a `DECISION-*` lowers it with a reason); `flutter test --coverage` figure quoted.
-- [ ] `report.md` lists counts (unit/widget/integration), skipped tests with reasons, and any flaky test.
+- [ ] **[E]** Coverage meets the PRD target (or a `DECISION-*` lowers it with a reason): quote `coverage.percent` (and `coverage.min` if the gate enforced it) from `verify.json`.
+- [ ] `report.md` lists counts (unit/widget/flow, matching `verify.json` `tests`), skipped tests with reasons, and any flaky test.
 
 ## qa
 
@@ -182,7 +183,9 @@ Answered by the orchestrator after every task, recorded as a line in
 - [ ] No secret literal introduced (grep the diff).
 - [ ] New user-facing strings went into `app_en.arb` (English), not into widget code; identifiers and comments are English.
 - [ ] Commit message `feat(<feature>): <title> [<id>]`, written in English; `pipeline-state.sh set task.<id> done`.
-- [ ] Parallel mode: branch `task/<id>` merged in id order and gate re-run after the merge.
+- [ ] T01 only: `pipeline-state.sh init --project <dir>` re-run (`project_dir` set, `.pipeline/` excluded); no nested git repo when the workspace is already a repo.
+- [ ] Parallel mode: task ran in its own worktree `../wt-<id>` on `task/<id>`; merged in id order, gate re-run after the merge, worktree removed and branch deleted.
+- [ ] Last task: `verify-gate --no-test --stage implementation` re-run on the final committed tree (`dirty: false`, `git_sha` = HEAD).
 
 ## bugfix cycle (self)
 
@@ -194,19 +197,19 @@ Answered before re-running the QA review; recorded at the top of
 - [ ] No new dependency without a dependency-table row.
 - [ ] A regression test was added for every `critical`/`major` bug fix.
 - [ ] Fix commit message in English — `fix(<feature>): <summary> [F-nn, …]`.
-- [ ] `verify-gate` (analyze + test) is `ok` after the fixes; `verify.json` path recorded.
+- [ ] Fixes committed first, then `verify-gate --stage test --coverage` is `ok` on that commit (`dirty: false`); `verify.json` path recorded.
 - [ ] `bugfix_cycles` bumped; the next QA prompt receives this cycle's Findings table as `previous_findings`.
 
 ## release (self)
 
 Answered before tagging; recorded in `artifacts/release/notes.md` §2.
 
-- [ ] `verify-gate --build <release_build> --release` is `ok` — analyze, test, build, `app_id`, `secrets` all `ok` (or `skipped_env` with a reason the user accepted).
-- [ ] Every stage in `gates.*` is `approved`; latest `qa-vN.md` is APPROVE.
-- [ ] Working tree clean; on the intended branch.
-- [ ] `pubspec.yaml` version bumped (semver + build number); tag `v<version>` does not already exist.
-- [ ] Release commit message in English (`chore(release): v<version>`); `git log` shows no non-English commit from this run.
-- [ ] `CHANGELOG`/`notes.md` filled from `verify.json`, `state.yaml`, `events.log`, `reviews/`, `tasks.json` only.
-- [ ] `notes.md` §6 lists every blocked task and unresolved finding — nothing dropped.
+- [ ] `pubspec.yaml` version bumped (semver + build number) and committed as `chore(release): v<version>` (English) **before** the gate; tag `v<version>` does not already exist.
+- [ ] `verify-gate --build <release_build> --release` is `ok` on that commit — analyze, test, build, `app_id`, `secrets` all `ok` (or `skipped_env` with a reason the user accepted); `dirty: false`, `git_sha` = HEAD.
+- [ ] Every earlier stage was left via `advance` (events.log shows `advance <stage>→…` for each; any `OVERRIDE` line is listed in §6); latest `qa-vN.md` is APPROVE.
+- [ ] On the intended branch; `git log` shows no non-English commit from this run.
+- [ ] `notes.md` filled from `verify.json`, `state.yaml`, `events.log`, `reviews/`, `tasks.json` only (a project `CHANGELOG.md`, if any, went into the release commit from `tasks.json` + `reviews/`).
+- [ ] `notes.md` §6 lists every blocked task, unresolved finding and `OVERRIDE` — nothing dropped.
+- [ ] Human gate asked with notes path + version, answered `approved`, **then** `git tag v<version>`, then `pipeline-state.sh advance`.
 - [ ] `notes.md` §7 hands off to `flutter-signing → flutter-build → flutter-store-metadata → flutter-store-compliance → flutter-publish`.
 - [ ] Push only if the user asked; otherwise the report says "not pushed".

@@ -1,5 +1,31 @@
 # Changelog
 
+## v2.4.0 — 2026-09-23
+
+The core principle ("a stage never advances on a claim") was prose only; the scripts now enforce it. Every fix below was found by exercising the v2.3.2 scripts and exercised again against a real `flutter create` project.
+
+### Added
+- **`pipeline-state.sh advance` / `check`** — the only way to change stage. Refuses (exit 1, reasons listed, refusal logged) unless, for the stage being left: the latest `reviews/<stage>-vN.md` re-validates as APPROVE; `gates.<stage>: approved` when the stage is in `human_gates`; `verify.json` passed on a clean tree whose `git_sha` is the project's HEAD (implementation, test, qa, release); key artifacts exist (filled constitution, `idea.md`, `prd.md` + `tasks.json`, valid `style:`/`seed:` lines, `DECISION-001.md`, no pending task, QA `evidence/index.json`, release notes + `v*` tag on HEAD). `--override "<reason>"` only on explicit user instruction, logged as `OVERRIDE` and reported in `notes.md` §6. `set stage` now warns.
+- **`verify.json` is bound to a commit** — `git_sha` + `dirty` (tree state when the gate started, `.pipeline/` excluded).
+- **`verify-gate.sh --coverage [--min-coverage <pct>]`** — lcov line coverage in `verify.json` (`coverage.percent`, `min`), a `coverage` step that fails below the PRD target, and `tests` pass/skip/fail counts parsed from `flutter test` for every run. The test checklist's coverage and counts lines are now answerable (`[E]`) instead of failing by construction.
+- **`review-verdict.sh --prev <previous report>`** (mandatory from v2): exactly one Regression row per previous finding, no invented rows, a `resolved` id may not stay in Findings, new ids must exceed the previous maximum. Also validates `## Checklist results` as `- [pass|fail|n.a.] …` bullets and rejects more `[fail]` lines than findings (except ESCALATE). v2.3.2 accepted a v2 report that silently dropped F-02…F-05 and restarted numbering.
+- **Git layout** section: the project repo is the only repo committed to; `.pipeline/` never enters it. `init` adds `.pipeline/` to `.git/info/exclude` of the repo containing root/project and is re-run after T01 (records `project_dir`). No nested repo inside an existing one (`flutter-init` trap documented). Gates run on committed code.
+- **Human-gate rejection file** `reviews/<stage>-vN-gate.md` (REVISE, the user's note as a `major` finding) so the next review has a `--prev` target.
+
+### Fixed
+- **Parallel implementation could not work**: several subagents cannot hold different `task/<id>` branches in one checkout. Now one `git worktree` per task (`../wt-<id>`), merged in id order by the orchestrator, then removed.
+- **bash 3.2 (macOS `/bin/bash`)**: `review-verdict.sh` used `declare -A`; `verify-gate.sh` expanded an empty `DEFINES[@]` under `set -u` ("unbound variable") on every build without `--dart-define`. Both removed; options missing their value now exit 2 instead of looping.
+- **`integration_test/`**: with only `integration_test/`, `flutter test` looked for `test/` and failed; with both, integration tests never ran although the checklist demanded one `[E]`. The gate now runs `flutter test test`; `integration_test/` runs only with `--integration-device <id>` (else `skipped_env`). The primary flow is a headless widget flow test in `test/flows/`.
+- **Release gate verified a different commit than the one tagged** (verify → bump → commit → tag). New order: bump + commit → verify on that commit → notes → human gate → tag → `advance`.
+- **`release` human gate had no defined moment** ("after its review approves" — release has no reviewer). Now: after the release verify and notes, before the tag.
+- **Constitution was never filled at a defined point**, yet reviewers score contradictions with it as `critical`. It is now filled at `env` (derived, guesses marked `(assumed)`); `advance` refuses empty fields.
+- Coverage percentage is computed with `LC_ALL=C` so a comma-decimal locale (e.g. `vi_VN`) cannot produce invalid JSON.
+
+### Changed
+- `state.yaml`: reviewer APPROVE is `review.<stage>`; `gates.<stage>` is only the human answer (they used to share a key, so an APPROVE could stand in for the human gate).
+- Reviewer prompt: test stage also gets the project dir; `verify.json` fields explained; Checklist results format fixed.
+- Bugfix cycle and test stage: commit first, then gate. `flutter-store-compliance`'s `store-metadata/` must be committed before the release commit.
+
 ## v2.3.2 — 2026-09-22
 
 ### Added

@@ -17,8 +17,9 @@ the pipeline never executes from prose.
       "files": ["pubspec.yaml", "lib/main.dart", "android/**", "ios/**"],
       "skill": "flutter-init",              // preferred sibling skill or null
       "steps": [
-        "flutter-init with project_name=spendly org=<DECISION-001> platforms=android,ios",
-        "pin compileSdk/targetSdk per architecture.md"
+        "flutter-init with project_name=spendly org=<DECISION-001> platforms=android,ios (no nested git init if the workspace is already a repo)",
+        "pin compileSdk/targetSdk per architecture.md",
+        "pipeline-state.sh init --project spendly (records project_dir, excludes .pipeline/ from the repo)"
       ],
       "verify": "flutter analyze",          // shell command, exit 0 = done
       "parallel_safe": false,
@@ -59,7 +60,8 @@ the pipeline never executes from prose.
 ## Rules
 
 1. **T01 is always the scaffold.** Nothing else may run first; its `verify`
-   is `flutter analyze`.
+   is `flutter analyze`. It ends by re-running `pipeline-state.sh init
+   --project <dir>` (SKILL.md → Git layout).
 2. **Every task has `verify`.** The reviewer rejects a plan with a task that
    cannot prove itself. Prefer scoped commands (`flutter test <dir>`) so
    failures point at the task.
@@ -103,14 +105,27 @@ for task in topological order:
     both ok → commit → mark done
     fail     → fix (max 3 rounds) → still failing → status: blocked, continue
                with tasks that do not depend on it, then ESCALATE at stage end
+after the last task:
+    bash verify-gate.sh --project <project_dir> --no-test --stage implementation   # on the committed tree
+    pipeline-state.sh advance                                                     # checks sha = HEAD, no pending task
 ```
 
 With `parallel_implementation: true`, take the largest set of ready,
-`parallel_safe`, pairwise-disjoint tasks; give each to a `subagent_general`
-with constitution + architecture + decisions + **its task object only**;
-each works on branch `task/<id>` and commits there with the English
-message `feat(<feature>): <title> [<id>]` (state it in the subagent
-prompt). Orchestrator merges in
-id order, running `verify-gate --no-test` after each merge; a red merge is
-fixed by the orchestrator, never by re-spawning the subagent with the
-conflict.
+`parallel_safe`, pairwise-disjoint tasks. A single checkout can only have
+one branch checked out, so each task gets its **own git worktree**:
+
+```bash
+git -C <project_dir> worktree add ../wt-<id> -b task/<id>     # one per task, from the working-branch HEAD
+```
+
+Give each to a `subagent_general` with constitution + architecture +
+decisions + **its task object only** + the absolute worktree path. The
+subagent works only inside that worktree (`flutter pub get` there first),
+runs `task.verify`, and commits on `task/<id>` with the English message
+`feat(<feature>): <title> [<id>]` (state it in the subagent prompt); it
+never merges and never touches the main checkout. When all are done, the
+orchestrator merges `task/<id>` into the working branch in id order
+(`git merge --no-ff`), running `verify-gate --no-test` after each merge,
+then `git worktree remove ../wt-<id>` and `git branch -d task/<id>`. A red
+merge is fixed by the orchestrator, never by re-spawning the subagent with
+the conflict.
