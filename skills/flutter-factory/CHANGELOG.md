@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.6.1 — 2026-09-23
+
+The contract is now aligned with `flutter-ui-revamp` v1.4.0, which added about 40 licence-verified sources, direct download URLs and new `fetch_asset.py` behaviour.
+
+### Changed
+- `sibling-contracts.md`: the `flutter-ui-revamp` row now targets v1.4.
+  - The Step 3 licence pre-answer rejects no-licence art.
+  - CC BY-SA assets are allowed only if used unmodified, never recoloured (trap 8).
+  - The licence judged is the **upstream** art's licence, not the pub wrapper's (trap 11). So `solar_icons` and `iconsax_flutter` are rejected, and `animated_emoji` counts as CC BY.
+  - Nothing under the Remix Icon License may be used as a launcher, splash or store icon (trap 12).
+  - Assets are fetched only through the *Direct download URLs* sections or `--local`, never from guessed URLs.
+  - The icon set must expose const `IconData`, so `apply_icons.py` can swap it.
+  - Step 4 uses `--filename` for generic basenames and `--strip N` for nested archives. When `fetch_asset.py` refuses a download, the fix is to pick another source.
+- Checklists: the design `[cons]` assets line and the QA `[sec] [E]` asset-licence line now check the upstream licence, unmodified BY-SA assets and the Remix app-icon rule. The design line also checks for const `IconData`.
+
 ## v2.6.0 — 2026-09-23
 
 A run now also ends with an App Store-ready iOS kit, prepared on any OS (including Linux). The IPA itself is built later on a Mac with one command, and nothing is uploaded. The iOS logic lives in the new sibling skill `flutter-ios-release`; flutter-factory only wires it in and gates on it.

@@ -24,7 +24,7 @@ capabilities:
   - skill-discovery
   - flutter
 metadata:
-  version: 2.6.0
+  version: 2.6.1
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }

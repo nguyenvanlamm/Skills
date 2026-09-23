@@ -83,7 +83,7 @@ orchestrator ran the skill on `ux.md`/`ui.md`: `evidence/dmmt-report.md`.
 - [ ] **[cons]** Light + dark palettes; body-text contrast ≥ 4.5:1 stated or computed.
 - [ ] **[cons]** Touch targets ≥ 48 dp; text scales with system font size; icon-only buttons have a semantics label.
 - [ ] **[cons]** All copy in `ui.md`/`states.md` is written in English (the default locale) and consistent (same verb for the same action everywhere); translations, if any, are a separate section keyed by the English string.
-- [ ] **[cons]** Assets: icon set / fonts / illustrations named with licence; none require attribution the app does not give.
+- [ ] **[cons]** Assets: icon set / fonts / illustrations named with their **upstream** licence (not the pub package's); none require attribution the app does not give; the icon set's Flutter package exposes const `IconData` (or the design says a widget refactor is budgeted); the app icon source is not under a no-logo licence (Remix Icon).
 - [ ] Nothing requires a component the architecture stage could not build in Flutter without a paid package.
 
 ## architecture
@@ -157,7 +157,7 @@ only when `store_bound`).
 - [ ] **[sec]** Release build has R8/minify enabled or a `DECISION-*` says why not. `→ gradle.txt`
 - [ ] **[sec] [E]** `flutter pub outdated` shows no dependency with a known advisory; discontinued packages flagged. `→ outdated.json`
 - [ ] **[sec]** Deep links / intent filters validate their input. `→ manifest.txt` §intent-filter data
-- [ ] **[sec] [E]** Asset licences: every file under `assets/` (fonts, icons, illustrations, animations, audio) has a row in `assets/CREDITS.md` with source + licence; none is GPL / CC-BY-NC / all-rights-reserved / third-party IP; every attribution-required asset has a visible credit (`showLicensePage` or an About screen) and bundled fonts are registered in `LicenseRegistry`. `→ assets/CREDITS.md`, `evidence/revamp-report.md`
+- [ ] **[sec] [E]** Asset licences: every file under `assets/` (fonts, icons, illustrations, animations, audio) has a row in `assets/CREDITS.md` with source + licence; none is GPL / CC-BY-NC / all-rights-reserved / no-licence / third-party IP; the licence recorded is the **upstream** art's, not the pub wrapper's; CC BY-SA assets are unmodified; no Remix Icon glyph in the launcher icon, splash or store icon; every attribution-required asset has a visible credit (`showLicensePage` or an About screen) and bundled fonts are registered in `LicenseRegistry`. `→ assets/CREDITS.md`, `evidence/revamp-report.md`
 - [ ] **[sec]** Store policy (only when `store_bound: true`) — `flutter-store-compliance` output referenced; its BLOCK rows are `critical` here.
 
 ### iOS `[sec]` (only when `ios_release: true`)
