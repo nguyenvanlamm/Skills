@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.6.0 — 2026-09-23
+
+A run now also ends with an App Store-ready iOS kit, prepared on any OS (including Linux). The IPA itself is built later on a Mac with one command, and nothing is uploaded. The iOS logic lives in the new sibling skill `flutter-ios-release`; flutter-factory only wires it in and gates on it.
+
+### Added
+- **`ios_release: true`** is on by default in `config.yaml`.
+  - T01 creates `ios/` even on Linux, which overrides `flutter-init`'s "non-macOS → android only" rule.
+  - Architecture records an iOS `DECISION-*`: bundle id, team id or "at build time", device family, deployment target, encryption exemption.
+  - A final implementation task (`tasks-schema.md` rule 10, example T13, `files` = `ios/**`, `ios-release/**`, `.gitignore`) runs `flutter-ios-release`. It never touches `lib/`, so rule 9 now reads "last *screen-affecting* task is UI polish".
+- **`verify-gate.sh --check NAME=COMMAND`** (repeatable): a generic extra gate step that runs in the project dir and passes on exit 0. The release gate uses it as `--check ios_kit='python3 <flutter-ios-release>/scripts/ios_prep_check.py --project .'`.
+- **`advance` out of `release`** requires an `ok` `ios_kit` step when `ios_release: true`, unless `fallbacks.flutter-ios-release: inline` is set (then only a note is printed).
+- **`evidence-pack.sh` writes `ios.txt`**: Info.plist usage/compliance keys, bundle id/team/device family/deployment target, privacy-manifest registration, and the `ios-release/` listing.
+- **QA with `ios_release`**:
+  - `ios_prep_check.py --out evidence/ios-prep.json` and `appstore-review-checker` (report only) → `evidence/appstore-review.md`.
+  - New `### iOS [sec]` checklist block: no BLOCK, every usage string traces to a feature, privacy manifest matches collected data, confirmed guideline FAILs become findings.
+- **Other checklists and templates**:
+  - Architecture checklist: iOS decision line.
+  - Planning checklist: iOS kit task line.
+  - Release self-checklist: `ios_kit` ok, and notes say "ready to build on a Mac", never "IPA built".
+  - Report template: `ios_kit` row in §2 and Mac build steps in §7.
+- **`sibling-contracts.md`**: rows for `flutter-ios-release` and `appstore-review-checker`. The latter was moved out of "not invoked".
+
 ## v2.5.0 — 2026-09-23
 
 An audit of v2.4.0 found that `advance` checked less than the SKILL.md said it did, and that the contract with `flutter-ui-revamp` v1.2.0 had drifted. The last implementation task could not pass its own self-check. The scripts were re-run against a real `flutter create` project (Flutter 3.47.4).

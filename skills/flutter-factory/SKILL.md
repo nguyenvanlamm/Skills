@@ -3,11 +3,12 @@ name: flutter-factory
 description: >-
   Self-contained, review-gated Flutter build pipeline with no external
   orchestrator: idea → review → plan → review → design → review →
-  architecture → review → implementation → test → QA → release. The agent
-  executes every stage itself, spawns fresh-context subagents as independent
-  reviewers (APPROVE | REVISE | BLOCK | ESCALATE), pauses at human gates,
-  gates every transition on real `flutter analyze / test / build` exit codes,
-  and discovers sibling skills by name and description. Use when asked to
+  architecture → review → implementation → test → QA → release, plus an App
+  Store-ready iOS kit (IPA built later on a Mac). The agent executes every
+  stage itself, spawns fresh-context subagents as independent reviewers
+  (APPROVE | REVISE | BLOCK | ESCALATE), pauses at human gates, gates every
+  transition on real `flutter analyze / test / build` exit codes, and
+  discovers sibling skills by name and description. Use when asked to
   "build a Flutter app end to end with reviews", "run the full pipeline",
   "idea to release with reviews", "flutter factory", "chạy pipeline có
   review", "build app từ idea đến release có kiểm duyệt". Don't use for
@@ -23,7 +24,7 @@ capabilities:
   - skill-discovery
   - flutter
 metadata:
-  version: 2.5.0
+  version: 2.6.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -76,9 +77,10 @@ Four consequences:
 | End at a Google Play upload with store assets + compliance | `idea-to-play-store` |
 | Drive the AIFactory/Herdr product | `ai-factory` |
 
-flutter-factory ends at a **tagged, build-verified release commit**. Store
-metadata, signing for upload and publishing are handed to the flutter-*
-store skills in the release notes' "Next steps", not run here.
+flutter-factory ends at a **tagged, build-verified release commit** that
+(with `ios_release`) also carries an App Store-ready iOS kit — the IPA
+itself is built later on a Mac. Store metadata, signing for upload and
+publishing are handed off in the release notes' "Next steps".
 
 ## Workspace
 
@@ -111,6 +113,7 @@ review_timeout_min: 15                   # async backends: no report file by the
 panel_stages: [qa]                       # stages reviewed by a multi-lens panel (see reviewer-prompt.md)
 release_build: apk                       # apk | appbundle | web | none — built by verify-gate at release
 store_bound: false                       # true → QA also runs flutter-store-compliance
+ios_release: true                        # App Store-ready iOS kit (flutter-ios-release); IPA built later on macOS
 ```
 
 `state.yaml` is flat, dotted keys, written only through the script:
@@ -137,34 +140,26 @@ current HEAD (implementation, test, qa — the test gate re-run after the
 last bugfix — and release) · the stage's key artifacts (filled
 constitution + `env.md`; `idea.md`; `prd.md` + `tasks.json`; valid
 `style:`/`seed:` lines; `architecture.md` + `DECISION-001.md`; no
-pending task; QA `evidence/index.json`; release notes + `v*` tag on HEAD).
+pending task; QA `evidence/index.json`; release notes + `v*` tag on HEAD
++ an `ok` `ios_kit` step when `ios_release`).
 `--override "<reason>"` exists **only** for an explicit user instruction;
 it is logged as `OVERRIDE` and listed in the release report.
 
-Resume rule: if `state.yaml` exists, run `status` then `check`, and
-continue from `stage`. Never restart a finished stage; never delete
-`.pipeline/` or the project directory without a fresh, explicit yes. When
-the session's context is near its limit, finish the current step, make
-sure its result is on disk, and resume from `.pipeline/` — never from
-memory.
+Resume rule: if `state.yaml` exists, run `status` then `check`, continue
+from `stage`, never restart a finished stage, never delete `.pipeline/` or
+the project without a fresh, explicit yes. Near the context limit, put the
+current step's result on disk and resume from `.pipeline/`, not memory.
 
 ### Git layout
 
-- The Flutter project's repo is the **only** repo the pipeline commits
-  to, and `.pipeline/` is **never** committed to it.
-- Fresh run (default): `.pipeline/` at the workspace root, project at
-  `./<slug>` — T01 creates it and its git repo.
-- Existing Flutter repo (`pubspec.yaml` at the root): `project_dir: .`.
-- The workspace is already inside a git repo (monorepo): the project is a
-  sub-folder of that repo — tell `flutter-init` / `flutter create` **not**
-  to `git init` a nested repo.
-- `pipeline-state.sh init` adds `.pipeline/` to `.git/info/exclude` of the
-  repo containing the root and the project (local, no tracked file
-  changes). **Re-run `init --project <dir>` right after T01** so the new
-  repo gets the exclude too and `project_dir` is recorded.
-- Gates run on committed code: commit first, then `verify-gate` —
-  `advance` rejects a `verify.json` whose `git_sha` is not HEAD or whose
-  tree was dirty.
+- The project's repo is the **only** repo committed to; `.pipeline/` never
+  enters it (`init` puts it in `.git/info/exclude` — **re-run `init
+  --project <dir>` right after T01** so the new repo gets it too).
+- Fresh run: project at `./<slug>`, created with its repo by T01. Existing
+  Flutter repo: `project_dir: .`. Workspace already inside a repo: no
+  nested `git init` (tell `flutter-init` / `flutter create`).
+- Gates run on committed code: commit, then `verify-gate` — `advance`
+  rejects a `verify.json` whose `git_sha` is not HEAD or whose tree was dirty.
 
 ## Pipeline
 
@@ -180,23 +175,20 @@ refuses, fix what it lists — never `set stage` by hand.
 | 2 | `planning` | `artifacts/planning/prd.md`, `tasks.json` | — | PRD covers the idea; tasks ordered, measurable, each with `verify` | `prd-generator`, `tasks-generator` |
 | 3 | `design` | `artifacts/design/{ux,ui,design-system,states}.md` | — | usability, consistency, tokens, loading/error/empty per screen, a11y | generate: `frontend-design`, `logo-designer` · evidence for review: `dont-make-me-think` |
 | 4 | `architecture` | `artifacts/architecture/{architecture,folder-structure,coding-rules}.md`, `DECISION-001.md` (org, stack) | — | decisions vs PRD/constitution, dependency table, feasibility | `tad-generator` |
-| 5 | `implementation` | Flutter project at `project_dir` | `verify-gate --no-test` after **every** task, and once more on the final commit | — (reviewed by QA) | `flutter-init` (task 1), `firebase-auth-setup`, `frontend-design`, matched per task, `flutter-ui-revamp` (last task) |
+| 5 | `implementation` | Flutter project at `project_dir` | `verify-gate --no-test` after **every** task, and once more on the final commit | — (reviewed by QA) | `flutter-init` (task 1), `firebase-auth-setup`, `frontend-design`, matched per task, `flutter-ui-revamp` (last screen task), `flutter-ios-release` (last task when `ios_release`) |
 | 6 | `test` | `test/`, `artifacts/test/report.md` | `verify-gate --coverage [--min-coverage <PRD target>]` (analyze + test + counts + coverage) | tests green, edge cases, primary flow covered | `test-coverage` |
-| 7 | `qa` | `artifacts/qa/evidence/`, `reviews/qa-vN.md` | `evidence-pack.sh` | bugs, security, performance, clean code, secrets scan | evidence for review: `code-review` (`mode:review`), + `flutter-store-compliance` when `store_bound` |
-| 8 | `release` | release commit, `artifacts/release/notes.md`, `verify.json`, tag | `verify-gate --build <release_build> --release` on the release commit | — | `release-manager`, `auto-push` |
+| 7 | `qa` | `artifacts/qa/evidence/`, `reviews/qa-vN.md` | `evidence-pack.sh` | bugs, security, performance, clean code, secrets scan | evidence for review: `code-review` (`mode:review`), + `flutter-store-compliance` when `store_bound`, + `appstore-review-checker` / `ios_prep_check.py` when `ios_release` |
+| 8 | `release` | release commit, `artifacts/release/notes.md`, `verify.json`, tag | `verify-gate --build <release_build> --release [--check ios_kit=…]` on the release commit | — | `release-manager`, `auto-push` |
 
 ### Stage notes
 
-**env** — record Flutter/Dart version, Android SDK, JDK, Chrome, OS. This
-decides which `release_build` values are even possible; if the user's
-choice is impossible here, ask before continuing. Then fill
-`constitution.md` — this is its only moment, and reviewers treat a
-contradiction with it as `critical`. Derive each field from the user's
-request, the repo (`README`, `AGENTS.md`, `analysis_options.yaml`, an
-existing `pubspec.yaml`) and `env.md`; where you had to guess, write the
-default and end the line with `(assumed)`. Do not ask the user unless a
-rule they stated conflicts with rules 8–9. `advance` refuses a field left
-empty.
+**env** — record Flutter/Dart version, Android SDK, JDK, Chrome, Xcode
+(if any), OS. This decides which `release_build` values are possible; if
+the user's choice is impossible here, ask. Then fill `constitution.md` —
+its only moment; reviewers treat a contradiction with it as `critical`.
+Derive each field from the request, the repo (`README`, `AGENTS.md`,
+`analysis_options.yaml`, `pubspec.yaml`) and `env.md`; mark guesses
+`(assumed)`. Ask only if a stated rule conflicts with rules 8–9.
 
 **idea** — one sentence from the user is enough. Fill gaps with
 assumptions and list them in `idea.md` under `## Assumptions`. Do not ask
@@ -205,10 +197,10 @@ assumption you state, never ask: "English (default); additional locales:
 <none | list from the idea>" (rule 9).
 
 **planning** — `tasks.json` follows `references/tasks-schema.md`. Task 1 is
-always the scaffold (`flutter-init` or inline `flutter create`); the last
-task is always UI polish (`flutter-ui-revamp`, after every screen task —
-schema rule 9). Every task has a `verify` command; a task without one is a
-planning REVISE finding.
+always the scaffold (`flutter-init` or inline `flutter create`, with `ios`
+when `ios_release`); UI polish (`flutter-ui-revamp`) follows every screen
+task (rule 9); with `ios_release` the iOS kit is the very last task (rule
+10). Every task has a `verify`; a task without one is a REVISE finding.
 
 **design** — `design-system.md` must open with two machine-readable
 lines, `style: <minimal-modern | playful-rounded | neo-brutalism |
@@ -224,7 +216,10 @@ default, ever: `flutter-init`, `flutter-build` and `flutter-publish` all
 block `com.example.*`. Also fix: state management, routing, persistence,
 minSdk/targetSdk, localisation (`gen-l10n`, `app_en.arb` first, extra
 locales per PRD — rule 9), and the dependency table (package · why · what
-breaks without it).
+breaks without it). With `ios_release`, one iOS `DECISION-*`: bundle id
+(default = `applicationId`), Apple team id (ask once; "at build time" is
+fine), device family (iPhone-only unless the PRD needs iPad), deployment
+target, encryption exemption.
 
 **implementation** — execute `tasks.json` in order. Right after T01,
 re-run `pipeline-state.sh init --project <dir>` (records `project_dir`,
@@ -238,10 +233,11 @@ one line in `artifacts/implementation/tasks-log.md`. After the last task
 (and its merge) run `verify-gate --no-test --stage implementation` once
 more on the committed tree — that is the `verify.json` `advance` checks.
 
-The last task (`flutter-ui-revamp`) stops for the user four times unless
-its prompt pre-answers them, adds packages that need dependency-table
-rows, and lands as a merge commit — follow `tasks-schema.md` rule 9 and
-its `sibling-contracts.md` row exactly.
+The UI-polish task (`flutter-ui-revamp`) stops for the user four times
+unless its prompt pre-answers them, adds packages that need
+dependency-table rows, and lands as a merge commit — follow schema rule 9
+and its contract row exactly. The iOS kit task (rule 10) prepares
+`ios/` + `ios-release/` on any OS and never claims an IPA.
 
 If `parallel_implementation: true`, delegate tasks whose `files` sets are
 disjoint to parallel `subagent_general` agents, **one git worktree per
@@ -270,7 +266,9 @@ gradle, risky Dart patterns → `artifacts/qa/evidence/`), then, if installed,
 `evidence/code-review-report.md`) and, when `store_bound`,
 `flutter-store-compliance` (copy `store-metadata/compliance-report.json` →
 `evidence/compliance-report.json`, commit `store-metadata/`, then re-run
-`verify-gate --stage test --coverage` — the commit moved HEAD).
+`verify-gate --stage test --coverage` — the commit moved HEAD). With
+`ios_release`: `ios_prep_check.py --out evidence/ios-prep.json` and
+`appstore-review-checker` (report only) → `evidence/appstore-review.md`.
 The reviewer gets the evidence dir plus the skills' methodology files
 (`code-review/references/review-mode.md`, `code-smells.md`) and reads the
 code, `artifacts/test/report.md` and `verify.json`. Skill reports are inputs
@@ -286,7 +284,8 @@ tagged, so the order is fixed:
    commit `chore(release): v<version>` (English).
 2. `verify-gate --build <release_build> --release --stage release` on that
    clean commit — must be `ok` (it also blocks on `com.example`, leaked
-   secrets and a red test suite).
+   secrets and a red test suite); with `ios_release` add `--check
+   ios_kit='python3 <flutter-ios-release>/scripts/ios_prep_check.py --project .'`.
 3. Write `notes.md` from `references/report-template.md` (it lives in
    `.pipeline/`, so writing it does not dirty the project) and answer the
    *release (self)* checklist in its §2.
@@ -298,7 +297,8 @@ tagged, so the order is fixed:
 
 Push only if the user says so (`auto-push` / `release-manager` if
 present). "Next steps" lists `flutter-signing → flutter-build →
-flutter-store-metadata → flutter-store-compliance → flutter-publish`.
+flutter-store-metadata → flutter-store-compliance → flutter-publish`, and
+for iOS `bash ios-release/build-ios.sh` on a Mac (Xcode 26+).
 
 ## Review loop
 
@@ -469,6 +469,7 @@ otherwise stop a run mid-stage.
   lib/ test/            flutter analyze clean, flutter test green (test/flows/ covers the primary flow)
   pubspec.yaml          version bumped, git tag v<version> on the commit verify.json names
   android/app/build.gradle*   applicationId = <org>.<slug>, not com.example
+  ios-release/          (ios_release) build-ios.sh + ExportOptions.plist + README.md, ios_prep_check no BLOCK
 ```
 
 ## Reference files
@@ -484,8 +485,8 @@ otherwise stop a run mid-stage.
 | Script | Run at |
 |--------|--------|
 | `scripts/pipeline-state.sh` | Every transition — `init · status · get · set · bump · log · check · advance`; `advance` refuses while a gate is unmet (review re-validated with `--prev`, stale artifacts, verify sha) |
-| `scripts/verify-gate.sh` | implementation (per task + final, `--no-test`), test (`--coverage [--min-coverage n]`), release (`--build … --release`) — writes `verify.json` with `git_sha`, `dirty`, test counts, coverage; exit 1 on any `fail` |
-| `scripts/evidence-pack.sh` | Before the `qa` review — analyze, pub outdated, deps, secrets, manifest, gradle, risky-pattern greps → `artifacts/qa/evidence/` + `index.json`; never modifies the project |
+| `scripts/verify-gate.sh` | implementation (per task + final, `--no-test`), test (`--coverage [--min-coverage n]`), release (`--build … --release [--check ios_kit=…]`) — writes `verify.json` with `git_sha`, `dirty`, test counts, coverage; exit 1 on any `fail` |
+| `scripts/evidence-pack.sh` | Before the `qa` review — analyze, pub outdated, deps, secrets, manifest, gradle, iOS facts, risky-pattern greps → `artifacts/qa/evidence/` + `index.json`; never modifies the project |
 | `scripts/review-verdict.sh` | After every review (`--prev` from v2) — validates the report file and its regression list, prints verdict + severity counts, exit 1 = malformed (re-run reviewer) |
 
 All scripts are bash 3.2-compatible (macOS `/bin/bash`).
@@ -493,6 +494,6 @@ All scripts are bash 3.2-compatible (macOS `/bin/bash`).
 ## Scope
 
 Does not: sign for upload, generate store assets, check store policy
-(unless `store_bound`), or publish — hand off to the flutter-* store
-skills (release notes §7). Does not install Flutter (`flutter-init`'s job
-in T01) or claim an iOS build off macOS.
+(unless `store_bound`), publish or upload — hand off per release notes §7.
+Does not install Flutter (`flutter-init` in T01) or build/sign an IPA (it
+prepares the kit; a Mac builds it).

@@ -35,6 +35,7 @@ Project: `<project_dir>` · applicationId `<org>.<slug>` · tag `v<version>` on 
 | build apk | ✅ ok | 0 | 2m10s | build/app/outputs/flutter-apk/app-release.apk |
 | secrets scan | ✅ ok | 0 | — | 0 matches |
 | applicationId | ✅ ok | — | — | com.acme.spendly |
+| ios_kit | ✅ ok | 0 | 1s | no BLOCK · 1 WARN (team id at build time) — **iOS: ready to build on a Mac, no IPA yet** |
 
 ## 3. Review trail (from reviews/ and events.log)
 | Stage | Revisions | Final verdict | Human gate |
@@ -72,7 +73,8 @@ Overrides: <none | each `OVERRIDE advance …` line from events.log — also in 
 3. `flutter-store-metadata` → listing assets
 4. `flutter-store-compliance` → policy audit
 5. `flutter-publish` → Play Console upload
-- <backend / iOS on macOS / deferred features as applicable>
+6. iOS (when `ios_release`): one-time Apple setup from `ios-release/README.md`, then on a Mac with Xcode 26+ `bash ios-release/build-ios.sh` → signed IPA in `build/ios/ipa/` + `ios-release/build-verify.json`; upload manually (Transporter) when you decide
+- <backend / deferred features as applicable>
 ```
 
 ## Filling rules

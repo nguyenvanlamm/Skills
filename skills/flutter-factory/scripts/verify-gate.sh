@@ -5,8 +5,11 @@
 #   bash verify-gate.sh --project <flutter-dir> [--root <dir-with-.pipeline>] [--stage <name>]
 #                       [--no-test] [--coverage] [--min-coverage <pct>] [--integration-device <id>]
 #                       [--build apk|appbundle|web|none] [--release] [--dart-define K=V]...
+#                       [--check NAME=COMMAND]...
 #
-# Steps, in order:  pub_get analyze test [coverage] [integration] build [release checks: app_id secrets]
+# Steps, in order:  pub_get analyze test [coverage] [integration] build [checks] [release checks: app_id secrets]
+# --check runs COMMAND with bash in the project dir as step NAME (exit 0 = ok) — e.g. a sibling
+# skill's static checker: --check ios_kit='python3 <flutter-ios-release>/scripts/ios_prep_check.py --project .'
 # Status per step:  ok | fail | skipped_env | skipped_user
 #   skipped_user = disabled by flag (--no-test, --build none)
 #   skipped_env  = environment cannot run it (no Android SDK, no device …) — report ⚠️, never ✅/❌
@@ -22,12 +25,12 @@
 # Exit 0 = no fail. Exit 1 = at least one fail. Exit 2 = usage/tooling error. Bash 3.2 compatible.
 set -uo pipefail
 
-usage() { sed -n '2,22p' "$0" >&2; exit 2; }
+usage() { sed -n '2,25p' "$0" >&2; exit 2; }
 PROJECT=""; ROOT="$PWD"; STAGE="gate"; RUN_TEST=true; COVERAGE=false; MIN_COV=""; IDEV=""
-BUILD=""; RELEASE=false; DEFINES=()
+BUILD=""; RELEASE=false; DEFINES=(); CHECKS=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    --project|--root|--stage|--build|--dart-define|--min-coverage|--integration-device) [ $# -ge 2 ] || usage;;
+    --project|--root|--stage|--build|--dart-define|--min-coverage|--integration-device|--check) [ $# -ge 2 ] || usage;;
   esac
   case "$1" in
     --project) PROJECT="$2"; shift 2;;
@@ -40,6 +43,8 @@ while [ $# -gt 0 ]; do
     --build) BUILD="$2"; shift 2;;
     --release) RELEASE=true; shift;;
     --dart-define) DEFINES+=("--dart-define=$2"); shift 2;;
+    --check) [[ "$2" =~ ^[a-z][a-z0-9_]*=.+ ]] || { echo "--check needs NAME=COMMAND (name: a-z0-9_)" >&2; exit 2; }
+             CHECKS+=("$2"); shift 2;;
     -h|--help) usage;;
     *) echo "unknown arg: $1" >&2; exit 2;;
   esac
@@ -130,6 +135,8 @@ case "$BUILD" in
     if [ ! -d "$PROJECT/web" ]; then row build skipped_env 0 0 "no web/ folder — flutter create --platforms web ."
     else rm -rf "$PROJECT/build/web"; run build flutter build web --release --no-pub ${DEFINES[@]+"${DEFINES[@]}"}; fi;;
 esac
+
+for c in ${CHECKS[@]+"${CHECKS[@]}"}; do run "${c%%=*}" bash -c "${c#*=}"; done
 
 if $RELEASE; then
   APPID=$(cat "$PROJECT"/android/app/build.gradle* 2>/dev/null | sed -n 's/.*applicationId[ =]*["'"'"']\([^"'"'"']*\)["'"'"'].*/\1/p' | head -1)

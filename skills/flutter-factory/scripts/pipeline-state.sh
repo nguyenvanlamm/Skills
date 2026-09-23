@@ -17,13 +17,14 @@
 # `advance` checks: latest reviews/<stage>-vN.md validates as APPROVE (reviewed stages; from v2 with
 # --prev <stage>-v(N-1)[-gate].md) and no stage artifact is newer than it · gates.<stage>
 # = approved (stages in config human_gates) · verify.json passed, for a clean tree at the project's
-# current HEAD (implementation, test, qa, release) · stage-specific artifacts (see check_stage).
+# current HEAD (implementation, test, qa, release) · stage-specific artifacts (see check_stage) ·
+# release with config ios_release: true → verify.json step ios_kit ok (unless the skill fell back inline).
 # --override bypasses the checks ONLY on the user's explicit instruction; it is logged as OVERRIDE.
 # init also adds `.pipeline/` to .git/info/exclude of the repo containing --root / --project.
 # --root defaults to $PWD (the dir that contains .pipeline/). Exit 2 on usage error. Bash 3.2 compatible.
 set -uo pipefail
 
-usage() { sed -n '2,23p' "$0" >&2; exit 2; }
+usage() { sed -n '2,24p' "$0" >&2; exit 2; }
 SELF_DIR=$(cd "$(dirname "$0")" && pwd)
 ROOT="$PWD"; PROJECT=""; OVERRIDE=""; ARGS=()
 while [ $# -gt 0 ]; do
@@ -34,7 +35,7 @@ while [ $# -gt 0 ]; do
     --root) ROOT="$2"; shift 2;;
     --project) PROJECT="$2"; shift 2;;
     --override) OVERRIDE="$2"; shift 2;;
-    -h|--help) sed -n '2,23p' "$0"; exit 0;;
+    -h|--help) sed -n '2,24p' "$0"; exit 0;;
     *) ARGS+=("$1"); shift;;
   esac
 done
@@ -146,6 +147,14 @@ check_stage() { # stage
       verify_ok release
       grep -q '"release":true' "$P/artifacts/release/verify.json" 2>/dev/null || block "release: verify.json was not produced with --release"
       need_file artifacts/release/notes.md release
+      if grep -qE '^ios_release:[[:space:]]*true' "$CONFIG" 2>/dev/null; then
+        if [ "$(sget fallbacks.flutter-ios-release)" = inline ]; then
+          echo "note: ios_release with flutter-ios-release inline — the iOS kit is unverified by script; say so in notes.md §2/§6" >&2
+        else
+          grep -q '{"step":"ios_kit","status":"ok"' "$P/artifacts/release/verify.json" 2>/dev/null \
+            || block "release: ios_release is on but verify.json has no ok 'ios_kit' step — verify-gate --check ios_kit='python3 <flutter-ios-release>/scripts/ios_prep_check.py --project .'"
+        fi
+      fi
       proj=$(project_path) && { git -C "$proj" tag --points-at HEAD 2>/dev/null | grep -q '^v' \
         || block "release: no v<version> tag on HEAD — tag after the human gate approves"; };;
   esac
@@ -165,6 +174,7 @@ review_timeout_min: 15                   # async backends: no report by then →
 panel_stages: [qa]                       # multi-lens panel stages (references/reviewer-prompt.md)
 release_build: apk                       # apk | appbundle | web | none
 store_bound: false                       # true → QA also runs flutter-store-compliance
+ios_release: true                        # App Store-ready iOS kit (flutter-ios-release); the IPA is built later on macOS
 EOF
     [ -f "$P/constitution.md" ] || cat > "$P/constitution.md" <<'EOF'
 # Constitution

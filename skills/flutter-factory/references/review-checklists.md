@@ -58,7 +58,8 @@ without the user (conflicting constitution vs PRD, missing business input).
 - [ ] Test strategy stated: what is unit / widget / flow tested (primary flow as a headless widget flow test in `test/flows/`; device `integration_test/` optional); coverage target as a number (it becomes `--min-coverage`).
 - [ ] **[E]** `tasks.json` validates against `tasks-schema.md` (ids unique, `depends_on` acyclic, every task has `verify`).
 - [ ] Task 1 is the scaffold; no task edits code before it.
-- [ ] Last task is UI polish (`skill: flutter-ui-revamp`) and depends on every screen task; no task runs after it. Its `files` include the app shell, router, `lib/l10n/**`, `assets/**`, `pubspec.{yaml,lock}` and `test/**`; its `verify` matches `release_build` and `env.md` (`tasks-schema.md` rule 9).
+- [ ] UI polish (`skill: flutter-ui-revamp`) depends on every screen task; nothing runs after it except the iOS kit task. Its `files` include the app shell, router, `lib/l10n/**`, `assets/**`, `pubspec.{yaml,lock}` and `test/**`; its `verify` matches `release_build` and `env.md` (`tasks-schema.md` rule 9).
+- [ ] `ios_release: true` → T01 creates `ios/`, and the last task is the iOS kit (`skill: flutter-ios-release`, `files` = `ios/**`, `ios-release/**`, `.gitignore`, depends on UI polish) (`tasks-schema.md` rule 10).
 - [ ] Each task is ≤ ~1 day of work and touches a bounded `files` set.
 - [ ] Tasks marked `parallel_safe: true` have pairwise-disjoint `files`.
 - [ ] Task order respects data flow: models → repositories → state → screens.
@@ -98,6 +99,7 @@ Lenses: `feas` = buildability & dependencies · `fit` = constitution/PRD fit & s
 - [ ] **[fit]** Localisation: `flutter gen-l10n` with `lib/l10n/app_en.arb` as template, `en` first in `supportedLocales`; additional ARBs only for locales the PRD lists; no user-facing string literals outside ARB.
 - [ ] **[feas]** Dependency table: package · why · what breaks without it. Every `pubspec` package has a row; each is null-safe, maintained, and licence-compatible.
 - [ ] **[feas]** minSdk / targetSdk / Dart SDK constraints stated and compatible with `env.md`.
+- [ ] **[fit] [E]** `ios_release: true` → an iOS `DECISION-*` fixes bundle id (not `com.example`), team id or "provided at build time", device family (iPhone-only unless the PRD needs iPad), deployment target, and the encryption-exemption answer.
 - [ ] **[feas]** Platform-specific code has a named home (`lib/core/platform/`) or is declared absent.
 - [ ] **[feas] [E]** Secrets/config path: `--dart-define` or env file, never Dart literals; `.gitignore` entries listed.
 - [ ] **[feas]** Error handling strategy: how failures surface from repository → state → UI; what is logged, what is never logged (user data).
@@ -158,6 +160,12 @@ only when `store_bound`).
 - [ ] **[sec] [E]** Asset licences: every file under `assets/` (fonts, icons, illustrations, animations, audio) has a row in `assets/CREDITS.md` with source + licence; none is GPL / CC-BY-NC / all-rights-reserved / third-party IP; every attribution-required asset has a visible credit (`showLicensePage` or an About screen) and bundled fonts are registered in `LicenseRegistry`. `→ assets/CREDITS.md`, `evidence/revamp-report.md`
 - [ ] **[sec]** Store policy (only when `store_bound: true`) — `flutter-store-compliance` output referenced; its BLOCK rows are `critical` here.
 
+### iOS `[sec]` (only when `ios_release: true`)
+- [ ] **[sec] [E]** `ios_prep_check.py` overall is not `BLOCK`; every `WARN` is either fixed or named in `report.md`/notes. `→ evidence/ios-prep.json`
+- [ ] **[sec] [E]** Every `NS*UsageDescription` traces to an MVP feature and says why in English; no permission key without a feature behind it. `→ ios.txt` §Info.plist, `ios-prep.json` `usage_strings*`
+- [ ] **[sec]** `PrivacyInfo.xcprivacy` data declarations match what the app actually collects (accounts, analytics, crash reports, location) — nothing collected but undeclared. `→ ios.txt` §privacy manifest
+- [ ] **[sec]** `appstore-review-checker` FAIL rows (e.g. 4.8 Sign in with Apple with third-party login, 5.1.1(v) in-app account deletion when accounts exist, 2.1 completeness) confirmed in the code become `critical`/`major` findings. `→ evidence/appstore-review.md`
+
 ### Fidelity & clean code
 - [ ] **[E]** Architecture fidelity: folder layout and packages match `architecture.md`; every deviation has a `DECISION-*`.
 - [ ] Design fidelity: screens use tokens from `design-system.md`, not raw values.
@@ -212,5 +220,6 @@ Answered before tagging; recorded in `artifacts/release/notes.md` §2.
 - [ ] `notes.md` filled from `verify.json`, `state.yaml`, `events.log`, `reviews/`, `tasks.json` only (a project `CHANGELOG.md`, if any, went into the release commit from `tasks.json` + `reviews/`).
 - [ ] `notes.md` §6 lists every blocked task, unresolved finding and `OVERRIDE` — nothing dropped.
 - [ ] Human gate asked with notes path + version, answered `approved`, **then** `git tag v<version>`, then `pipeline-state.sh advance`.
+- [ ] `ios_release: true` → the release gate ran with `--check ios_kit=…` and it is `ok`; `ios-release/` is in the tagged commit; notes §2 says "iOS: ready to build on a Mac", never "IPA built", and §7 lists `bash ios-release/build-ios.sh` + the one-time Apple setup from `ios-release/README.md`.
 - [ ] `notes.md` §7 hands off to `flutter-signing → flutter-build → flutter-store-metadata → flutter-store-compliance → flutter-publish`.
 - [ ] Push only if the user asked; otherwise the report says "not pushed".

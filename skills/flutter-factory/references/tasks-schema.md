@@ -38,7 +38,7 @@ the pipeline never executes from prose.
       "status": "pending"
     },
     {
-      "id": "T12",                          // always the LAST task — see rule 9
+      "id": "T12",                          // last screen-affecting task — see rule 9
       "title": "UI polish and licensed assets",
       "feature": "infra",
       "depends_on": ["T05", "T08", "T11"],  // every screen task
@@ -59,6 +59,21 @@ the pipeline never executes from prose.
       "verify": "flutter analyze && flutter build apk --debug",  // chosen per rule 9 from release_build + env.md
       "parallel_safe": false,
       "status": "pending"
+    },
+    {
+      "id": "T13",                          // only when config ios_release: true — see rule 10
+      "title": "App Store release kit for iOS",
+      "feature": "infra",
+      "depends_on": ["T12"],
+      "files": ["ios/**", "ios-release/**", ".gitignore"],
+      "skill": "flutter-ios-release",
+      "steps": [
+        "ios_prep_apply.py with bundle id / team / device family / encryption from DECISION-00x and one English usage string per permission the PRD features need",
+        "ios_prep_check.py --out ios-release/prep-report.json — no BLOCK"
+      ],
+      "verify": "python3 <flutter-ios-release>/scripts/ios_prep_check.py --project . && flutter analyze",
+      "parallel_safe": false,
+      "status": "pending"
     }
   ]
 }
@@ -67,7 +82,8 @@ the pipeline never executes from prose.
 ## Rules
 
 1. **T01 is always the scaffold.** Nothing else may run first; its `verify`
-   is `flutter analyze`. It ends by re-running `pipeline-state.sh init
+   is `flutter analyze`. With `ios_release: true` its platforms include
+   `ios` even on Linux (creating `ios/` needs no Mac). It ends by re-running `pipeline-state.sh init
    --project <dir>` (SKILL.md → Git layout).
 2. **Every task has `verify`.** The reviewer rejects a plan with a task that
    cannot prove itself. Prefer scoped commands (`flutter test <dir>`) so
@@ -90,9 +106,9 @@ the pipeline never executes from prose.
    the commit message, and every commit the pipeline makes is in English
    (SKILL.md rule 8) — even when `idea.md`/`prd.md` are written in another
    language. Translate when converting `tasks-generator` output.
-9. **The last task is always UI polish** (`skill: flutter-ui-revamp`,
-   `feature: infra`, `parallel_safe: false`), depending on every screen
-   task. It runs on a working app with a clean tree — which is exactly the
+9. **The last screen-affecting task is always UI polish** (`skill:
+   flutter-ui-revamp`, `feature: infra`, `parallel_safe: false`), depending
+   on every screen task; only the iOS kit (rule 10) may follow it. It runs on a working app with a clean tree — which is exactly the
    state after the previous task's commit — and never before the screens
    exist. `style`, `seed` and `keep` come from the approved
    `design-system.md`; the skill's own "ask the user" steps are answered
@@ -116,6 +132,19 @@ the pipeline never executes from prose.
      (`git merge --no-ff --no-commit`, `.revamp/` added to `.gitignore` and
      untracked, then `git commit -m "feat(infra): <title> [<id>]"`); the
      skill's grouped commits stay underneath it.
+10. **iOS kit task** — when `config.yaml` has `ios_release: true`, the very
+    last task is `skill: flutter-ios-release`, depending on the UI-polish
+    task (the app icon and display name are final by then). `files`:
+    `ios/**`, `ios-release/**`, `.gitignore` — it never touches `lib/`, so it
+    cannot break a screen. Inputs come from the architecture iOS decision
+    (bundle id = Android `applicationId` unless decided otherwise, team id
+    or "at build time", device family, encryption exemption) and from the
+    PRD features (one English usage string per permission). `verify` is the
+    skill's `ios_prep_check.py` (exit 0 = no BLOCK) plus `flutter analyze`.
+    It prepares; it never claims an IPA — that is built on macOS later with
+    `ios-release/build-ios.sh`. Skill missing → inline: set the same keys by
+    hand, write `ios-release/README.md` with the Mac build steps, log
+    `fallbacks.flutter-ios-release: inline`.
 
 ## Orchestrator loop
 

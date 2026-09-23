@@ -12,13 +12,14 @@
 #   secrets.txt          grep for secret-looking literals in lib/  (empty = clean)
 #   manifest.txt         AndroidManifest facts: permissions, exported, cleartext, debuggable
 #   gradle.txt           applicationId, minSdk/targetSdk/compileSdk, minifyEnabled/shrinkResources
+#   ios.txt              Info.plist usage/compliance keys, bundle id/team/device family, privacy manifest, ios-release/
 #   patterns.txt         grep hits for risky Dart patterns (context after await, bare `!`, print, http://, bare CircularProgressIndicator, ignore:)
 #   index.json           one line per file: name, lines, ok|fail|skipped_env
 # Never modifies the project. Exit 0 always unless usage error (exit 2) — the facts, not this
 # script, decide the verdict. `skipped_env` marks a fact a tool could not produce here.
 set -uo pipefail
 
-usage() { sed -n '2,18p' "$0" >&2; exit 2; }
+usage() { sed -n '2,19p' "$0" >&2; exit 2; }
 PROJECT=""; ROOT="$PWD"; STAGE="qa"
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -28,7 +29,7 @@ while [ $# -gt 0 ]; do
     --project) PROJECT="$2"; shift 2;;
     --root) ROOT="$2"; shift 2;;
     --stage) STAGE="$2"; shift 2;;
-    -h|--help) sed -n '2,18p' "$0"; exit 0;;
+    -h|--help) sed -n '2,19p' "$0"; exit 0;;
     *) echo "unknown arg: $1" >&2; exit 2;;
   esac
 done
@@ -77,6 +78,21 @@ if ls "$PROJECT"/android/app/build.gradle* >/dev/null 2>&1; then
     "$PROJECT"/android/app/build.gradle* > "$OUT/gradle.txt" 2>/dev/null
   note gradle.txt ok "ids, sdk levels, minify"
 else note gradle.txt skipped_env "no android/app/build.gradle*"; fi
+
+PLIST="$PROJECT/ios/Runner/Info.plist"; PBXP="$PROJECT/ios/Runner.xcodeproj/project.pbxproj"
+if [ -f "$PLIST" ] && [ -f "$PBXP" ]; then
+  {
+    echo "# iOS facts (static — nothing here was built)"
+    echo "## Info.plist permission / compliance keys"
+    grep -nA1 -E '<key>(NS[A-Za-z]+UsageDescription|NFCReaderUsageDescription|ITSAppUsesNonExemptEncryption|CFBundleDisplayName|UIRequiresFullScreen)</key>' "$PLIST" || echo "(none)"
+    echo "## project.pbxproj signing / targeting"
+    grep -nE 'PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM|CODE_SIGN_STYLE|TARGETED_DEVICE_FAMILY|IPHONEOS_DEPLOYMENT_TARGET' "$PBXP" | awk '{k=$0; sub(/^[0-9]+:/, "", k)} !seen[k]++' || echo "(none)"
+    echo "## privacy manifest"
+    if [ -f "$PROJECT/ios/Runner/PrivacyInfo.xcprivacy" ]; then echo "ios/Runner/PrivacyInfo.xcprivacy present; in Runner Resources: $(grep -q 'PrivacyInfo.xcprivacy in Resources' "$PBXP" && echo yes || echo NO)"; else echo "(absent)"; fi
+    echo "## ios-release/"
+    ls "$PROJECT/ios-release" 2>/dev/null || echo "(absent)"
+  } > "$OUT/ios.txt"; note ios.txt ok "Info.plist keys, bundle id/team/device family, privacy manifest, kit"
+else note ios.txt skipped_env "no ios/ project"; fi
 
 LIB="$PROJECT/lib"
 sec() { echo "## $1"; }
