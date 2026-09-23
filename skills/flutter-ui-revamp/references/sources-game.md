@@ -81,6 +81,42 @@ Format targets for a Flutter game. `optimize_flutter.py` produces these, and fla
 
 Mono for SFX is not a compromise — game SFX are positioned by the engine, and stereo doubles the bytes for information the mixer discards.
 
+## Direct download URLs
+
+`fetch_asset.py --url` needs a URL that returns **the file itself**, not a landing page. The patterns below were all fetched successfully on **2026-09-23**. Placeholders are in `<angle brackets>`. Read the licence on the landing page and pass that page as `--source`.
+
+| Source | URL pattern | Returns | Notes |
+|---|---|---|---|
+| **Kenney** | `https://kenney.nl/media/pages/assets/<pack>/<hash>/kenney_<pack>.zip` | zip + `License.txt` (CC0) | The `<hash>` changes with each pack release, so copy the link from the Download button on `kenney.nl/assets/<pack>`. |
+| **Game-icons.net** | `https://game-icons.net/archives/<fg>/<bg>/game-icons.net.svg.zip`, e.g. `000000/transparent` | zip, ~4 200 SVGs, ~4 MB | Files sit at `icons/<fg>/<bg>/1x1/<author>/<name>.svg`, and `icons/license.txt` is included. Use `--strip 4` to keep just `<author>/<name>.svg`. Keep that author folder, because attribution is per author. |
+| **Mixkit SFX** | `https://assets.mixkit.co/active_storage/sfx/<id>/<id>.wav` | WAV, full quality | The `<id>` is in the page's download link (`/free-sound-effects/download/<id>/`). **Not** `<id>-preview.mp3`, which is a 35 KB low-bitrate preview; `fetch_asset.py` refuses it and prints the `.wav` URL. |
+| **ambientCG** | `https://ambientcg.com/get?file=<AssetId>_<res>-<fmt>.zip`, e.g. `Bricks090_1K-PNG.zip` | zip of PBR maps | The asset ID must exist at that resolution/format; a wrong one is a plain 404. Take `1K` for mobile. |
+| **Poly Haven** | Ask the API: `https://api.polyhaven.com/files/<id>` → JSON → `Diffuse.1k.png.url` (or `Normal`, `Rough`, …) | PNG per map | Map file names are not guessable (`…_diffuse_1k.png`), so always read them from the API. |
+| **OpenGameArt** | `https://opengameart.org/sites/default/files/<filename>` from the item's "File(s)" list | whatever the uploader attached | The licence is **per submission**. Read it on the item page. |
+
+Filter large packs down to what the screen actually uses:
+
+```bash
+# Kenney UI Pack: one colour, 1x sprites + licence. The pack also ships "Double"
+# (2x) folders — for Flame, pick one resolution and keep it (no density buckets).
+--only 'PNG/Blue/Default/|License\.txt' --flatten
+
+# Game-icons: just the glyphs you need + the licence → lorc/crossed_swords.svg, …, license.txt
+--only '/(crossed-swords|shield|health-potion)\.svg$|icons/license\.txt' --strip 4
+```
+
+Kenney audio packs (Interface Sounds, UI Audio, …) ship **OGG only**. On a project with `ios/` or `macos/`, run `optimize_flutter.py` afterwards; it converts them to `.m4a`, because AVPlayer cannot play Vorbis (see § Audio).
+
+**Hand download only.** For these sources, download in a browser and import with `--local <file> --source <page>`:
+
+| Source | Why |
+|---|---|
+| itch.io (including KayKit / Kay Lousberg), CraftPix, Quaternius | The download sits behind a JS button or popup, and the page HTML has no file link |
+| Glitch (OpenGameArt) | The link works, but it is a **185 MB `.7z`**. `fetch_asset.py` cannot unpack 7z/rar/tar.gz and refuses them before downloading. Extract by hand, then zip the subset you need |
+| Freesound | Needs a login or OAuth token (a plain request gets 401) |
+| Pixabay, Uppbeat, Sketchfab | Bot-blocked (403/429) or login-gated |
+| Poly Pizza | Not verified for direct links; treat as manual |
+
 ## Sprite hygiene, before the assets touch the project
 
 The four rules that turn "the sprites look wrong and I can't say why" into a fixed bug:

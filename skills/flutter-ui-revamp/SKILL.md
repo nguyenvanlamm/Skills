@@ -4,7 +4,7 @@ description: Revamp the UI of an existing Flutter app or game with free assets �
 capabilities: [ui-revamp]
 license: MIT
 metadata:
-  version: 1.2.0
+  version: 1.3.0
 ---
 
 # Flutter UI Revamp
@@ -103,7 +103,7 @@ Get explicit agreement. This file is what Step 6 is checked against — a change
 
 Read `references/sources-ui.md` (app) or `references/sources-game.md` (game), and `references/licensing.md`.
 
-Pick from the locked direction, then present the list **before downloading**:
+Pick from the locked direction, then present the list **before downloading**. For each asset, also note how it will be fetched. Each sources file has a **Direct download URLs** section, which gives verified file-URL patterns (Kenney, Game-icons, Google Fonts, Fontshare, Mixkit, ambientCG, Poly Haven, …) and lists the sources that must be downloaded by hand and imported with `--local`. Do not guess URLs: a landing page returns HTML, and the script refuses it.
 
 | Asset | Source | Licence | Credit | Size | Why this one |
 |---|---|---|---|---|---|

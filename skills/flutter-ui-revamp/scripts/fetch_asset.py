@@ -43,7 +43,7 @@ CREDIT_LICENSE_PAGE = (r"^MIT\b", r"^ISC\b", r"^BSD\b", r"^APACHE\b", r"^OFL\b",
                        r"^SIL OFL\b", r"^ITF\b", r"FONTSHARE")
 CREDIT_LEVELS = ("on-screen", "license-page", "none")
 SKIP_NAMES = {"__macosx", ".ds_store", "thumbs.db"}
-LICENSE_HINTS = ("license", "licence", "readme", "copying", "credits")
+LICENSE_HINTS = ("license", "licence", "readme", "copying", "credits", "notice", "ofl", "ffl")
 
 # Licences this skill will not ship without an explicit --force override.
 # Regexes against the normalised upper-case licence string. Word boundaries
@@ -115,7 +115,17 @@ def is_html(data: bytes) -> bool:
         and b"<svg" not in head
 
 
-def plan_zip(data: bytes, dest: Path, flatten: bool, only: str | None
+NOTICE_EXT = ("", ".txt", ".md", ".html", ".htm", ".pdf", ".rtf")
+
+
+def is_notice(base: str) -> bool:
+    """A licence/readme file — by name AND text-like extension, so an icon
+    called `credits-currency.svg` is not mistaken for a licence."""
+    stem, ext = os.path.splitext(base.lower())
+    return ext in NOTICE_EXT and any(h in stem for h in LICENSE_HINTS)
+
+
+def plan_zip(data: bytes, dest: Path, flatten: bool, only: str | None, strip: int = 0
              ) -> Tuple[List[Tuple[str, Path]], List[str]]:
     """Return (extraction plan, licence-ish files found inside the archive)."""
     plan: List[Tuple[str, Path]] = []
@@ -132,11 +142,12 @@ def plan_zip(data: bytes, dest: Path, flatten: bool, only: str | None
                 log(f"WARN: refusing suspicious archive path {name!r}")
                 continue
             base = parts[-1]
-            if any(h in base.lower() for h in LICENSE_HINTS):
+            if is_notice(base):
                 notices.append(name)
             if only and not re.search(only, name):
                 continue
-            rel = Path(snake(base)) if flatten else Path(*[snake(p) for p in parts])
+            kept = parts[min(strip, len(parts) - 1):]  # never strip the filename itself
+            rel = Path(snake(base)) if flatten else Path(*[snake(p) for p in kept])
             plan.append((name, dest / rel))
     return plan, notices
 
@@ -227,6 +238,44 @@ def scripted_download_banned(url: str) -> str | None:
     return next((h for h in NO_SCRIPTED_DOWNLOAD if host == h or host.endswith("." + h)), None)
 
 
+# Archive formats this script cannot unpack with the standard library. Saving
+# one as a single opaque file puts a useless blob in the bundle.
+UNSUPPORTED_ARCHIVES = (
+    (b"7z\xbc\xaf\x27\x1c", "7z"),
+    (b"Rar!\x1a\x07", "rar"),
+    (b"\x1f\x8b", "gzip/tar.gz"),
+)
+# URL basenames that name the format, not the asset, so every download from
+# that source lands on the same path.
+GENERIC_STEMS = {"lottie", "animation", "data", "svg", "png", "image", "icon", "download",
+                 "file", "color", "default", "a_24px", "a_48px", "a_512", "a_128"}
+RE_MIXKIT_PREVIEW = re.compile(r"^(https?://assets\.mixkit\.co/active_storage/sfx/(\d+)/)\2-preview\.mp3$")
+
+
+def sniff_ext(data: bytes) -> str:
+    """Extension from content, for URLs whose path has none (`…/svg?seed=x`)."""
+    head = data[:512].lstrip(b"\xef\xbb\xbf \t\r\n")
+    if head.startswith(b"\x89PNG"):
+        return ".png"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return ".webp"
+    if head.startswith((b"<?xml", b"<svg")) and b"<svg" in data[:4096]:
+        return ".svg"
+    if head.startswith((b"{", b"[")):
+        return ".json"
+    return ""
+
+
+def unsupported_archive(data: bytes) -> str | None:
+    return next((kind for magic, kind in UNSUPPORTED_ARCHIVES if data.startswith(magic)), None)
+
+
+def preview_instead_of_file(url: str) -> str | None:
+    """Return the full-quality URL when `url` is a low-bitrate preview."""
+    m = RE_MIXKIT_PREVIEW.match(url)
+    return f"{m.group(1)}{m.group(2)}.wav" if m else None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Download (or import) and normalise a free asset.")
     src = ap.add_mutually_exclusive_group(required=True)
@@ -244,6 +293,13 @@ def main() -> int:
     ap.add_argument("--only", help="Regex; extract only archive members matching it")
     ap.add_argument("--flatten", action="store_true",
                     help="Drop archive directory structure and dump files into --dest")
+    ap.add_argument("--strip", type=int, default=0, metavar="N",
+                    help="Drop the first N directory levels of each archive path (like tar "
+                         "--strip-components), e.g. keep only <author>/<icon>.svg")
+    ap.add_argument("--filename",
+                    help="Output name for a single-file download. Needed when the URL basename "
+                         "is generic or shared (Noto `…/1f680/lottie.json`, Material Symbols "
+                         "`…/24px.svg`, DiceBear `…/svg?seed=x`)")
     ap.add_argument("--apply", action="store_true", help="Write to disk (default: dry run)")
     ap.add_argument("--force", action="store_true",
                     help="Allow a denylisted licence (GPL / CC-BY-NC / ARR). Requires user sign-off.")
@@ -284,6 +340,16 @@ def main() -> int:
             log(f"FATAL: {banned}'s terms forbid downloading through a script or tool. Download "
                 f"the file by hand in a browser, then re-run with --local <file> --source <page>.")
             return 2
+        if urlparse(args.url).path.lower().endswith((".7z", ".rar", ".tar.gz", ".tgz")):
+            log("FATAL: 7z / rar / tar.gz archives cannot be unpacked by this script (checked "
+                "before downloading). Download and extract by hand, then import the files you "
+                "need with --local <file.zip> --source <page>.")
+            return 2
+        full = preview_instead_of_file(args.url)
+        if full:
+            log(f"FATAL: that is Mixkit's low-bitrate preview, not the sound effect. Use the full "
+                f"file instead: --url {full}")
+            return 2
         log(f"GET {args.url}")
         try:
             data = download(args.url)
@@ -298,10 +364,17 @@ def main() -> int:
             "serves the download behind a JS button or login. Find the direct file URL "
             "(browser devtools → Network) or download by hand. Nothing written.")
         return 1
+    kind = unsupported_archive(data)
+    if kind:
+        log(f"FATAL: this is a {kind} archive, which this script cannot unpack; saving it as-is "
+            f"would ship one opaque blob. Extract it by hand, pick the files you need, zip them "
+            f"(or take them one by one) and re-run with --local <file.zip> --source <page>. "
+            f"Nothing written.")
+        return 1
 
     written: List[Path] = []
     if is_zip(data):
-        plan, notices = plan_zip(data, dest, args.flatten, args.only)
+        plan, notices = plan_zip(data, dest, args.flatten, args.only, args.strip)
         log(f"zip archive · {len(plan)} file(s) selected"
             + (f" (filter {args.only!r})" if args.only else ""))
         if notices:
@@ -318,9 +391,14 @@ def main() -> int:
                     out_path.write_bytes(zf.read(src_name))
             written.append(out_path)
     else:
-        raw_name = Path(args.local).name if args.local else \
-            unquote(os.path.basename(urlparse(args.url).path))
+        raw_name = args.filename or (Path(args.local).name if args.local else
+                                     unquote(os.path.basename(urlparse(args.url).path)))
         base = snake(raw_name or args.name)
+        if "." not in base:
+            base += sniff_ext(data)
+        if not args.filename and os.path.splitext(base)[0] in GENERIC_STEMS:
+            log(f"WARN: {base!r} is a generic name that the next download from this source "
+                f"will overwrite. Pass --filename, e.g. --filename rocket.json.")
         out_path = dest / base
         print(f"        {args.local or args.url}  ->  {out_path.relative_to(project)}",
               file=sys.stderr)

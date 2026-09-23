@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.3.0 — 2026-09-23
+
+The skill named ~50 asset sites but no fetchable URLs, so every run had to rediscover them. That is how an agent ends up fetching a Mixkit 35 KB preview instead of the sound, or guessing a Poly Haven filename that does not exist.
+
+### Added
+- **Direct download URLs** sections in `sources-ui.md` and `sources-game.md`. Every pattern was fetched live through `fetch_asset.py`: Google Fonts (`ofl/`, `apache/`, bracketed variable names URL-encoded), Fontshare API (with tested `--only` filters for static or variable TTF + `ffl.txt`), Fontsource, Lucide/Phosphor/Tabler/Iconify SVG, Open Peeps, Transparent Textures, Kenney, Game-icons, Mixkit `.wav`, ambientCG, Poly Haven (via its API) and OpenGameArt. Each section also lists which sources are **hand download only** and why (terms, JS button, login, bot-block, 7z), and which are generators rather than downloads.
+- **`fetch_asset.py --strip N`** drops leading archive directories. Game-icons becomes `<author>/<name>.svg` instead of `icons/a_000000/transparent/a_1x1/<author>/…`.
+- `SKILL.md` Step 3 points to these sections and says not to guess URLs.
+
+### Fixed
+- **Unsupported archives.** `fetch_asset.py` refuses `.7z` / `.rar` / `.tar.gz`, by extension before downloading and by magic bytes after. It used to save them as one opaque blob; Glitch's pack is a 185 MB `.7z`.
+- **Mixkit previews.** `fetch_asset.py` refuses Mixkit `-preview.mp3` URLs and prints the full-quality `<id>.wav` URL.
+- **False licence notices.** Licence/readme detection inside archives now also requires a text-like extension. An icon named `credits-currency.svg` was listed as a licence notice.
+
 ## v1.2.0 — 2026-09-23
 
 The 1.1.0 audit's "no changes needed" was wrong. Three defects each produced an app that does not compile, or a report number that cannot be measured, even when the workflow was followed exactly. All three are the same failure: reference rot in the API docs, the thing the skill already guarded against for licences. Every Dart snippet below was compiled with `flutter analyze` (Flutter 3.47.4) against the package versions that `flutter pub add` resolves today.

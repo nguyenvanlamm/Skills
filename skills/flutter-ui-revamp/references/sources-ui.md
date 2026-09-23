@@ -90,6 +90,46 @@ These inform decisions about density, spacing and state; they are not assets to 
 
 **Material Theme Builder is the one to actually use.** It emits a complete light + dark `ColorScheme` from a seed colour, tonally correct, with the contrast pairs already solved. Paste its Dart output into `lib/theme/app_colors.dart` rather than hand-picking hexes — hand-picked schemes are where the 3.1:1 body text comes from.
 
+## Direct download URLs
+
+`fetch_asset.py --url` needs a URL that returns **the file itself**. A landing page returns HTML, and the script refuses it. The patterns below were all fetched successfully on **2026-09-23**. Placeholders are in `<angle brackets>`. Always read the licence on the landing page first, and pass that page as `--source`.
+
+| Source | URL pattern | Returns | Notes |
+|---|---|---|---|
+| **Google Fonts** | `https://github.com/google/fonts/raw/main/ofl/<family-lowercase>/<File>.ttf` | TTF | Variable files carry their axes in brackets, which must be URL-encoded: `Nunito[wght].ttf` becomes `Nunito%5Bwght%5D.ttf`, and `Roboto[wdth,wght].ttf` becomes `Roboto%5Bwdth%2Cwght%5D.ttf`. Fetch `…/ofl/<family>/OFL.txt` as well; it becomes `ofl.txt` for `LicenseRegistry`. About 40 older families (e.g. Chewy) live under `apache/<family>/` and ship `LICENSE.txt` instead. If `ofl/` returns 404, list the folder with `https://api.github.com/repos/google/fonts/contents/<dir>/<family>`, where `<dir>` is `ofl`, `apache` or `ufl`. |
+| **Fontshare** | `https://api.fontshare.com/v2/fonts/download/<slug>` (e.g. `satoshi`, `clash-display`, `general-sans`) | zip, ~60 files (OTF, TTF, WOFF, CSS) | Take only what you ship; see the `--only` filters below the table. The licence is `License/FFL.txt`, which becomes `ffl.txt`. |
+| **Fontsource** | `https://cdn.jsdelivr.net/fontsource/fonts/<id>@latest/latin-<weight>-normal.ttf` | TTF (one weight, latin subset) | Subset files are small. Pick another subset (`vietnamese`, `latin-ext`, …) if the app's copy needs it. |
+| **Lucide** (single SVG) | `https://unpkg.com/lucide-static@latest/icons/<name>.svg` | SVG | Only for a custom icon font. Normally use the `lucide_icons_flutter` package. |
+| **Phosphor** (single SVG) | `https://raw.githubusercontent.com/phosphor-icons/core/main/assets/<weight>/<name>.svg` | SVG | `<weight>` is `regular`, `bold`, `fill`, …; non-regular files carry a suffix (`house-fill.svg`). |
+| **Tabler** (single SVG) | `https://raw.githubusercontent.com/tabler/tabler-icons/main/icons/<style>/<name>.svg` | SVG | `<style>` is `outline` or `filled`. No official Flutter package; build a font (above). |
+| **Iconify** | `https://api.iconify.design/<set>/<icon>.svg` | SVG | Each set has **its own licence**. Look it up on icon-sets.iconify.design before using a glyph. |
+| **Open Peeps** | the `cdn.prod.website-files.com/…/<id>_peep-<n>.svg` links in the "Grab and go" grid on openpeeps.com | SVG / PNG | Copy the link from the page; the IDs are not guessable. |
+| **Transparent Textures** | `https://www.transparenttextures.com/patterns/<name>.png` | tileable PNG | "Attribution appreciated". Record it anyway. |
+
+A Fontshare zip holds every format and weight. Filter it down to what you ship:
+
+```bash
+# Static weights → satoshi_regular.ttf, satoshi_medium.ttf, satoshi_bold.ttf, ffl.txt
+python3 <skill>/scripts/fetch_asset.py --url https://api.fontshare.com/v2/fonts/download/satoshi \
+    --only 'WEB/fonts/Satoshi-(Regular|Medium|Bold)\.ttf$|License/' --flatten \
+    --dest assets/fonts --name Satoshi --author "Indian Type Foundry" \
+    --license "ITF Free Font License" --source https://www.fontshare.com/fonts/satoshi --apply
+
+# One variable file instead → satoshi_variable.ttf (+ italic), ffl.txt
+    --only 'Fonts/TTF/|License/' --flatten
+```
+
+**Hand download only.** For these sources, download in a browser and import with `--local <file> --source <page>`:
+
+| Source | Why |
+|---|---|
+| unDraw, Storyset (Freepik), Flaticon | The terms forbid scripted downloads, and `fetch_asset.py` refuses these hosts (`licensing.md` trap 9) |
+| Humaaans | Distributed through Gumroad, so the link is an HTML checkout page |
+| Rive Community, LottieFiles, Lordicon | Download sits behind a JS button and usually a login |
+| Blush, DrawKit, HugeIcons (web) | Per-item download flow in the browser (HugeIcons is also available as the `hugeicons` pub package) |
+
+**Tools, not downloads.** Haikei, Hero Patterns, Coolors, Realtime Colors and Material Theme Builder are generators: you configure the result on the site and export it. The Figma kits are layout reference only.
+
 ## Verification before proposing anything
 
 For each candidate, be able to answer all five, and put the answers in front of the user:
