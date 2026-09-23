@@ -43,6 +43,10 @@ RE_COLOR_ARGB = re.compile(r"\bColor\.fromARGB\(|\bColor\.fromRGBO\(")
 RE_COLOR_NAMED = re.compile(r"\bColors\.([A-Za-z]+)(?:\.shade(\d+))?")
 RE_TEXTSTYLE = re.compile(r"\bTextStyle\s*\(")
 RE_ASSET_PATH = re.compile(r"^(assets|lib/assets|packages/[^/]+/assets)/\S+$")
+# Paths Flame resolves under assets/images/ or assets/audio/ ('ui/panel.png', 'sfx/click.m4a').
+RE_FLAME_PATH = re.compile(
+    r"^[\w\-./]+\.(png|jpe?g|webp|gif|bmp|wav|mp3|ogg|m4a|aac|flac|json|riv|svg)$", re.I)
+FLAME_PREFIXES = ("assets/images/", "assets/audio/", "assets/")
 RE_PROGRESS = re.compile(r"\b(CircularProgressIndicator|LinearProgressIndicator)\s*\(")
 RE_MAGIC_PAD = re.compile(
     r"\b(?:EdgeInsets\.(?:all|symmetric|only|fromLTRB)|SizedBox|BorderRadius\.circular)\b"
@@ -56,7 +60,7 @@ STATE_PACKAGES = [
 UI_ASSET_PACKAGES = [
     "flutter_svg", "vector_graphics", "vector_graphics_compiler", "rive", "lottie",
     "google_fonts", "cached_network_image", "flutter_gen", "flutter_gen_runner",
-    "lucide_icons", "phosphor_flutter", "hugeicons", "ionicons", "flutter_animate",
+    "lucide_icons", "lucide_icons_flutter", "phosphor_flutter", "hugeicons", "ionicons", "flutter_animate",
     "shimmer", "skeletonizer",
 ]
 GAME_PACKAGES = ["flame", "flame_audio", "flame_forge2d", "flame_tiled", "just_audio", "audioplayers"]
@@ -195,7 +199,9 @@ def scan_lib(project: Path, lib: Path) -> Dict[str, Any]:
             counts["colors"] += 1
         for m in RE_COLOR_NAMED.finditer(code):
             name = m.group(1)
-            if name in ("of", "hashCode", "runtimeType"):
+            # Colors.transparent is "no colour" in every theme and brightness — it
+            # has no scheme token to migrate to, so counting it inflates the audit.
+            if name in ("of", "hashCode", "runtimeType", "transparent"):
                 continue
             colors.append({"file": rel, "line": dart_lex.line_of(src, m.start()),
                            "value": f"Colors.{name}" + (f".shade{m.group(2)}" if m.group(2) else ""),
@@ -218,7 +224,9 @@ def scan_lib(project: Path, lib: Path) -> Dict[str, Any]:
 
         for lit in literals:
             v = lit.value.strip()
-            if RE_ASSET_PATH.match(v):
+            if "$" in v or v.startswith("packages/"):
+                continue  # interpolated or another package's asset: not checkable here
+            if RE_ASSET_PATH.match(v) or RE_FLAME_PATH.match(v):
                 asset_refs[v].add(rel)
 
         counts["padding_sites"] = len(RE_MAGIC_PAD.findall(code))
@@ -232,7 +240,7 @@ def scan_lib(project: Path, lib: Path) -> Dict[str, Any]:
             ("ThemeExtension", "theme_extension"), ("Hero(", "hero"),
             ("HapticFeedback", "haptics"), ("Semantics(", "semantics"),
             ("semanticLabel", "semantic_label"), ("Skeleton", "skeleton"),
-            ("Shimmer", "shimmer"), ("RiveAnimation", "rive"), ("Lottie.", "lottie"),
+            ("Shimmer", "shimmer"), ("RiveAnimation", "rive"), ("RiveWidget", "rive"), ("Lottie.", "lottie"),
             ("SvgPicture", "svg"), ("GoogleFonts.", "google_fonts"),
             # IconButton.tooltip feeds the semantics tree — count it as a11y signal.
             ("tooltip:", "tooltip"),
@@ -407,10 +415,15 @@ def derive(pubspec: Dict[str, Any], lib: Dict[str, Any], assets: Dict[str, Any])
         add("med", "RUNTIME_FONT",
             "google_fonts is used without bundled font files — fonts download at runtime (FOUT + offline break).")
     if lib.get("icon_distinct", 0) and not any(
-        p in deps for p in ("lucide_icons", "phosphor_flutter", "hugeicons", "ionicons")
+        p in deps for p in ("lucide_icons", "lucide_icons_flutter", "phosphor_flutter",
+                            "hugeicons", "ionicons")
     ):
         add("med", "DEFAULT_ICONS",
             f"{lib['icon_distinct']} distinct default Material/Cupertino icons — no custom icon set.")
+    if "lucide_icons" in deps:
+        add("med", "STALE_LUCIDE",
+            "lucide_icons is frozen at 0.257.0 and lacks current names (house, circleAlert, …). "
+            "Migrate to lucide_icons_flutter; never keep both.")
     if lib.get("progress_indicators"):
         add("low", "PLAIN_LOADER",
             f"{len(lib['progress_indicators'])} plain ProgressIndicator(s) — no branded loading state.")
@@ -434,6 +447,10 @@ def derive(pubspec: Dict[str, Any], lib: Dict[str, Any], assets: Dict[str, Any])
     if assets.get("declared_missing"):
         add("high", "MISSING_ASSETS",
             f"{len(assets['declared_missing'])} pubspec asset entr(ies) point at nothing on disk — this is a runtime crash.")
+    if lib.get("asset_refs_missing"):
+        add("high", "BROKEN_ASSET_REFS",
+            f"{len(lib['asset_refs_missing'])} asset path(s) referenced in code do not exist on "
+            f"disk — a renamed (.png→.webp, .wav→.m4a) or missing file; this throws at runtime.")
     if assets.get("heavy"):
         add("med", "HEAVY_ASSETS", f"{len(assets['heavy'])} asset(s) over the size threshold.")
     if assets.get("over_budget"):
@@ -443,10 +460,12 @@ def derive(pubspec: Dict[str, Any], lib: Dict[str, Any], assets: Dict[str, Any])
         add("low", "NO_VECTORS", "No SVG/.vec assets — everything is raster.")
     png = sum(1 for f in assets.get("files", []) if f["ext"] == ".png")
     webp = sum(1 for f in assets.get("files", []) if f["ext"] == ".webp")
-    if png and not webp:
+    # Flame reads neither density buckets nor needs WebP for sprites (atlases and
+    # tile maps reference PNG filenames), so these two would be wrong advice there.
+    if png and not webp and not is_game:
         add("low", "NO_WEBP", f"{png} PNG(s) and no WebP — typically 25–35% of image bytes are wasted.")
     buckets = any("/2.0x/" in f["path"] or "/3.0x/" in f["path"] for f in assets.get("files", []))
-    if assets.get("by_kind", {}).get("image") and not buckets:
+    if assets.get("by_kind", {}).get("image") and not buckets and not is_game:
         add("med", "NO_DENSITY_BUCKETS",
             "No 2.0x/3.0x density buckets — raster images will be resampled on most phones.")
 
@@ -578,7 +597,7 @@ def render_md(a: Dict[str, Any], top: int) -> str:
             w("")
 
     refs = lib.get("asset_refs", {})
-    unresolved = [r for r in refs if not (Path(a["project"]) / r).exists()]
+    unresolved = lib.get("asset_refs_missing", [])
     if unresolved:
         w("## Asset paths referenced in code but absent from disk")
         w("")
@@ -607,6 +626,30 @@ def render_md(a: Dict[str, Any], top: int) -> str:
     return "\n".join(L)
 
 
+def missing_refs(project: Path, refs: Dict[str, List[str]]) -> List[str]:
+    """Referenced paths that resolve to no file.
+
+    `assets/...` paths are checked as written. Bare relative paths with an asset
+    extension ('ui/panel.png', 'sfx/click.m4a') are how Flame and audioplayers
+    address assets; they count as missing only when a same-named file exists
+    nowhere under assets/ yet a same-stem file does (the rename case), so that
+    unrelated strings like 'config.json' are not reported.
+    """
+    missing: List[str] = []
+    for ref in refs:
+        if RE_ASSET_PATH.match(ref):
+            if not (project / ref).exists():
+                missing.append(ref)
+            continue
+        if any((project / pre / ref).exists() for pre in FLAME_PREFIXES):
+            continue
+        stem = Path(ref).with_suffix("")
+        if any(next((project / pre).glob(f"{stem}.*"), None) is not None
+               for pre in FLAME_PREFIXES if (project / pre / stem.parent).is_dir()):
+            missing.append(ref)
+    return missing
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Audit a Flutter project before a UI revamp.")
     ap.add_argument("--project", default=".", help="Flutter project root (default: .)")
@@ -624,6 +667,7 @@ def main() -> int:
     pubspec = parse_pubspec(project / "pubspec.yaml")
     lib = scan_lib(project, project / "lib")
     assets = scan_assets(project, pubspec.get("declared_assets", []))
+    lib["asset_refs_missing"] = missing_refs(project, lib.get("asset_refs", {}))
     derived = derive(pubspec, lib, assets)
 
     audit = {

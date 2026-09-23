@@ -48,7 +48,7 @@ The SIL Open Font Licence explicitly permits bundling in an application, includi
 - The font **cannot be sold on its own**, or shipped as the product. Bundled inside an app is fine; a "font pack" download is not.
 - A **Reserved Font Name** clause means a modified version must be renamed. Subsetting is not modification; re-hinting and renaming metrics is.
 
-Keep the `OFL.txt` that came with the download inside `assets/fonts/` and register it via `LicenseRegistry` (see `integration-flutter.md`).
+Keep the licence file that came with the download inside `assets/fonts/`. `fetch_asset.py` renames `OFL.txt` to `ofl.txt`. Declare it as an asset and register it via `LicenseRegistry` (see `integration-flutter.md`).
 
 ### 5. Free music usually excludes ads and monetised video
 
@@ -83,7 +83,13 @@ GoogleFonts.config.allowRuntimeFetching = false;
 
 Recolouring a CC BY-SA illustration to your seed colour produces a derivative that must itself be CC BY-SA. That does not infect the app's source code, but it does mean the asset — and your modified version of it — must remain shareable under the same terms. For a proprietary app that is usually unwanted. Prefer CC0 or CC BY.
 
-### 9. An icon *font* licence is not the icon *set* licence
+### 9. Some "free" sites forbid scripted downloads
+
+The asset licence and the *site's* terms are two separate documents. unDraw's licence forbids "automated and non-automated ways to link, embed, scrape, search or download the assets … without our consent". Storyset / Freepik's terms forbid downloads made through "robots, spiders or any other mechanism, mobile application, program or tool". For these sources, download by hand in a browser, then record the licence yourself. `fetch_asset.py` is for sources that publish direct file URLs meant to be fetched, such as Kenney, GitHub releases, Google Fonts, and the OpenGameArt file links.
+
+The same trap exists for no-derivatives terms. Lordicon's free tier is a modified CC BY-ND 4.0, so recolouring an animation to your seed colour breaches it.
+
+### 10. An icon *font* licence is not the icon *set* licence
 
 Some sets publish the SVGs under MIT and the compiled webfont under different terms; some aggregate fonts bundle glyphs from several sets. When building a custom font via fluttericon.com, the licence you must satisfy is the one on each **source SVG** — which is why mixing sets into one font requires clearing every set involved.
 
@@ -102,3 +108,15 @@ Some sets publish the SVGs under MIT and the compiled webfont under different te
 - No asset is CC BY-NC, GPL, or unlicensed.
 - No asset contains third-party IP.
 - `assets/CREDITS.md` will have one row per asset — written by `fetch_asset.py` at download time, not reconstructed from memory afterwards.
+
+## The Credit column in `CREDITS.md`
+
+`fetch_asset.py` works out where the obligation is met from `--license`. Override it with `--credit` when the licence page says something the name alone does not.
+
+| `Credit` | Licences | What Step 8 must do |
+|---|---|---|
+| `on-screen` | CC BY, CC BY-SA, Freepik / Storyset, Uppbeat free, any custom or unrecognised licence | A visible line on the About / Credits screen: asset, author, licence, link |
+| `license-page` | MIT, ISC, BSD, Apache-2.0, OFL, Fontshare ITF | Licence text registered with `LicenseRegistry`, reachable through `showLicensePage`. No on-screen line needed |
+| `none` | CC0, public domain, Unlicense, unDraw | Nothing, although a courtesy credit costs nothing |
+
+An unrecognised licence defaults to `on-screen` on purpose. Wrongly assuming "no credit needed" breaches the licence, while wrongly adding a credit line costs one row of text.

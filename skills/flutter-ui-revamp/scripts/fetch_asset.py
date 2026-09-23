@@ -12,6 +12,10 @@ Licence metadata is REQUIRED, not optional. An asset in the tree with no row in
 CREDITS.md is an asset nobody can prove the project is allowed to ship. If you
 do not know the licence yet, you are not ready to download the file.
 
+Some sites (unDraw, Storyset/Freepik) forbid downloading through a script.
+Download those by hand and import them with `--local <file> --source <page>`:
+the same filename normalisation and CREDITS row apply, with no network call.
+
 Dry run is the default; pass --apply to actually write to disk.
 """
 
@@ -28,22 +32,27 @@ from pathlib import Path
 from typing import List, Tuple
 from urllib.parse import unquote, urlparse
 
-CREDIT_REQUIRED = {"CC-BY", "CC BY", "CC-BY-SA", "CC BY-SA", "CC-BY-NC", "CC BY-NC",
-                   "MIT", "APACHE-2.0", "BSD-3-CLAUSE", "OFL", "OFL-1.1"}
-NO_CREDIT_NEEDED = {"CC0", "CC0-1.0", "PUBLIC DOMAIN", "UNLICENSE"}
+# Where the attribution obligation is satisfied (licensing.md § table):
+#   on-screen     visible credit line on the About / Credits screen (CC BY family,
+#                 Freepik/Storyset, anything custom or unknown)
+#   license-page  licence text shipped via LicenseRegistry + showLicensePage
+#                 (MIT / ISC / BSD / Apache-2.0 / OFL — no on-screen credit)
+#   none          no obligation (CC0 / public domain / Unlicense / unDraw)
+CREDIT_NONE = (r"^CC0\b", r"PUBLIC DOMAIN", r"^UNLICENSE$", r"^UNDRAW\b")
+CREDIT_LICENSE_PAGE = (r"^MIT\b", r"^ISC\b", r"^BSD\b", r"^APACHE\b", r"^OFL\b",
+                       r"^SIL OFL\b", r"^ITF\b", r"FONTSHARE")
+CREDIT_LEVELS = ("on-screen", "license-page", "none")
 SKIP_NAMES = {"__macosx", ".ds_store", "thumbs.db"}
 LICENSE_HINTS = ("license", "licence", "readme", "copying", "credits")
 
 # Licences this skill will not ship without an explicit --force override.
-# Matched as substrings against a normalised upper-case licence string.
-LICENSE_DENY_SUBSTRINGS = (
-    "GPL",          # GPL, LGPL, AGPL — viral over closed-source apps
-    "AGPL",
-    "CC-BY-NC",     # non-commercial
-    "CC BY-NC",
-    "BY-NC",
-    "ALL RIGHTS RESERVED",
-    "ARR",
+# Regexes against the normalised upper-case licence string. Word boundaries
+# matter: a bare "ARR" substring would also reject "…no warranty…".
+LICENSE_DENY_PATTERNS = (
+    (r"\bA?L?GPL", "GPL/LGPL/AGPL — viral over closed-source apps"),
+    (r"\bBY-NC\b|\bNC\b|NON-?COMMERCIAL", "non-commercial"),
+    (r"PERSONAL USE", "personal use only"),
+    (r"ALL RIGHTS RESERVED|\bARR\b", "all rights reserved"),
 )
 
 MAX_BYTES = 200 * 1024 * 1024  # a UI pack is a few MB; 200 MB means a wrong URL
@@ -98,6 +107,14 @@ def is_zip(data: bytes) -> bool:
     return data[:2] == b"PK"
 
 
+def is_html(data: bytes) -> bool:
+    """A landing page served where a file was expected (JS download buttons,
+    login walls, 404 pages returned as 200). SVG starts with `<?xml`/`<svg`."""
+    head = data[:512].lstrip(b"\xef\xbb\xbf \t\r\n").lower()
+    return head.startswith((b"<!doctype html", b"<html", b"<head", b"<!--")) \
+        and b"<svg" not in head
+
+
 def plan_zip(data: bytes, dest: Path, flatten: bool, only: str | None
              ) -> Tuple[List[Tuple[str, Path]], List[str]]:
     """Return (extraction plan, licence-ish files found inside the archive)."""
@@ -124,50 +141,71 @@ def plan_zip(data: bytes, dest: Path, flatten: bool, only: str | None
     return plan, notices
 
 
+def norm_license(license_str: str) -> str:
+    return license_str.strip().upper().replace("_", "-")
+
+
 def licence_blocked(license_str: str) -> str | None:
     """Return a reason if the licence is in the denylist, else None."""
-    norm = license_str.strip().upper().replace("_", "-")
-    # CC0 must not match the bare "GPL" substring check via false paths — it doesn't.
-    if norm in NO_CREDIT_NEEDED or norm.startswith("CC0"):
-        return None
-    for needle in LICENSE_DENY_SUBSTRINGS:
-        if needle.upper() in norm:
+    norm = norm_license(license_str)
+    for pattern, why in LICENSE_DENY_PATTERNS:
+        if re.search(pattern, norm):
             return (
-                f"licence {license_str!r} matches denylist ({needle}). "
+                f"licence {license_str!r} matches denylist ({why}). "
                 f"This skill rejects GPL/AGPL/CC-BY-NC and all-rights-reserved "
                 f"assets. Pass --force only with a written reason from the user."
             )
     return None
 
 
+def credit_level(license_str: str) -> str:
+    norm = norm_license(license_str)
+    if any(re.search(p, norm) for p in CREDIT_NONE):
+        return "none"
+    if any(re.search(p, norm) for p in CREDIT_LICENSE_PAGE):
+        return "license-page"
+    return "on-screen"
+
+
 def credits_row(args, files: List[Path], project: Path) -> str:
-    lic = args.license.strip()
-    needs = "Y" if lic.upper().replace("_", "-") not in NO_CREDIT_NEEDED else "N"
     listed = ", ".join(f"`{p.relative_to(project)}`" for p in files[:4])
     if len(files) > 4:
         listed += f" +{len(files) - 4} more"
-    return (f"| {args.name} | {args.type} | {listed} | {args.author} | {lic} | "
-            f"{needs} | {args.source or args.url} | {date.today().isoformat()} |")
+    return (f"| {args.name} | {args.type} | {listed} | {args.author} | {args.license.strip()} | "
+            f"{args.credit} | {args.source or args.url} | {date.today().isoformat()} |")
 
 
 CREDITS_HEADER = """# Credits
 
-Every third-party asset shipped in this app, with its licence. Rows marked
-**Credit required = Y** must also appear on the app's About / Credits screen —
-shipping the file without that attribution breaches the licence.
+Every third-party asset shipped in this app, with its licence. The **Credit**
+column says where the obligation is met:
 
-| Asset | Type | Files | Author | License | Credit required | Source | Downloaded |
+- `on-screen` — a visible credit line on the About / Credits screen. Shipping
+  the file without it breaches the licence.
+- `license-page` — licence text registered with `LicenseRegistry`, shown by
+  `showLicensePage`. No on-screen credit line needed.
+- `none` — no obligation.
+
+| Asset | Type | Files | Author | License | Credit | Source | Downloaded |
 |---|---|---|---|---|---|---|---|
 """
 
 
-def update_credits(project: Path, row: str, apply: bool) -> None:
+def update_credits(project: Path, row: str, name: str, apply: bool) -> None:
+    """Append the row, or replace an existing row for the same asset name so a
+    re-download does not leave two contradictory entries."""
     path = project / "assets" / "CREDITS.md"
     if path.exists():
-        text = path.read_text(encoding="utf-8")
-        if not text.endswith("\n"):
-            text += "\n"
-        new = text + row + "\n"
+        lines = path.read_text(encoding="utf-8").splitlines()
+        key = f"| {name} |"
+        hits = [k for k, ln in enumerate(lines) if ln.startswith(key)]
+        if hits:
+            lines[hits[0]] = row
+            lines = [ln for k, ln in enumerate(lines) if k not in hits[1:]]
+            log(f"CREDITS.md already has a row for {name!r} — replacing it.")
+        else:
+            lines.append(row)
+        new = "\n".join(lines) + "\n"
     else:
         new = CREDITS_HEADER + row + "\n"
     if apply:
@@ -179,15 +217,28 @@ def update_credits(project: Path, row: str, apply: bool) -> None:
         print(f"        {row}", file=sys.stderr)
 
 
+# Sites whose terms forbid downloading through a script or tool (licensing.md
+# trap 9). Download these by hand in a browser and import with --local.
+NO_SCRIPTED_DOWNLOAD = ("undraw.co", "storyset.com", "freepik.com", "flaticon.com")
+
+
+def scripted_download_banned(url: str) -> str | None:
+    host = (urlparse(url).hostname or "").lower()
+    return next((h for h in NO_SCRIPTED_DOWNLOAD if host == h or host.endswith("." + h)), None)
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Download and normalise a free asset.")
-    ap.add_argument("--url", required=True)
+    ap = argparse.ArgumentParser(description="Download (or import) and normalise a free asset.")
+    src = ap.add_mutually_exclusive_group(required=True)
+    src.add_argument("--url", help="Direct file URL to download")
+    src.add_argument("--local", help="A file or zip you downloaded by hand (for sites that "
+                                     "forbid scripted downloads, e.g. unDraw, Storyset)")
     ap.add_argument("--dest", required=True, help="Destination dir, e.g. assets/icons")
     ap.add_argument("--project", default=".", help="Flutter project root")
     ap.add_argument("--name", required=True, help="Human name, e.g. 'Kenney UI Pack'")
     ap.add_argument("--author", required=True)
     ap.add_argument("--license", required=True, help="CC0 / CC-BY-4.0 / OFL-1.1 / MIT / ...")
-    ap.add_argument("--source", help="Landing page URL (defaults to --url)")
+    ap.add_argument("--source", help="Landing page URL (defaults to --url; required with --local)")
     ap.add_argument("--type", default="asset",
                     help="icon | illustration | font | sprite | audio | animation | texture")
     ap.add_argument("--only", help="Regex; extract only archive members matching it")
@@ -196,7 +247,13 @@ def main() -> int:
     ap.add_argument("--apply", action="store_true", help="Write to disk (default: dry run)")
     ap.add_argument("--force", action="store_true",
                     help="Allow a denylisted licence (GPL / CC-BY-NC / ARR). Requires user sign-off.")
+    ap.add_argument("--credit", choices=CREDIT_LEVELS,
+                    help="Where attribution is satisfied. Default: inferred from --license "
+                         "(unknown/custom licences default to on-screen)")
     args = ap.parse_args()
+    if not args.credit:
+        args.credit = credit_level(args.license)
+        log(f"credit level inferred from licence: {args.credit}")
 
     project = Path(args.project).resolve()
     dest = (project / args.dest).resolve()
@@ -211,15 +268,36 @@ def main() -> int:
     if blocked and args.force:
         log(f"WARN: --force overriding denylist: {blocked}")
 
-    log(f"GET {args.url}")
-    try:
-        data = download(args.url)
-    except SystemExit:
-        raise
-    except Exception as exc:
-        log(f"FATAL: download failed: {exc}")
+    if args.local:
+        local = Path(args.local).expanduser()
+        if not local.is_file():
+            log(f"FATAL: --local file not found: {local}")
+            return 2
+        if not args.source:
+            log("FATAL: --local needs --source <landing page URL> so CREDITS.md can cite it.")
+            return 2
+        data = local.read_bytes()
+        log(f"imported {local} · {len(data) / 1024:.1f} KB")
+    else:
+        banned = scripted_download_banned(args.url)
+        if banned:
+            log(f"FATAL: {banned}'s terms forbid downloading through a script or tool. Download "
+                f"the file by hand in a browser, then re-run with --local <file> --source <page>.")
+            return 2
+        log(f"GET {args.url}")
+        try:
+            data = download(args.url)
+        except SystemExit:
+            raise
+        except Exception as exc:
+            log(f"FATAL: download failed: {exc}")
+            return 1
+        log(f"{len(data) / 1024:.1f} KB received")
+    if is_html(data):
+        log("FATAL: the URL returned an HTML page, not an asset file. The site probably "
+            "serves the download behind a JS button or login. Find the direct file URL "
+            "(browser devtools → Network) or download by hand. Nothing written.")
         return 1
-    log(f"{len(data) / 1024:.1f} KB received")
 
     written: List[Path] = []
     if is_zip(data):
@@ -240,15 +318,18 @@ def main() -> int:
                     out_path.write_bytes(zf.read(src_name))
             written.append(out_path)
     else:
-        base = snake(unquote(os.path.basename(urlparse(args.url).path)) or args.name)
+        raw_name = Path(args.local).name if args.local else \
+            unquote(os.path.basename(urlparse(args.url).path))
+        base = snake(raw_name or args.name)
         out_path = dest / base
-        print(f"        {args.url}  ->  {out_path.relative_to(project)}", file=sys.stderr)
+        print(f"        {args.local or args.url}  ->  {out_path.relative_to(project)}",
+              file=sys.stderr)
         if args.apply:
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_bytes(data)
         written.append(out_path)
 
-    update_credits(project, credits_row(args, written, project), args.apply)
+    update_credits(project, credits_row(args, written, project), args.name, args.apply)
 
     if not args.apply:
         log("DRY RUN — nothing written. Re-run with --apply.")

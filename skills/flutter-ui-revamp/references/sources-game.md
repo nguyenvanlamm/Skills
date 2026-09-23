@@ -13,7 +13,7 @@ Read at Step 3 when `audit.json → derived.app_type` is `flame_game`, or when t
 | **itch.io** | itch.io/game-assets/free | **per-author, arbitrary** | ✅ some | Large and high quality, but "free" here frequently means *free to download, not to sell with*. Read the readme inside the zip. |
 | **CraftPix free** | craftpix.net/freebies | custom — free-with-restrictions | ✅ | Free section forbids redistribution and some resale scenarios. Read the licence page, not the tag. |
 | **Game-icons.net** | game-icons.net | **CC BY 3.0** | ✅ 4000+ one style | Attribution mandatory → the game needs a Credits screen. SVG, recolourable, single visual voice. |
-| **Glitch** | glitchthegame.com/public-domain-game-art | **CC0** | ✅ | The entire art library of a shut-down MMO. Distinctive, hand-painted, huge. |
+| **Glitch** | opengameart.org/content/glitch-sprite-assets-huge-collection (+ github.com/tinyspeck, archived) | **CC0** | ✅ | The entire art library of a shut-down MMO. Distinctive, hand-painted, huge. The original glitchthegame.com page now redirects to slack.com; use the OpenGameArt PNG uploads, since much of the Tiny Speck source is Flash `.fla`. |
 
 ### Kenney UI Pack — why it is the default answer for game UI
 
@@ -70,12 +70,14 @@ In Flame, prefer generating particles from one small sprite over importing an an
 | **Pixabay** | pixabay.com/music | Pixabay Content Licence | No attribution required. Cannot be used in a *music-focused* product. |
 | **Uppbeat** | uppbeat.io | free tier **requires credit**; no-credit needs a paid plan | Read the trap in `licensing.md`. |
 
-Format targets for a Flutter game — the numbers `optimize_flutter.py` enforces:
+Format targets for a Flutter game. `optimize_flutter.py` produces these, and flags any SFX over 50 KB or music file over 1 MB:
 
 | Kind | Format | Channels | Rate | Budget |
 |---|---|---|---|---|
-| SFX | OGG Vorbis (q3) | mono | 44.1 kHz | < 50 KB each |
-| Music loop | OGG Vorbis | stereo | 44.1 kHz @ ~128 kbps | < 1 MB per minute |
+| SFX | AAC `.m4a` 64 kbps — or OGG Vorbis q3 if the game never ships to iOS/macOS | mono | 44.1 kHz | < 50 KB each |
+| Music loop | AAC `.m4a` 128 kbps — or OGG Vorbis | source channels (≤ 2) | 44.1 kHz | < 1 MB per minute |
+
+**OGG is silent on iOS.** `flame_audio` plays through `audioplayers`, and on iOS/macOS that means Apple's `AVPlayer`, which has no Vorbis decoder. Kenney and most free SFX packs ship `.ogg`, so a game that sounds right on Android is mute on iPhone. `optimize_flutter.py` picks `.m4a` automatically when the project has an `ios/` or `macos/` folder, and converts any `.ogg` it finds. Update the `FlameAudio.play('…')` paths to match the new filenames.
 
 Mono for SFX is not a compromise — game SFX are positioned by the engine, and stereo doubles the bytes for information the mixer discards.
 

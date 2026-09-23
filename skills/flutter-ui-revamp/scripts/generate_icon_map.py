@@ -11,18 +11,30 @@ Icons.* → Lucide/Phosphor line.
 
 Prints the map, lists UNMAPPED icons from the audit, and writes JSON with
 --apply (or always when --out is given — write is intentional for this script).
+
+After `flutter pub add <package> && flutter pub get`, every target constant is
+checked against the package source actually resolved in
+`.dart_tool/package_config.json`. A constant the installed version does not
+define is dropped from the map and reported, because one missing name in the
+map is a compile error in every file the bulk swap touches.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
+from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Set, Tuple
+from urllib.parse import unquote, urlparse
 
 # Keep in sync with references/refactor-patterns.md § mapping table.
 # Prefer const IconData targets (no call parentheses).
+# Targets use `lucide_icons_flutter` (maintained, current upstream names).
+# The older `lucide_icons` package stopped at 0.257.0 and lacks `house`,
+# `circleAlert`, `circleHelp` and `circleUser`.
 LUCIDE: Dict[str, str] = {
     "Icons.home": "LucideIcons.house",
     "Icons.search": "LucideIcons.search",
@@ -67,7 +79,7 @@ LUCIDE: Dict[str, str] = {
     "Icons.send": "LucideIcons.send",
     "Icons.bookmark": "LucideIcons.bookmark",
     "Icons.bookmark_border": "LucideIcons.bookmark",
-    "Icons.check_circle": "LucideIcons.checkCircle2",
+    "Icons.check_circle": "LucideIcons.circleCheck",
     "Icons.radio_button_unchecked": "LucideIcons.circle",
     "Icons.remove": "LucideIcons.minus",
     "Icons.clear": "LucideIcons.x",
@@ -153,21 +165,81 @@ PHOSPHOR: Dict[str, str] = {
 
 SETS = {
     "lucide": {
-        "import": "package:lucide_icons/lucide_icons.dart",
+        "package": "lucide_icons_flutter",
+        "import": "package:lucide_icons_flutter/lucide_icons.dart",
         "map": LUCIDE,
-        "note": "Verify each constant against the installed lucide_icons version; "
-                "upstream renames (home→house) are already applied here.",
+        "note": "Targets lucide_icons_flutter (not the stale lucide_icons 0.257.0). "
+                "Do not add both packages to one app.",
     },
     "phosphor": {
+        "package": "phosphor_flutter",
         "import": "package:phosphor_flutter/phosphor_flutter.dart",
         "map": PHOSPHOR,
         "note": "Uses const constants (PhosphorIconsRegular.*), not PhosphorIcons.x() calls.",
     },
 }
 
+RE_CLASS = re.compile(r"^\s*(?:abstract\s+|final\s+|sealed\s+)*class\s+(\w+)", re.M)
+RE_CONST_MEMBER = re.compile(r"\bstatic\s+const\s+(?:[\w<>?]+\s+)?(\w+)\s*=")
+
 
 def log(msg: str) -> None:
     print(f"[icon-map] {msg}", file=sys.stderr)
+
+
+def package_lib(project: Path, package: str) -> Optional[Path]:
+    """lib/ of `package` as resolved by `flutter pub get`, or None."""
+    cfg = project / ".dart_tool" / "package_config.json"
+    if not cfg.is_file():
+        return None
+    for pkg in json.loads(cfg.read_text(encoding="utf-8")).get("packages", []):
+        if pkg.get("name") != package:
+            continue
+        uri = pkg.get("rootUri", "")
+        root = Path(unquote(urlparse(uri).path)) if uri.startswith("file:") else cfg.parent / uri
+        return (root / pkg.get("packageUri", "lib/")).resolve()
+    return None
+
+
+def package_constants(lib: Path) -> Dict[str, Set[str]]:
+    """{ClassName: {static const member names}} across the package's lib/."""
+    found: Dict[str, Set[str]] = defaultdict(set)
+    for path in lib.rglob("*.dart"):
+        src = path.read_text(encoding="utf-8", errors="replace")
+        heads = list(RE_CLASS.finditer(src))
+        for k, head in enumerate(heads):
+            end = heads[k + 1].start() if k + 1 < len(heads) else len(src)
+            found[head.group(1)].update(RE_CONST_MEMBER.findall(src, head.end(), end))
+    return found
+
+
+def verify(mapped: Dict[str, str], project: Path, package: str
+           ) -> Tuple[Dict[str, str], List[Tuple[str, str]], bool]:
+    """Drop targets the installed package does not define.
+
+    Returns (kept, dropped [(source, target)], verified?)."""
+    lib = package_lib(project, package)
+    if lib is None or not lib.is_dir():
+        return mapped, [], False
+    consts = package_constants(lib)
+    kept: Dict[str, str] = {}
+    dropped: List[Tuple[str, str]] = []
+    for src, target in mapped.items():
+        cls, _, member = target.partition(".")
+        member = member.split("(")[0]
+        if member in consts.get(cls, ()):
+            kept[src] = target
+        else:
+            dropped.append((src, target))
+    return kept, dropped, True
+
+
+def collisions(mapped: Dict[str, str]) -> Dict[str, List[str]]:
+    """Targets that more than one distinct source icon collapses into."""
+    by_target: Dict[str, List[str]] = defaultdict(list)
+    for src, target in mapped.items():
+        by_target[target].append(src)
+    return {t: sorted(s) for t, s in by_target.items() if len(s) > 1}
 
 
 def load_audit_icons(path: Path) -> List[Tuple[str, int]]:
@@ -223,6 +295,8 @@ def main() -> int:
     ap.add_argument("--project", default=".", help="Project root (resolves relative paths)")
     ap.add_argument("--all-known", action="store_true",
                     help="Emit the full known table, not only icons found in the audit")
+    ap.add_argument("--skip-verify", action="store_true",
+                    help="Do not check targets against the installed package source")
     args = ap.parse_args()
 
     project = Path(args.project).resolve()
@@ -254,6 +328,20 @@ def main() -> int:
         return 0
 
     payload, used, unmapped = build(audit_icons, args.set)
+    package = SETS[args.set]["package"]
+    dropped: List[Tuple[str, str]] = []
+    if not args.skip_verify:
+        payload["map"], dropped, verified = verify(payload["map"], project, package)
+        if verified:
+            log(f"verified targets against the installed {package}: "
+                f"{len(payload['map'])} ok, {len(dropped)} missing")
+        else:
+            log(f"WARN: {package} is not resolved in .dart_tool/package_config.json — "
+                f"targets NOT verified. Run `flutter pub add {package} && flutter pub get`, "
+                f"then re-run this script before apply_icons.py --apply.")
+        counts = dict(used)
+        used = [(n, c) for n, c in used if n in payload["map"]]
+        unmapped += [(src, counts.get(src, 0)) for src, _ in dropped]
     # Strip _meta from file written for apply_icons (it accepts unknown keys
     # only if not inside map — keep meta out of map, sibling is fine; apply
     # ignores non-map keys at top level except import/map).
@@ -273,6 +361,19 @@ def main() -> int:
             f"generate_icon_map.py / refactor-patterns.md:")
         for name, n in sorted(unmapped, key=lambda x: -x[1])[:40]:
             print(f"        {name:<40} x{n}", file=sys.stderr)
+    if dropped:
+        log(f"DROPPED ({len(dropped)}) — target not defined by the installed {package}; "
+            f"pick a name that exists in its API and add it by hand:")
+        for src, target in dropped:
+            print(f"        {src:<40} -/-> {target}", file=sys.stderr)
+    clashes = collisions(payload["map"])
+    if clashes:
+        log(f"COLLISION ({len(clashes)}) — distinct source icons collapse into one glyph. "
+            f"Where the pair encodes state (NavigationBar icon/selectedIcon, "
+            f"favorite/favorite_border, star/star_border) the state becomes invisible; "
+            f"differentiate by colour or a second glyph before applying:")
+        for target, srcs in sorted(clashes.items()):
+            print(f"        {', '.join(srcs):<60} -> {target}", file=sys.stderr)
 
     log(f"Next: python3 apply_icons.py --project . --map {out_path.name}")
     log("Show the dry-run diff to the user before --apply.")

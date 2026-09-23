@@ -245,6 +245,16 @@ def main() -> int:
             f"Handle these by hand or extend the map:")
         for token, n in total_unmapped.most_common():
             print(f"        {token:<38} x{n}", file=sys.stderr)
+    by_target: Dict[str, List[str]] = {}
+    for token in total_applied:
+        by_target.setdefault(repl[token], []).append(token)
+    clashes = {t: sorted(s) for t, s in by_target.items() if len(s) > 1}
+    if clashes:
+        log(f"COLLISION — {len(clashes)} glyph(s) now stand for more than one former icon. "
+            f"If a pair encoded state (NavigationBar icon/selectedIcon, favorite vs "
+            f"favorite_border), that state is now invisible — check those sites in the diff:")
+        for target, srcs in sorted(clashes.items()):
+            print(f"        {', '.join(srcs):<60} -> {target}", file=sys.stderr)
     if const_hazards:
         verb = "removed the governing `const` at" if args.fix_const else "CONST HAZARD at"
         log(f"{verb} {len(const_hazards)} site(s) — a callable replacement cannot sit in a "

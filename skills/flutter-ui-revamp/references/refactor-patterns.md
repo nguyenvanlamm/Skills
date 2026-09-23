@@ -28,7 +28,7 @@ AppBar(
 **AFTER**
 
 ```dart
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 AppBar(
   leading: IconButton(
@@ -67,9 +67,11 @@ Map to the **const constants** (`PhosphorIconsRegular.*`, `PhosphorIconsBold.*`)
 
 ### Mapping table
 
-Verify each constant against the package version you actually installed. Icon sets rename glyphs between releases — Lucide renamed `home` to `house`, and packages lag upstream by varying amounts. A mapping that assumes a name is a mapping that produces 40 analyzer errors.
+Verify each constant against the package version you actually installed. Icon sets rename glyphs between releases, and packages lag behind upstream by different amounts. A mapping that assumes a name exists produces 40 analyzer errors. The Lucide column below targets **`lucide_icons_flutter`**. The older `lucide_icons` package stopped at 0.257.0 and has no `house`, `circleAlert`, `circleHelp` or `circleUser`. `generate_icon_map.py` checks every target against the resolved package source and drops the missing ones, so run it *after* `flutter pub get`.
 
-| Material | Lucide (`lucide_icons`) | Phosphor const (`phosphor_flutter`) |
+Several Material pairs collapse into one glyph: `favorite` / `favorite_border`, `star` / `star_border`, `bookmark` / `bookmark_border`, `home` / `home_outlined`. Lucide has no filled variants. Where the pair encodes state, keep the state visible by another means. The usual case is a `NavigationBar` `icon` / `selectedIcon`, or a toggle. Tint the selected glyph with `colorScheme.primary`, or pair Phosphor `Regular` with `Fill`. Both scripts print a `COLLISION` list of these pairs.
+
+| Material | Lucide (`lucide_icons_flutter`) | Phosphor const (`phosphor_flutter`) |
 |---|---|---|
 | `Icons.home` | `LucideIcons.house` | `PhosphorIconsRegular.house` |
 | `Icons.search` | `LucideIcons.search` | `PhosphorIconsRegular.magnifyingGlass` |
@@ -113,7 +115,7 @@ Save the chosen mapping as JSON and feed it to `apply_icons.py`:
 
 ```json
 {
-  "import": "package:lucide_icons/lucide_icons.dart",
+  "import": "package:lucide_icons_flutter/lucide_icons.dart",
   "map": {
     "Icons.home": "LucideIcons.house",
     "Icons.search": "LucideIcons.search",
@@ -130,7 +132,7 @@ python3 <skill>/scripts/generate_icon_map.py --project . --audit .revamp/audit.j
 
 Icons with no good equivalent stay Material — the script lists them as UNMAPPED. One deliberate exception beats a forced glyph that means the wrong thing.
 
-**Verify constants against the installed package version** before `--apply`. Lucide upstream renamed `home` → `house`; this table uses `house`. If `lucide_icons` on pub lags and still exposes `home` only, check the package API and adjust the map — do not guess.
+**Verify constants against the installed package version** before `--apply`. The script does this automatically once the package is resolved. If it prints `targets NOT verified`, run `flutter pub add lucide_icons_flutter && flutter pub get` and generate the map again. If it prints `DROPPED`, look the glyph up in the installed package's API and add the correct name by hand. Do not guess.
 
 ---
 
@@ -406,7 +408,8 @@ return const Center(child: CircularProgressIndicator());
 ```dart
 // lib/widgets/loading_view.dart
 import 'package:flutter/material.dart';
-import 'package:rive/rive.dart';
+
+import 'rive_loader.dart'; // RiveLoader — integration-flutter.md § Rive (rive 0.14 API)
 
 class LoadingView extends StatelessWidget {
   const LoadingView({super.key, this.label});
@@ -415,6 +418,8 @@ class LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Reduce motion: a static indicator carries the same meaning.
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return Center(
       child: Semantics(
         label: label ?? 'Loading',
@@ -422,13 +427,11 @@ class LoadingView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(
-              width: 96,
-              height: 96,
-              child: RiveAnimation.asset(
-                'assets/animations/loader.riv',
-                fit: BoxFit.contain,
-              ),
+            SizedBox.square(
+              dimension: 96,
+              child: reduceMotion
+                  ? const Center(child: CircularProgressIndicator())
+                  : const RiveLoader(),
             ),
             if (label != null) ...[
               const SizedBox(height: 12),
@@ -513,26 +516,34 @@ class AppButton extends StatefulWidget {
 class _AppButtonState extends State<AppButton> {
   bool _down = false;
 
+  void _setDown(bool value) {
+    if (_down != value && widget.onPressed != null) setState(() => _down = value);
+  }
+
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onPressed != null;
-    return AnimatedScale(
-      scale: _down ? 0.97 : 1.0,
-      duration: const Duration(milliseconds: 90),
-      curve: Curves.easeOut,
-      child: FilledButton.icon(
-        onPressed: enabled
-            ? () {
-                HapticFeedback.lightImpact();
-                widget.onPressed!();
-              }
-            : null,
-        onLongPress: null,
-        icon: widget.icon == null ? null : Icon(widget.icon, size: 20),
-        label: Text(widget.label),
-        style: FilledButton.styleFrom(
-          // 48dp is the accessibility floor, not a style choice.
-          minimumSize: const Size(64, 48),
+    return Listener(
+      onPointerDown: (_) => _setDown(true),
+      onPointerUp: (_) => _setDown(false),
+      onPointerCancel: (_) => _setDown(false),
+      child: AnimatedScale(
+        scale: _down ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 90),
+        curve: Curves.easeOut,
+        child: FilledButton.icon(
+          onPressed: enabled
+              ? () {
+                  HapticFeedback.lightImpact();
+                  widget.onPressed!();
+                }
+              : null,
+          icon: widget.icon == null ? null : Icon(widget.icon, size: 20),
+          label: Text(widget.label),
+          style: FilledButton.styleFrom(
+            // 48dp is the accessibility floor, not a style choice.
+            minimumSize: const Size(64, 48),
+          ),
         ),
       ),
     );
@@ -540,7 +551,7 @@ class _AppButtonState extends State<AppButton> {
 }
 ```
 
-Press-scale needs the pointer state, which `FilledButton` does not expose — wrap it in a `Listener` (`onPointerDown` / `onPointerUp` / `onPointerCancel` setting `_down`) when the effect is wanted. Handle `onPointerCancel`: without it, a drag off the button leaves it stuck at 0.97.
+Press-scale needs the pointer state, and `FilledButton` does not expose it, so the `Listener` provides it. Keep `onPointerCancel`: without it, dragging off the button leaves it stuck at 0.97.
 
 Haptics are for confirmations, not for every tap. `lightImpact` on a primary action, `selectionClick` on a picker, `heavyImpact` on an error. A phone that buzzes on every touch gets its haptics turned off system-wide.
 
@@ -563,8 +574,8 @@ Route<T> _fadeThrough<T>(Widget page) {
   return PageRouteBuilder<T>(
     transitionDuration: const Duration(milliseconds: 280),
     reverseTransitionDuration: const Duration(milliseconds: 220),
-    pageBuilder: (_, __, ___) => page,
-    transitionsBuilder: (_, animation, __, child) {
+    pageBuilder: (context, animation, secondaryAnimation) => page,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
       final curved =
           CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
       return FadeTransition(
@@ -657,7 +668,7 @@ class _AppSkeletonState extends State<AppSkeleton>
 loading
     ? ListView.builder(
         itemCount: 6,
-        itemBuilder: (_, __) => const Padding(
+        itemBuilder: (context, index) => const Padding(
           padding: EdgeInsets.all(16),
           child: Row(children: [
             AppSkeleton(height: 64, width: 64, radius: 12),
@@ -693,19 +704,19 @@ add(SpriteComponent(sprite: await loadSprite('ui/panel_bg.png')));
 **AFTER**
 
 ```dart
+// import 'package:flame_texturepacker/flame_texturepacker.dart';
 @override
 Future<void> onLoad() async {
-  await images.loadAll(<String>['ui/atlas.png']);
-  final atlas = await fromJSONString(
-    await rootBundle.loadString('assets/images/ui/atlas.json'),
-    images.fromCache('ui/atlas.png'),
-  );
-  add(SpriteComponent(sprite: atlas.getSprite('btn_play.png')));
-  add(SpriteComponent(sprite: atlas.getSprite('btn_pause.png')));
+  // assets/images/ui/atlas.atlas + atlas.png, exported in libGDX format.
+  final atlas = await atlasFromAssets('ui/atlas.atlas');
+  for (final name in ['btn_play', 'btn_pause']) {
+    final sprite = atlas.findSpriteByName(name); // names have no extension
+    if (sprite != null) add(SpriteComponent(sprite: sprite));
+  }
 }
 ```
 
-Three loads and three draw-call batches become one of each.
+Three loads and three draw-call batches become one of each. The atlas loader is `flame_texturepacker` (see `integration-flutter.md § Flame`); Flame core does not parse atlases.
 
 Panels: replace the hand-drawn stretched PNG with the `NineSlicePanel` from `integration-flutter.md`, using the insets from the pack's spec. A Kenney panel at 64×64 with 16 px borders scales from a tooltip to a dialog with the corners intact.
 
@@ -713,13 +724,13 @@ SFX belong on the event, not on the frame:
 
 ```dart
 void _onButtonPressed() {
-  FlameAudio.play('sfx/click.ogg', volume: 0.6);
+  FlameAudio.play('sfx/click.m4a', volume: 0.6);
   HapticFeedback.selectionClick();
   overlays.add('pauseMenu');
 }
 
-void _onWin() => FlameAudio.play('sfx/win.ogg');
-void _onLose() => FlameAudio.play('sfx/lose.ogg');
+void _onWin() => FlameAudio.play('sfx/win.m4a');
+void _onLose() => FlameAudio.play('sfx/lose.m4a');
 ```
 
 Preload every clip in `onLoad` (`FlameAudio.audioCache.loadAll`). A first-play decode mid-game is an audible stutter at the exact moment the player is watching.

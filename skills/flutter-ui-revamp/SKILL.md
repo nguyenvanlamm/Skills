@@ -4,7 +4,7 @@ description: Revamp the UI of an existing Flutter app or game with free assets �
 capabilities: [ui-revamp]
 license: MIT
 metadata:
-  version: 1.1.0
+  version: 1.2.0
 ---
 
 # Flutter UI Revamp
@@ -105,13 +105,15 @@ Read `references/sources-ui.md` (app) or `references/sources-game.md` (game), an
 
 Pick from the locked direction, then present the list **before downloading**:
 
-| Asset | Source | Licence | Attribution | Size | Why this one |
+| Asset | Source | Licence | Credit | Size | Why this one |
 |---|---|---|---|---|---|
-| Lucide icon set | lucide.dev | ISC | no | ~40 KB tree-shaken | const IconData; matches 1.5px stroke direction |
-| Satoshi | fontshare.com | ITF free commercial | no | 3 × 45 KB | Body font in the locked pairing |
-| unDraw empty box | undraw.co | unDraw licence | no | 12 KB SVG | Recoloured to seed; transparent |
+| Lucide icon set (`lucide_icons_flutter`) | lucide.dev | ISC | license-page | ~40 KB tree-shaken | const IconData; matches 1.5px stroke direction |
+| Satoshi | fontshare.com | ITF free commercial | license-page | 3 × 45 KB | Body font in the locked pairing |
+| unDraw empty box | undraw.co | unDraw licence | none | 12 KB SVG | Recoloured to seed; transparent |
 
-Not negotiable at this step: the licence is read **from the source page now** — reference files rot, and a licence quoted from one is a guess. Anything CC BY-NC, GPL or unlicensed is rejected, with the reason stated. Anything requiring attribution needs a decision about **where on screen** the credit appears; if the app has no About screen, building one is part of this work. Wait for approval before Step 4.
+Not negotiable at this step: read the licence **from the source page now**. Reference files go out of date, and a licence quoted from one is a guess. Reject anything CC BY-NC, GPL or unlicensed, and state the reason.
+
+The **Credit** column uses the same three levels that `CREDITS.md` records (`licensing.md § The Credit column`). Every `on-screen` asset needs a decision about **where on screen** its credit appears. If the app has no About screen, building one is part of this work. Wait for approval before Step 4.
 
 ### Step 4 — Download and optimize
 
@@ -121,9 +123,23 @@ python3 <skill>/scripts/fetch_asset.py --url <url> --dest assets/<kind> \
 python3 <skill>/scripts/optimize_flutter.py --project . --dir assets --apply --replace
 ```
 
-`fetch_asset.py` normalises filenames to `lower_snake_case` (Dart asset paths become Dart identifiers under `flutter_gen`), prints every LICENSE/README found inside a zip — **read them** — and writes the `assets/CREDITS.md` row at download time, which is the only moment the metadata is reliably known.
+`fetch_asset.py` does five things:
 
-`optimize_flutter.py` derives the 1.0x/2.0x/3.0x set from @3x sources, converts to WebP, and reports before/after bytes. Pillow, svgo and ffmpeg are each optional; a missing one is a skipped job with a warning, never a crash. Then update `pubspec.yaml` (the script prints the snippet — **directory entries are not recursive**, so every subdirectory needs its own line) and run `flutter pub add <packages> && flutter pub get`.
+- **Normalises filenames** to `lower_snake_case`, because Dart asset paths become Dart identifiers under `flutter_gen`. `Satoshi-Regular.ttf` becomes `satoshi_regular.ttf`, and `OFL.txt` becomes `ofl.txt`. **Write pubspec paths from the names the script printed**, not from the vendor's zip listing. A mismatched font path is the silent fall-back-to-Roboto failure.
+- **Refuses HTML.** If a URL returns an HTML page (a JS download button or a login wall), the script writes nothing. Find the direct file URL instead.
+- **Respects no-script sites.** unDraw, Storyset/Freepik and Flaticon forbid downloading through a tool, and the script refuses their URLs. Download those files by hand in a browser, then import each one with `--local <file> --source <page>`. The same normalisation and CREDITS row apply (`licensing.md` trap 9).
+- **Prints every LICENSE/README** it finds inside a zip. **Read them.**
+- **Writes the `assets/CREDITS.md` row** at download time, the only moment the metadata is reliably known. Re-downloading an asset replaces its row instead of adding a duplicate.
+
+`optimize_flutter.py` handles each asset type differently:
+
+- **Widget images** get a 1.0x/2.0x/3.0x set derived from the @3x source, converted to WebP.
+- **Sprites keep their pixels and filenames** and are only recompressed losslessly. This covers every image in a Flame project, anything in `sprites/`, `tiles/` or `atlas/`, and anything with atlas metadata beside it. Flame reads no density buckets, and atlases and 9-slice insets address source pixels.
+- **Audio becomes `.m4a` (AAC)** when the project has `ios/` or `macos/`, because `AVPlayer` cannot play OGG Vorbis. Otherwise it becomes OGG.
+
+With `--replace`, the script lists every renamed file (`.png` → `.webp`, `.wav` → `.m4a`). Update each reference to the old name. At Step 7, `scan_project.py`'s "referenced in code but absent from disk" list must be empty. The script reports before/after bytes. Pillow, svgo and ffmpeg are each optional; a missing one is a skipped job with a warning, never a crash.
+
+Then update `pubspec.yaml`. The script prints the snippet. **Directory entries are not recursive**, so every subdirectory needs its own line. Then run `flutter pub add <packages> && flutter pub get`, and read the resolved versions in `pubspec.lock`. Rive 0.14 and 0.13 have incompatible APIs (`integration-flutter.md § Rive`), and the icon package must be `lucide_icons_flutter`, not the stale `lucide_icons`.
 
 ### Step 5 — Build the design system
 
@@ -145,7 +161,7 @@ Material (and mixed root) files:
 | `lib/widgets/app_button.dart` | Ripple + haptics + 48dp minimum |
 | `lib/widgets/app_card.dart` | `Material` + `InkWell`, themed surface |
 | `lib/widgets/empty_state.dart` | Illustration + title + message + action |
-| `lib/widgets/loading_view.dart` | Rive/Lottie loader |
+| `lib/widgets/loading_view.dart` | Rive/Lottie loader with a reduce-motion fallback. For Rive, use `RiveWidgetBuilder` + `FileLoader` (0.14), plus `RiveNative.init()` in `main` |
 | `lib/widgets/app_skeleton.dart` | When audit has list/grid loaders — shimmer placeholder (§11 patterns) |
 | `lib/widgets/nine_slice_panel.dart` | Flame / game UI only — from integration § 9-slice |
 
@@ -172,15 +188,22 @@ A font that is not resolving, a package version conflict, a renamed `CardTheme` 
 
 The step everything else exists to serve. Read `references/refactor-patterns.md` and follow its per-screen order: icons → colours → text → components → spacing → states → micro-interactions.
 
-Icons first, because they are mechanical:
+Icons first, because they are mechanical. The icon package must already be resolved (`flutter pub get` from Step 4), because the map is checked against its source:
 
 ```bash
 python3 <skill>/scripts/generate_icon_map.py --project . --audit .revamp/audit.json --set lucide --out icons.json
-python3 <skill>/scripts/apply_icons.py --project . --map icons.json          # dry run
-python3 <skill>/scripts/apply_icons.py --project . --map icons.json --apply
+python3 <skill>/scripts/apply_icons.py --project . --map icons.json                 # dry run
+python3 <skill>/scripts/apply_icons.py --project . --map icons.json --apply --yes   # after the user approved the diff
 ```
 
-Use `--set phosphor` when the locked direction says Phosphor. **Show the user the diff from the dry run before applying.** The script skips matches inside comments and strings, reports every unmapped icon, and flags the const hazard — a callable replacement like `PhosphorIcons.house()` cannot sit inside `const Icon(...)`, and it will fail across every touched file at once. Prefer const constants in the mapping; `--fix-const` is the fallback.
+Use `--set phosphor` when the locked direction says Phosphor. `generate_icon_map.py` drops any target the installed package does not define and lists it as `DROPPED`. If it prints `targets NOT verified`, the package is not resolved yet: fix that before applying. **Show the user the diff from the dry run before applying.** `--apply` without `--yes` asks on stdin, and a non-interactive shell answers "no".
+
+The apply script:
+
+- skips matches inside comments and strings, while `${…}` interpolations are treated as code;
+- reports every unmapped icon;
+- lists every **COLLISION**, where two icons became one glyph. For example, `home` and `home_outlined` both become `house`, so a `NavigationBar` `selectedIcon` stops showing the selected state. Fix those sites by tinting the selected glyph with `colorScheme.primary`;
+- flags the **const hazard**. A callable replacement like `PhosphorIcons.house()` cannot sit inside `const Icon(...)`, and it fails in every touched file at once. Prefer const constants in the mapping; `--fix-const` is the fallback.
 
 Then, **one screen at a time**:
 
@@ -214,8 +237,8 @@ Then the checks a build cannot make. Each needs evidence, not a tick:
 | Reduce motion | With animations disabled (OS setting or `MediaQuery.disableAnimations`), loaders/Rive must not be required for meaning — provide a static fallback where needed. |
 | Contrast | Body text ≥ 4.5:1, large text ≥ 3:1. Derived-from-seed schemes usually pass; hand-edited slots usually do not. |
 | Touch targets | ≥ 48×48 dp on every tappable. |
-| Assets declared | Re-run `scan_project.py` — `ORPHAN_ASSETS` and `MISSING_ASSETS` must both be clear. Density folders (`2.0x/`, `3.0x/`) are **not** orphans when the 1.0x sibling is declared. |
-| Bundle delta | `flutter build apk --release --analyze-size`, before vs after. |
+| Assets declared | Re-run `scan_project.py`. `ORPHAN_ASSETS`, `MISSING_ASSETS` and `BROKEN_ASSET_REFS` must all be clear. The last one catches code still pointing at a file that `--replace` renamed. Density folders (`2.0x/`, `3.0x/`) are **not** orphans when the 1.0x sibling is declared. |
+| Bundle delta | `flutter build apk --release --analyze-size --target-platform android-arm64`, before vs after (size analysis refuses multi-ABI builds; use the same ABI both times). |
 
 If a device or emulator is attached, run the app and read a screenshot of two screens. It is the only check that proves the font actually loaded rather than silently falling back to Roboto — which is the failure that passes every mechanical gate and defeats the entire point of the work.
 
@@ -231,7 +254,11 @@ showLicensePage(
 );
 ```
 
-Register bundled font licences with `LicenseRegistry` so that page tells the truth (`integration-flutter.md § Typography`). Any CC BY asset needs a visible credit line, not just the file.
+Go through the `Credit` column of `CREDITS.md`:
+
+- Every `license-page` row gets its licence text registered with `LicenseRegistry`, so `showLicensePage` tells the truth (`integration-flutter.md § Typography`).
+- Every `on-screen` row (CC BY, Freepik, anything custom) needs a visible credit line on the About / Credits screen, not just the file.
+- `none` rows need nothing.
 
 Write `.revamp/report.md`:
 
@@ -293,7 +320,7 @@ lib/widgets/       app_button · app_card · empty_state · loading_view · app_
 .revamp/           audit.md · audit.json · design-direction.md · report.md
 ```
 
-`CREDITS.md` is a table: Asset | Type | Files | Author | License | Credit required (Y/N) | Source | Downloaded. `fetch_asset.py` writes the rows.
+`CREDITS.md` is a table with the columns Asset | Type | Files | Author | License | Credit | Source | Downloaded. `Credit` takes one of three values: `on-screen`, `license-page` or `none`. It is inferred from the licence, can be overridden with `--credit`, and unknown licences default to `on-screen`. `fetch_asset.py` writes the rows, and re-running it for the same asset replaces the row.
 
 ## Examples
 
@@ -354,7 +381,7 @@ return Padding(
     },
     child: Row(children: [
       Icon(
-        todo.done ? LucideIcons.checkCircle2 : LucideIcons.circle,
+        todo.done ? LucideIcons.circleCheck : LucideIcons.circle,
         color: todo.done ? semantic.success : scheme.outline,
         semanticLabel: todo.done ? 'Completed' : 'Not completed',
       ),
@@ -413,7 +440,7 @@ return Semantics(
   label: label,
   child: GestureDetector(
     onTap: () {
-      FlameAudio.play('sfx/click.ogg', volume: 0.6);
+      FlameAudio.play('sfx/click.m4a', volume: 0.6);
       HapticFeedback.selectionClick();
       onTap();
     },
@@ -422,7 +449,7 @@ return Semantics(
       height: 60,
       // Kenney's button is 64x64 with 16px borders — from the pack spec.
       child: NineSlicePanel(
-        asset: 'assets/sprites/ui/button_blue.webp',
+        asset: 'assets/sprites/ui/button_blue.png',
         sourceSize: const Size(64, 64),
         border: const EdgeInsets.all(16),
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -476,7 +503,7 @@ InkWell(
           imageUrl: product.image,
           height: 140,
           fadeInDuration: const Duration(milliseconds: 200),
-          placeholder: (_, __) => const AppSkeleton(height: 140, radius: 12),
+          placeholder: (context, url) => const AppSkeleton(height: 140, radius: 12),
         ),
       ),
     ),
@@ -502,10 +529,10 @@ Plus: grid spinner → six skeleton cards, empty cart → `EmptyState` with an u
 | Script | Run at |
 |---|---|
 | `scripts/scan_project.py` | Step 1 and again at Step 7 — writes `.revamp/audit.{json,md}` |
-| `scripts/fetch_asset.py` | Step 4 — download, normalise filenames, write the CREDITS row; denylists GPL/NC |
-| `scripts/optimize_flutter.py` | Step 4 — density buckets, WebP, svgo, OGG, size report, pubspec snippet |
-| `scripts/generate_icon_map.py` | Step 6 — audit.json → `icons.json` for Lucide or Phosphor |
-| `scripts/apply_icons.py` | Step 6 — bulk icon swap; dry run by default, const-hazard detection |
+| `scripts/fetch_asset.py` | Step 4 — download, reject HTML, normalise filenames, write/replace the CREDITS row with a 3-level credit; denylists GPL/NC/ARR |
+| `scripts/optimize_flutter.py` | Step 4 — density buckets + WebP for widget images, lossless in-place for sprites, svgo, m4a/OGG by platform, rename list, size report, pubspec snippet |
+| `scripts/generate_icon_map.py` | Step 6 — audit.json → `icons.json` for Lucide or Phosphor, verified against the resolved package source; reports collisions |
+| `scripts/apply_icons.py` | Step 6 — bulk icon swap; dry run by default, const-hazard and collision detection |
 
 `fetch_asset`, `optimize_flutter`, and `apply_icons` default to a dry run and write only with `--apply`. `scan_project` and `generate_icon_map` always write their output files (read-only w.r.t. app source).
 

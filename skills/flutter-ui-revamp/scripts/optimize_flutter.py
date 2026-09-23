@@ -4,9 +4,18 @@
 Three jobs, all optional and all skippable when the tool is missing:
 
   images  a source file treated as @3x becomes the Flutter density set
-          (1.0x at the declared path, 2.0x/ and 3.0x/ beside it), in WebP
+          (1.0x at the declared path, 2.0x/ and 3.0x/ beside it), in WebP.
+          EXCEPT sprites: files in a Flame project, under sprites/ tiles/
+          atlas/ …, or with atlas metadata beside them (same stem .json/.xml/
+          .atlas/…) are only recompressed losslessly in place — same pixels,
+          same size, same filename. Flame does not read density buckets, atlas
+          and tile maps address pixels and filenames, and 9-slice insets are
+          measured in source pixels; resizing or renaming any of them breaks it.
   svg     svgo pass, plus the vector_graphics_compiler command to emit .vec
-  audio   ffmpeg to OGG — SFX mono 44.1 kHz, music stereo ~128 kbps
+  audio   ffmpeg — SFX mono 44.1 kHz, music ~128 kbps. OGG Vorbis only when
+          the project has no ios/ or macos/ folder: Apple's AVPlayer (used by
+          audioplayers / flame_audio) cannot decode Vorbis, so OGG is silent
+          on iOS. Otherwise AAC in .m4a, which every Flutter target plays.
 
     python3 optimize_flutter.py --project . --dir assets --apply
 
@@ -17,6 +26,8 @@ absent the corresponding job is skipped with a warning, never a crash.
 from __future__ import annotations
 
 import argparse
+import io
+import re
 import shutil
 import subprocess
 import sys
@@ -25,11 +36,15 @@ from typing import Dict, List, Optional, Tuple
 
 HEAVY_IMAGE = 500 * 1024
 HEAVY_AUDIO = 1024 * 1024
+HEAVY_SFX = 50 * 1024
 BUNDLE_BUDGET = 30 * 1024 * 1024
 
 RASTER = {".png", ".jpg", ".jpeg", ".bmp", ".tiff"}
-AUDIO = {".wav", ".mp3", ".aiff", ".flac", ".m4a", ".aac"}
+AUDIO = {".wav", ".mp3", ".aiff", ".flac", ".m4a", ".aac", ".ogg"}
 BUCKETS = ("1.5x", "2.0x", "3.0x", "4.0x")
+SPRITE_DIRS = {"sprites", "sprite", "spritesheets", "tiles", "tilesets", "tilemaps",
+               "atlas", "atlases", "particles", "game"}
+ATLAS_META = (".json", ".xml", ".atlas", ".plist", ".fnt", ".tsx", ".tmx", ".txt")
 
 
 def log(msg: str) -> None:
@@ -62,7 +77,49 @@ def run(cmd: List[str]) -> Tuple[bool, str]:
 
 # ── images ───────────────────────────────────────────────────────────────────
 
-def optimise_images(files: List[Path], project: Path, args, results: List[Dict]) -> None:
+def is_flame_project(project: Path) -> bool:
+    pubspec = project / "pubspec.yaml"
+    return pubspec.is_file() and re.search(
+        r"^\s+flame\s*:", pubspec.read_text(encoding="utf-8", errors="replace"), re.M) is not None
+
+
+def sprite_reason(src: Path, root: Path, args) -> Optional[str]:
+    """Why this raster must keep its pixels and filename, or None."""
+    if args.sprite_mode == "off":
+        return None
+    if args.sprite_mode == "on":
+        return "--sprite-mode on"
+    if any(src.with_suffix(ext).exists() for ext in ATLAS_META):
+        return "atlas metadata beside it"
+    if any(p.lower() in SPRITE_DIRS for p in src.relative_to(root).parts[:-1]):
+        return "sprite/tile directory"
+    if args.flame:
+        return "Flame project (no density buckets)"
+    return None
+
+
+def recompress_in_place(src: Path, args, results: List[Dict], project: Path, why: str) -> None:
+    """Lossless PNG re-encode: identical pixels, dimensions and filename."""
+    from PIL import Image  # type: ignore
+
+    before = src.stat().st_size
+    after = before
+    if src.suffix.lower() == ".png":
+        with Image.open(src) as im:
+            im.load()
+            buf = io.BytesIO()
+            im.save(buf, "PNG", optimize=True)
+        if buf.tell() < before:
+            after = buf.tell()
+            if args.apply:
+                src.write_bytes(buf.getvalue())
+    results.append({"file": str(src.relative_to(project)), "kind": "sprite",
+                    "before": before, "after": after,
+                    "note": f"kept size + name ({why})", "heavy": after > HEAVY_IMAGE})
+
+
+def optimise_images(files: List[Path], project: Path, root: Path, args, results: List[Dict],
+                    renamed: List[Tuple[str, str]]) -> None:
     try:
         from PIL import Image  # type: ignore
     except ImportError:
@@ -73,6 +130,10 @@ def optimise_images(files: List[Path], project: Path, args, results: List[Dict])
         if any(f"/{b}/" in str(src).replace("\\", "/") for b in BUCKETS):
             continue  # already a density variant
         try:
+            why = sprite_reason(src, root, args)
+            if why:
+                recompress_in_place(src, args, results, project, why)
+                continue
             with Image.open(src) as im:
                 im = im.convert("RGBA") if im.mode in ("P", "LA", "RGBA") else im.convert("RGB")
                 w, h = im.size
@@ -100,16 +161,17 @@ def optimise_images(files: List[Path], project: Path, args, results: List[Dict])
                                      lossless=args.lossless, method=6)
                         after_total += out.stat().st_size
                     else:
-                        import io as _io
-
-                        buf = _io.BytesIO()
+                        buf = io.BytesIO()
                         resized.save(buf, "WEBP", quality=args.quality,
                                      lossless=args.lossless, method=6)
                         after_total += buf.tell()
                     out_paths.append(out)
 
-                if args.apply and args.replace and after_total and after_total < before:
-                    src.unlink()
+                if args.replace and after_total and after_total < before:
+                    renamed.append((str(src.relative_to(project)),
+                                    str(out_paths[0].relative_to(project))))
+                    if args.apply:
+                        src.unlink()
                 results.append({
                     "file": str(src.relative_to(project)), "kind": "image",
                     "before": before, "after": after_total,
@@ -149,21 +211,39 @@ def optimise_svgs(files: List[Path], project: Path, args, results: List[Dict]) -
 
 # ── audio ────────────────────────────────────────────────────────────────────
 
-def optimise_audio(files: List[Path], project: Path, args, results: List[Dict]) -> None:
+def audio_format(project: Path, choice: str) -> str:
+    if choice != "auto":
+        return choice
+    apple = (project / "ios").is_dir() or (project / "macos").is_dir()
+    return "m4a" if apple else "ogg"
+
+
+def optimise_audio(files: List[Path], project: Path, args, results: List[Dict],
+                   renamed: List[Tuple[str, str]]) -> None:
     if not files:
         return
     if not have("ffmpeg"):
         log("WARN: ffmpeg not found — audio job SKIPPED. Install ffmpeg to enable it.")
         return
+    fmt = audio_format(project, args.audio_format)
+    log(f"audio target: {fmt}" + (" (ios/ or macos/ present — AVPlayer cannot play OGG Vorbis)"
+                                  if fmt == "m4a" and args.audio_format == "auto" else ""))
     for src in files:
+        if src.suffix.lower() == f".{fmt}":
+            continue  # already in the target format; re-encoding only loses quality
+        if fmt == "m4a" and src.suffix.lower() == ".ogg":
+            log(f"WARN: {src.name} is OGG and this project builds for iOS/macOS, where it "
+                f"will not play — converting to .m4a.")
         rel = str(src).replace("\\", "/")
         is_sfx = "/sfx/" in rel or args.audio_profile == "sfx"
-        out = src.with_suffix(".ogg")
-        if out.resolve() == src.resolve():
-            out = src.with_name(src.stem + "_opt.ogg")
-        cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(src)]
-        cmd += (["-ac", "1", "-ar", "44100", "-c:a", "libvorbis", "-q:a", "3"] if is_sfx
-                else ["-ac", "2", "-ar", "44100", "-c:a", "libvorbis", "-b:a", "128k"])
+        out = src.with_suffix(f".{fmt}")
+        codec = ["-c:a", "libvorbis"] if fmt == "ogg" else ["-c:a", "aac", "-movflags", "+faststart"]
+        cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-vn"]
+        if is_sfx:
+            cmd += ["-ac", "1", "-ar", "44100"] + codec + (["-q:a", "3"] if fmt == "ogg" else ["-b:a", "64k"])
+        else:
+            # Keep the source channel count (≤ 2); upmixing mono music doubles its bytes.
+            cmd += ["-ar", "44100"] + codec + ["-b:a", "128k"]
         cmd.append(str(out))
         before = src.stat().st_size
         after = before
@@ -175,10 +255,12 @@ def optimise_audio(files: List[Path], project: Path, args, results: List[Dict]) 
             after = out.stat().st_size
             if args.replace and after < before:
                 src.unlink()
+        if args.replace and (not args.apply or not src.exists()):
+            renamed.append((str(src.relative_to(project)), str(out.relative_to(project))))
         results.append({"file": str(src.relative_to(project)), "kind": "audio",
                         "before": before, "after": after,
-                        "note": "sfx mono 44.1k q3" if is_sfx else "music stereo 128k",
-                        "heavy": after > HEAVY_AUDIO})
+                        "note": f"sfx mono {fmt}" if is_sfx else f"music {fmt} 128k",
+                        "heavy": after > (HEAVY_SFX if is_sfx else HEAVY_AUDIO)})
 
 
 # ── pubspec snippet ──────────────────────────────────────────────────────────
@@ -208,6 +290,11 @@ def main() -> int:
     ap.add_argument("--quality", type=int, default=85)
     ap.add_argument("--lossless", action="store_true", help="Lossless WebP (flat art, UI, sprites)")
     ap.add_argument("--audio-profile", choices=["auto", "sfx", "music"], default="auto")
+    ap.add_argument("--audio-format", choices=["auto", "ogg", "m4a"], default="auto",
+                    help="auto: m4a when ios/ or macos/ exists (AVPlayer has no Vorbis), else ogg")
+    ap.add_argument("--sprite-mode", choices=["auto", "on", "off"], default="auto",
+                    help="auto: keep pixels+names for Flame projects, sprite/tile dirs and "
+                         "atlas-backed images; on: for everything; off: never")
     ap.add_argument("--skip", default="", help="Comma list: images,svg,audio")
     args = ap.parse_args()
 
@@ -217,6 +304,10 @@ def main() -> int:
         log(f"FATAL: {root} does not exist.")
         return 2
     skip = {s.strip() for s in args.skip.split(",") if s.strip()}
+    args.flame = is_flame_project(project)
+    if args.flame and args.sprite_mode == "auto":
+        log("Flame project: images keep their pixels and filenames (Flame reads no density "
+            "buckets). Pass --sprite-mode off for widget-only images in a separate --dir.")
 
     everything = [p for p in sorted(root.rglob("*")) if p.is_file() and not p.name.startswith(".")]
     images = [p for p in everything if p.suffix.lower() in RASTER]
@@ -226,12 +317,13 @@ def main() -> int:
         f"{len(images)} raster, {len(svgs)} svg, {len(audio)} audio")
 
     results: List[Dict] = []
+    renamed: List[Tuple[str, str]] = []
     if images and "images" not in skip:
-        optimise_images(images, project, args, results)
+        optimise_images(images, project, root, args, results, renamed)
     if svgs and "svg" not in skip:
         optimise_svgs(svgs, project, args, results)
     if audio and "audio" not in skip:
-        optimise_audio(audio, project, args, results)
+        optimise_audio(audio, project, args, results, renamed)
 
     print("")
     print("| File | Kind | Before | After | Δ | Note |")
@@ -257,6 +349,15 @@ def main() -> int:
     heavy = [r for r in results if r.get("heavy")]
     if heavy:
         log(f"WARN: {len(heavy)} file(s) still over threshold — review them individually.")
+
+    if renamed:
+        verb = "replaced" if args.apply else "would be replaced"
+        log(f"{len(renamed)} source file(s) {verb} by a new filename. Every Dart reference, "
+            f"flutter_gen accessor and metadata file pointing at the old name must be updated; "
+            f"re-run scan_project.py — its 'referenced in code but absent from disk' list "
+            f"must be empty:")
+        for old, new in renamed[:30]:
+            print(f"        {old}  ->  {new}", file=sys.stderr)
 
     print("# pubspec.yaml — paste under the existing `flutter:` key")
     print(pubspec_snippet(project, root))

@@ -1,20 +1,23 @@
 # Integrating assets into Flutter
 
-Read at Step 4 and Step 5. Every snippet is null-safe and compiles against Flutter 3.22+ / Dart 3.4+.
+Read at Step 4 and Step 5. Every snippet is null-safe and targets Flutter **3.27+** / Dart 3.6+ (for `CardThemeData`). On an older SDK, see the notes beside each snippet.
 
-**On versions:** the constraints below were current when this file was written and pub moves. Add packages with `flutter pub add rive` rather than pasting a pin, then check the resolved version against the API used here.
+**On versions:** the constraints below were checked against pub.dev in 2026-09, and pub keeps moving. Add packages with `flutter pub add <name>` instead of pasting a pin. Then open `pubspec.lock`, find the resolved version, and check it against the API used here. Rive is the package where this matters most (see § Rive).
 
-| Package | Constraint at time of writing | For |
+| Package | Checked 2026-09 | For |
 |---|---|---|
-| `flutter_svg` | `^2.0.10` | runtime SVG |
-| `vector_graphics` / `vector_graphics_compiler` | `^1.1.11` | precompiled `.vec` |
-| `rive` | `^0.13.0` | state-machine animation |
-| `lottie` | `^3.1.0` | linear animation |
-| `google_fonts` | `^6.2.1` | font resolution (bundled — see `licensing.md`) |
-| `cached_network_image` | `^3.3.1` | remote images |
-| `flutter_gen_runner` (dev) | `^5.4.0` | typed asset accessors |
-| `flame` / `flame_audio` | `^1.18.0` / `^2.10.0` | 2D game engine + audio |
-| `just_audio` | `^0.9.37` | app-side audio |
+| `flutter_svg` | `^2.3.0` | runtime SVG |
+| `vector_graphics` / `vector_graphics_compiler` | `^1.2.0` | precompiled `.vec` |
+| `rive` | `^0.14.0` (**new API**, see § Rive) | state-machine animation |
+| `lottie` | `^3.6.0` | linear animation |
+| `google_fonts` | `^8.2.0` | font resolution (bundled — see `licensing.md`) |
+| `cached_network_image` | `^4.0.0` | remote images |
+| `lucide_icons_flutter` | `^3.1.0` | Lucide icons (**not** the stale `lucide_icons` 0.257.0) |
+| `phosphor_flutter` | `^2.1.0` | Phosphor icons |
+| `flutter_gen_runner` (dev) | `^5.15.0` | typed asset accessors (older releases emit the removed Rive 0.13 API) |
+| `flame` / `flame_audio` | `^1.38.0` / `^2.12.0` | 2D game engine + audio |
+| `flame_texturepacker` | `^5.1.0` | libGDX `.atlas` sprite sheets (Flame core has no atlas parser) |
+| `just_audio` | `^0.10.0` | app-side audio |
 
 ## Declaring assets
 
@@ -31,15 +34,17 @@ flutter:
   fonts:
     - family: Satoshi
       fonts:
-        - asset: assets/fonts/Satoshi-Regular.ttf
+        - asset: assets/fonts/satoshi_regular.ttf
           weight: 400
-        - asset: assets/fonts/Satoshi-Medium.ttf
+        - asset: assets/fonts/satoshi_medium.ttf
           weight: 500
-        - asset: assets/fonts/Satoshi-Bold.ttf
+        - asset: assets/fonts/satoshi_bold.ttf
           weight: 700
 ```
 
-**A directory entry is not recursive.** `assets/audio/` does not pick up `assets/audio/sfx/beep.ogg` — every subdirectory needs its own line. This is the single most common cause of "works in debug on my machine, `Unable to load asset` in release", and it is what `scan_project.py`'s `ORPHAN_ASSETS` finding detects.
+**Filenames are the ones `fetch_asset.py` actually wrote.** It normalises every filename to `lower_snake_case`, so `Satoshi-Regular.ttf` becomes `satoshi_regular.ttf` and `OFL.txt` becomes `ofl.txt`. Copy paths from the script's output or `ls assets/fonts/`, never from the font vendor's zip listing. A pubspec path that does not match fails the build with "unable to locate asset entry". A `family:` name that does not match `fontFamily:` in Dart is worse: nothing reports it, and the app silently renders in Roboto. The family name (`Satoshi`) is free text and is not renamed.
+
+**A directory entry is not recursive.** `assets/audio/` does not pick up `assets/audio/sfx/beep.m4a` — every subdirectory needs its own line. This is the single most common cause of "works in debug on my machine, `Unable to load asset` in release", and it is what `scan_project.py`'s `ORPHAN_ASSETS` finding detects.
 
 Directory entry when the folder's contents change often (sprite packs, icon sets). Individual entries when the list is short and stable, or when you want an unused file to stay out of the bundle.
 
@@ -48,7 +53,7 @@ For a variable font, declare the file once and drive it with `FontVariation`:
 ```yaml
     - family: Inter
       fonts:
-        - asset: assets/fonts/Inter-Variable.ttf
+        - asset: assets/fonts/inter_variable.ttf
 ```
 
 ```dart
@@ -122,12 +127,12 @@ Declare the `.vec` files in pubspec (the directory entry covers them) and you ma
 | Monochrome glyph, tinted by theme, many sizes | **icon font** — one file, no per-icon decode, `IconData` is const |
 | Multi-colour, gradients, or an illustration | **SVG / `.vec`** |
 | Under ~40 glyphs from mixed sources | **custom icon font** (below) |
-| A published set with a maintained package | the **package** (`lucide_icons`, `phosphor_flutter`) |
+| A published set with a maintained package | the **package** (`lucide_icons_flutter`, `phosphor_flutter`) |
 
 ## Custom icon font from SVGs
 
 1. Collect the SVGs — single path, no strokes (convert strokes to fills), square viewBox.
-2. Upload to **fluttericon.com**, select the glyphs, name the font, download.
+2. Upload to **www.fluttericon.com**, select the glyphs, name the font, download.
 3. Put `MyIcons.ttf` in `assets/fonts/` and declare it.
 
 ```yaml
@@ -157,21 +162,79 @@ If you ever build with `--no-tree-shake-icons`, a full icon package costs ~1 MB.
 
 ## Rive
 
-```dart
-import 'package:rive/rive.dart';
+**Runtime version matters more here than anywhere else in this file.** `rive` 0.14 replaced the whole API: `RiveAnimation.asset`, `StateMachineController`, `SMIBool` and `onInit` no longer exist. `flutter pub add rive` resolves 0.14.x, so every snippet below targets it. If the project already pins `rive: ^0.13.x` (legacy runtime, last release 0.13.20), keep its existing code style and do **not** mix the two APIs. Look up the resolved version in `pubspec.lock` before you write any Rive code.
 
-RiveAnimation.asset(
-  'assets/animations/loader.riv',
-  fit: BoxFit.contain,
-  animations: const ['idle'],
-);
-```
-
-### State machine — an interactive button
+0.14 is backed by `rive_native`, so it must be initialised once, before `runApp`:
 
 ```dart
 import 'package:flutter/material.dart';
-import 'package:rive/rive.dart';
+import 'package:rive/rive.dart' as rive;
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await rive.RiveNative.init();
+  runApp(const MyApp());
+}
+```
+
+Import `rive` with a prefix (`as rive`) in any file that also uses Flutter types. The package exports its own `File`, `Image`, `Fit` and `Factory`, and those names clash with `dart:io` and with Flutter widgets.
+
+### A looping loader
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:rive/rive.dart' as rive;
+
+class RiveLoader extends StatefulWidget {
+  const RiveLoader({super.key, this.size = 96});
+
+  final double size;
+
+  @override
+  State<RiveLoader> createState() => _RiveLoaderState();
+}
+
+class _RiveLoaderState extends State<RiveLoader> {
+  // The state owns the loader, so it must dispose it.
+  late final rive.FileLoader _loader = rive.FileLoader.fromAsset(
+    'assets/animations/loader.riv',
+    riveFactory: rive.Factory.rive,
+  );
+
+  @override
+  void dispose() {
+    _loader.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: widget.size,
+      child: rive.RiveWidgetBuilder(
+        fileLoader: _loader,
+        builder: (context, state) => switch (state) {
+          rive.RiveLoading() => const SizedBox.shrink(),
+          // Fail soft: a missing or corrupt .riv must never break the screen.
+          rive.RiveFailed() => const Center(child: CircularProgressIndicator()),
+          rive.RiveLoaded() => rive.RiveWidget(
+              controller: state.controller,
+              fit: rive.Fit.contain,
+            ),
+        },
+      ),
+    );
+  }
+}
+```
+
+### State machine — an interactive button (data binding)
+
+In 0.14 you drive a state machine through **data binding** (a ViewModel property that the artist exposes). State-machine *inputs* still exist, but they are deprecated. Before you write any code, open the `.riv` in the Rive editor and write down the view-model property names. They are case-sensitive, and a lookup of a renamed property returns `null`.
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:rive/rive.dart' as rive;
 
 class RiveLikeButton extends StatefulWidget {
   const RiveLikeButton({super.key, required this.onTap});
@@ -183,14 +246,17 @@ class RiveLikeButton extends StatefulWidget {
 }
 
 class _RiveLikeButtonState extends State<RiveLikeButton> {
-  SMIBool? _pressed;
+  late final rive.FileLoader _loader = rive.FileLoader.fromAsset(
+    'assets/animations/like_button.riv',
+    riveFactory: rive.Factory.rive,
+  );
+  rive.ViewModelInstanceBoolean? _liked;
 
-  void _onInit(Artboard artboard) {
-    final controller =
-        StateMachineController.fromArtboard(artboard, 'ButtonMachine');
-    if (controller == null) return; // machine renamed in the .riv — fail soft
-    artboard.addController(controller);
-    _pressed = controller.findSMI<SMIBool>('pressed');
+  @override
+  void dispose() {
+    _liked?.dispose();
+    _loader.dispose();
+    super.dispose();
   }
 
   @override
@@ -200,16 +266,25 @@ class _RiveLikeButtonState extends State<RiveLikeButton> {
       label: 'Like',
       child: GestureDetector(
         onTap: () {
-          _pressed?.value = !(_pressed?.value ?? false);
+          final liked = _liked;
+          if (liked != null) liked.value = !liked.value;
           widget.onTap();
         },
-        child: SizedBox(
-          width: 64,
-          height: 64,
-          child: RiveAnimation.asset(
-            'assets/animations/like_button.riv',
-            onInit: _onInit,
-            fit: BoxFit.contain,
+        child: SizedBox.square(
+          dimension: 64,
+          child: rive.RiveWidgetBuilder(
+            fileLoader: _loader,
+            stateMachineSelector: rive.StateMachineSelector.byName('ButtonMachine'),
+            dataBind: rive.DataBind.auto(),
+            // Property renamed in the .riv → null → the button stays static.
+            onLoaded: (state) => _liked = state.viewModelInstance?.boolean('liked'),
+            builder: (context, state) => switch (state) {
+              rive.RiveLoaded() => rive.RiveWidget(
+                  controller: state.controller,
+                  fit: rive.Fit.contain,
+                ),
+              _ => const Icon(Icons.favorite_border),
+            },
           ),
         ),
       ),
@@ -218,9 +293,9 @@ class _RiveLikeButtonState extends State<RiveLikeButton> {
 }
 ```
 
-Two things that go wrong: the state-machine name is set by the artist and is case-sensitive, and `findSMI` returns null for a renamed input. Both fail silently to a static drawing. Handle null rather than `!`.
+Two things go wrong silently, and both leave you with a static drawing: the state-machine name (`byName`) and the view-model property name. Both are set by the artist and are case-sensitive. Handle `null` instead of using `!`.
 
-Rive is not a `TickerProvider` animation — it runs its own renderer, and a `.riv` left mounted off-screen keeps ticking. Dispose or unmount it.
+Dispose every `FileLoader`, `File`, controller and property you create. The native runtime keeps its own memory outside the Dart GC, and a `.riv` left mounted off-screen keeps ticking, so unmount it when it is not visible.
 
 ## Lottie
 
@@ -246,7 +321,7 @@ CachedNetworkImage(
   imageUrl: url,
   fadeInDuration: const Duration(milliseconds: 200),
   placeholder: (context, _) => const AppSkeleton(height: 180),
-  errorWidget: (context, _, __) => Icon(
+  errorWidget: (context, url, error) => Icon(
     Icons.broken_image_outlined,
     color: Theme.of(context).colorScheme.outline,
   ),
@@ -268,6 +343,8 @@ WebP over PNG: typically 25–35% smaller at visually identical quality, decoded
 ## 9-slice panels
 
 ```dart
+import 'package:flutter/material.dart';
+
 /// A game panel that scales without smearing its corners.
 ///
 /// [border] is given in the SOURCE image's pixel coordinates, and the widget
@@ -278,7 +355,7 @@ class NineSlicePanel extends StatelessWidget {
     super.key,
     required this.child,
     required this.sourceSize,
-    this.asset = 'assets/sprites/ui/panel_beige.webp',
+    this.asset = 'assets/sprites/ui/panel_beige.png',
     this.border = const EdgeInsets.all(16),
     this.padding = const EdgeInsets.all(20),
   });
@@ -370,7 +447,7 @@ class AppTheme {
 // )
 ```
 
-Bundled fonts still go in pubspec; set `fontFamily` on `CupertinoTextThemeData` / per-style overrides. Icons: prefer one set (`lucide_icons` or keep `CupertinoIcons` if the direction is stock iOS). Never embed SF Symbols in a multi-platform build (`licensing.md` trap 3).
+Bundled fonts still go in pubspec; set `fontFamily` on `CupertinoTextThemeData` / per-style overrides. Icons: prefer one set (`lucide_icons_flutter` or keep `CupertinoIcons` if the direction is stock iOS). Never embed SF Symbols in a multi-platform build (`licensing.md` trap 3).
 
 Empty/loading patterns still apply: a Cupertino empty state is the same layout as `EmptyState` without Material `FilledButton` — use `CupertinoButton.filled`.
 
@@ -463,7 +540,7 @@ class AppTheme {
 }
 ```
 
-`CardTheme` was renamed to `CardThemeData` in Flutter 3.22+. On an older SDK the analyzer will tell you; use whichever the project's SDK exposes.
+`ThemeData.cardTheme` takes `CardThemeData` from Flutter **3.27**. On 3.22–3.24 it takes `CardTheme` instead, and the same change applies to `dialogTheme` / `DialogThemeData` and `tabBarTheme` / `TabBarThemeData`. Check `flutter --version` and use whichever the project's SDK exposes.
 
 ```dart
 MaterialApp(
@@ -532,17 +609,20 @@ Register the font licence so `showLicensePage` tells the truth:
 
 ```dart
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   LicenseRegistry.addLicense(() async* {
-    final license = await rootBundle.loadString('assets/fonts/OFL.txt');
+    final license = await rootBundle.loadString('assets/fonts/ofl.txt');
     yield LicenseEntryWithLineBreaks(const <String>['Satoshi'], license);
   });
   runApp(const MyApp());
 }
 ```
+
+The licence file must be declared as an asset too (`- assets/fonts/ofl.txt`, or `- assets/fonts/`). If the app also uses Rive, this is the same `main()` as the `RiveNative.init()` one in § Rive: merge them into a single `async` `main` rather than writing two.
 
 ## Flame
 
@@ -563,8 +643,8 @@ class MyGame extends FlameGame {
       'sprites/player.png',
     ]);
     await FlameAudio.audioCache.loadAll(<String>[
-      'sfx/click.ogg',
-      'sfx/win.ogg',
+      'sfx/click.m4a',
+      'sfx/win.m4a',
     ]);
 
     final sheet = SpriteSheet(
@@ -584,27 +664,39 @@ class MyGame extends FlameGame {
 }
 ```
 
-Flame reads from `assets/images/` and `assets/audio/` by default, so `images.load('ui/panel.png')` resolves `assets/images/ui/panel.png`. Both directories still need pubspec entries — including every subdirectory.
+Flame reads from `assets/images/` and `assets/audio/` by default, so `images.load('ui/panel.png')` resolves `assets/images/ui/panel.png`. Both directories still need pubspec entries, including every subdirectory.
 
-TexturePacker atlas:
+Two things Flame does *not* do:
+
+- **It does not read density buckets.** `images.load` decodes exactly the file at that path. A sprite downscaled to "1.0x" is simply a smaller, blurrier sprite, and it also breaks atlas coordinates and 9-slice insets. `optimize_flutter.py` therefore keeps pixels and filenames for every image in a Flame project, in `sprites/` or `tiles/`, or beside atlas metadata. It only recompresses them losslessly.
+- **It does not play OGG on iOS/macOS.** `flame_audio` goes through `audioplayers` to `AVPlayer`, which has no Vorbis decoder. Ship `.m4a` (AAC) when the game builds for Apple platforms (`sources-game.md § Audio`).
+
+TexturePacker atlas. Flame core has no atlas parser; use `flame_texturepacker` (`flutter pub add flame_texturepacker`). It reads the **libGDX `.atlas`** format, so in Code & Web TexturePacker choose the "libGDX" data format (not "JSON"), or use gdx-texture-packer-gui. Put `ui.atlas` and `ui.png` in `assets/images/`:
 
 ```dart
-import 'package:flame/sprite.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flame/components.dart';
+import 'package:flame/game.dart';
+import 'package:flame_texturepacker/flame_texturepacker.dart';
 
-final atlas = await fromJSONString(
-  await rootBundle.loadString('assets/images/ui.json'),
-  images.fromCache('ui.png'),
-);
-final button = atlas.getSprite('button_blue.png');
+class MenuGame extends FlameGame {
+  @override
+  Future<void> onLoad() async {
+    final atlas = await atlasFromAssets('ui.atlas'); // assets/images/ui.atlas
+    // Region names drop the file extension: 'button_blue.png' → 'button_blue'.
+    final button = atlas.findSpriteByName('button_blue');
+    if (button != null) add(SpriteComponent(sprite: button));
+  }
+}
 ```
+
+`findSpriteByName` returns `null` for a name that is not in the atlas. Handle the null instead of using `!`, so that one renamed region does not crash the whole menu.
 
 One atlas per screen keeps the draw calls batched; a directory of loose sprites does not.
 
 SFX, once, at the event:
 
 ```dart
-FlameAudio.play('sfx/click.ogg', volume: 0.6);
+FlameAudio.play('sfx/click.m4a', volume: 0.6);
 ```
 
 Looping music belongs on `FlameAudio.bgm` (which handles lifecycle pause/resume), not on a second `play` call.
@@ -613,8 +705,8 @@ Looping music belongs on `FlameAudio.bgm` (which handles lifecycle pause/resume)
 
 ```yaml
 dev_dependencies:
-  build_runner: ^2.4.9
-  flutter_gen_runner: ^5.4.0
+  build_runner: ^2.16.0
+  flutter_gen_runner: ^5.15.0   # older releases emit the removed Rive 0.13 API
 
 flutter_gen:
   output: lib/gen/
@@ -635,6 +727,8 @@ Assets.images.hero.image(width: 160);
 Assets.illustrations.emptyBox.svg(width: 220);
 ```
 
+With `rive: true` and rive ≥ 0.14, a `.riv` asset exposes `riveFileLoader(...)`, which returns a `FileLoader` you can pass to `RiveWidgetBuilder`. It does **not** expose a `rive()` widget; that accessor only exists for rive 0.13 and older.
+
 A typo becomes a compile error instead of a grey box in production. Re-run the generator whenever assets change, and commit the generated file so CI does not need the step.
 
 ## Bundle size
@@ -642,10 +736,10 @@ A typo becomes a compile error instead of a grey box in production. Re-run the g
 ```bash
 flutter build apk --release --split-per-abi     # ~⅓ the size per ABI
 flutter build appbundle --release               # Play splits this for you
-flutter build apk --release --analyze-size      # where the bytes actually went
+flutter build apk --release --analyze-size --target-platform android-arm64   # where the bytes went
 ```
 
-`--analyze-size` writes a JSON you can open in DevTools' app-size tool. Run it before and after the revamp; the delta is a required line in the Step 8 report, and it is the number that catches a 12 MB illustration set nobody noticed.
+`--analyze-size` needs exactly one ABI. Without `--target-platform`, the tool stops with "Cannot perform code size analysis when building for multiple ABIs". Use `android-arm64` for both the before and the after run so the two numbers are comparable. It writes a JSON you can open in DevTools' app-size tool. Run it before and after the revamp; the delta is a required line in the Step 8 report, and it is the number that catches a 12 MB illustration set nobody noticed.
 
 Budget: assets under **30 MB**. Above that, either cut, or defer:
 
@@ -664,4 +758,4 @@ import 'premium_gallery.dart' deferred as premium;
 await premium.loadLibrary();
 ```
 
-Cheaper wins first, in this order: WebP instead of PNG, `.vec` instead of SVG, one atlas instead of loose sprites, mono OGG instead of stereo WAV, and deleting the pack files you downloaded but never used — `scan_project.py`'s orphan list is exactly that.
+Cheaper wins first, in this order: WebP instead of PNG, `.vec` instead of SVG, one atlas instead of loose sprites, mono AAC/OGG instead of stereo WAV (OGG only without an iOS/macOS build), and deleting the pack files you downloaded but never used — `scan_project.py`'s orphan list is exactly that.

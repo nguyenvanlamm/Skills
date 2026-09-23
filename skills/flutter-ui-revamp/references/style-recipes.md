@@ -15,7 +15,7 @@ Licence column is a hint only — re-read on the source page before Step 4
 | Slot | Choice |
 |---|---|
 | Seed default | `#4F46E5` (indigo) |
-| Icons | **Lucide** (ISC) — 1.5px stroke, const `IconData` via `lucide_icons` |
+| Icons | **Lucide** (ISC) — 1.5px stroke, const `IconData` via `lucide_icons_flutter` |
 | Fonts | **Clash Display** 600 (headings) + **Satoshi** 400/500/700 (body) — Fontshare |
 | Illustration | unDraw, flat, recolour to seed, transparent |
 | Animation | Rive loader + empty-state; skeletons for lists |
@@ -34,7 +34,7 @@ Best for: productivity, SaaS, finance, settings-heavy apps that currently look l
 | Seed default | `#7C3AED` or a warm coral `#F97316` |
 | Icons | **Phosphor** (MIT) — regular + fill pair for tabs; use **const** `PhosphorIconsRegular.*` / `Fill.*` |
 | Fonts | **Nunito** or **Plus Jakarta Sans** (OFL, Google Fonts — **bundle** TTF) |
-| Illustration | Open Peeps (CC0) or Popsy; soft, human, transparent |
+| Illustration | Open Peeps or Humaaans (both CC0); soft, human, transparent |
 | Animation | Lottie empty/success bursts; playful press-scale 0.96 |
 | Spacing | 4 / 8 / 16 / 24 / 32 / 48 |
 | Radius | 12 / 16 / 24 / pill (softer than minimal) |
@@ -69,7 +69,7 @@ Best for: marketing tools, indie brands, portfolios. Clashes with Material defau
 | Icons | **Game-icons.net** (CC BY → Credits screen) for abilities; pack glyphs for chrome |
 | Fonts | **Baloo 2** or **Fredoka** (OFL) for HUD; one family only |
 | UI pack | **Kenney UI Pack** (CC0) — panels/buttons with documented 9-slice insets |
-| Audio | Kenney Interface Sounds (CC0); SFX mono OGG |
+| Audio | Kenney Interface Sounds (CC0); SFX mono `.m4a` (OGG only if no iOS/macOS build — `sources-game.md § Audio`) |
 | Animation | Button press scale + SFX; win/lose stingers; no full-screen Lottie menus |
 | Spacing | Follow pack metrics; HUD padding 8 / 12 / 16 |
 | Radius | From pack (often chunky 8–12 px pixel-ish) |

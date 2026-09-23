@@ -15,6 +15,7 @@ applied directly to the original.
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from dataclasses import dataclass
 from typing import List, Tuple
 
@@ -31,91 +32,101 @@ class StringLiteral:
     end: int
 
 
-def _blank(chunk: str) -> str:
-    """Replace a chunk with spaces, preserving newlines so lines still align."""
-    return "".join("\n" if ch == "\n" else " " for ch in chunk)
-
-
 def strip(src: str) -> Tuple[str, List[StringLiteral]]:
     """Blank out comments and string bodies.
 
     Returns (code_only, string_literals). `code_only` has exactly the same
-    length as `src`.
+    length as `src`. The inside of a `${...}` interpolation is code, not string,
+    so it stays visible: `'${Icons.home.codePoint}'` counts as a real usage and
+    is rewritten by the bulk replacer like any other.
     """
-    out: List[str] = []
+    out = list(src)
     strings: List[StringLiteral] = []
-    i, n, line = 0, len(src), 1
+    n = len(src)
+    newlines = [k for k, c in enumerate(src) if c == "\n"]
 
-    while i < n:
-        ch = src[i]
+    def blank(a: int, b: int) -> None:
+        for k in range(a, min(b, n)):
+            if out[k] != "\n":
+                out[k] = " "
 
-        if ch == "\n":
-            out.append("\n")
-            line += 1
-            i += 1
-            continue
-
-        # Line comment
-        if ch == "/" and i + 1 < n and src[i + 1] == "/":
-            j = src.find("\n", i)
-            j = n if j == -1 else j
-            out.append(_blank(src[i:j]))
-            i = j
-            continue
-
-        # Block comment. Dart nests them, so count depth rather than
-        # find('*/') — an unbalanced scan swallows the rest of the file.
-        if ch == "/" and i + 1 < n and src[i + 1] == "*":
-            depth, j = 1, i + 2
-            while j < n and depth:
-                if src.startswith("/*", j):
+    def scan_code(i: int, in_interp: bool) -> int:
+        """Scan code from i. Inside an interpolation, stop at the matching `}`
+        and return its offset; at top level, return n."""
+        depth = 0
+        while i < n:
+            ch = src[i]
+            if ch == "/" and src.startswith("//", i):
+                j = src.find("\n", i)
+                j = n if j == -1 else j
+                blank(i, j)
+                i = j
+                continue
+            # Block comment. Dart nests them, so count depth rather than
+            # find('*/') — an unbalanced scan swallows the rest of the file.
+            if ch == "/" and src.startswith("/*", i):
+                d, j = 1, i + 2
+                while j < n and d:
+                    if src.startswith("/*", j):
+                        d, j = d + 1, j + 2
+                    elif src.startswith("*/", j):
+                        d, j = d - 1, j + 2
+                    else:
+                        j += 1
+                blank(i, j)
+                i = j
+                continue
+            # String literal, with optional r (raw) prefix. The `r` must start a
+            # token, or `bar'` in malformed code would be read as a raw string.
+            prev_ident = i > 0 and (src[i - 1].isalnum() or src[i - 1] in "_$")
+            if ch == "r" and not prev_ident and i + 1 < n and src[i + 1] in QUOTES:
+                i = scan_string(i, i + 1, raw=True)
+                continue
+            if ch in QUOTES:
+                i = scan_string(i, i, raw=False)
+                continue
+            if in_interp:
+                if ch == "{":
                     depth += 1
-                    j += 2
-                elif src.startswith("*/", j):
+                elif ch == "}":
+                    if depth == 0:
+                        return i
                     depth -= 1
-                    j += 2
-                else:
-                    j += 1
-            chunk = src[i:j]
-            out.append(_blank(chunk))
-            line += chunk.count("\n")
-            i = j
-            continue
+            i += 1
+        return n
 
-        # String literal, with optional r (raw) prefix
-        raw = False
-        q_at = i
-        if ch == "r" and i + 1 < n and src[i + 1] in QUOTES:
-            raw = True
-            q_at = i + 1
+    def scan_string(start: int, q_at: int, raw: bool) -> int:
+        quote = src[q_at]
+        triple = src.startswith(quote * 3, q_at)
+        delim = quote * 3 if triple else quote
+        body_start = q_at + len(delim)
+        j = body_start
+        blank(start, body_start)
+        while j < n:
+            if not raw and src[j] == "\\":
+                blank(j, j + 2)
+                j += 2
+                continue
+            if not triple and src[j] == "\n":
+                break  # unterminated single-line string; bail out safely
+            if src.startswith(delim, j):
+                break
+            if not raw and src.startswith("${", j):
+                blank(j, j + 2)
+                close = scan_code(j + 2, in_interp=True)
+                blank(close, close + 1)
+                j = close + 1
+                continue
+            blank(j, j + 1)
+            j += 1
+        end = min(j + len(delim), n)
+        blank(j, end)
+        strings.append(StringLiteral(src[body_start:j], bisect_left(newlines, start) + 1,
+                                     start, end))
+        return end
 
-        if src[q_at] in QUOTES:
-            quote = src[q_at]
-            triple = src.startswith(quote * 3, q_at)
-            delim = quote * 3 if triple else quote
-            body_start = q_at + len(delim)
-            j = body_start
-            while j < n:
-                if not raw and src[j] == "\\":
-                    j += 2
-                    continue
-                if not triple and src[j] == "\n":
-                    break  # unterminated single-line string; bail out safely
-                if src.startswith(delim, j):
-                    break
-                j += 1
-            body = src[body_start:j]
-            end = min(j + len(delim), n)
-            chunk = src[i:end]
-            strings.append(StringLiteral(body, line, i, end))
-            out.append(_blank(chunk))
-            line += chunk.count("\n")
-            i = end
-            continue
-
-        out.append(ch)
-        i += 1
-
+    scan_code(0, in_interp=False)
+    strings.sort(key=lambda s: s.start)
     return "".join(out), strings
 
 
@@ -128,13 +139,20 @@ if __name__ == "__main__":  # tiny self-test
     sample = '''
 // Icons.home in a comment
 final a = 'assets/images/logo.png';
-/* block Icons.search */
+/* block Icons.search /* nested Icons.close */ still Icons.edit */
 Icon(Icons.settings);
+final s = 'cp ${Icons.star.codePoint} and ${m['k']} not Icons.add';
+final r = r'raw ${Icons.delete}';
 '''
     code, lits = strip(sample)
     assert len(code) == len(sample)
-    assert "Icons.home" not in code
-    assert "Icons.search" not in code
+    assert code.count("\n") == sample.count("\n")
+    for gone in ("Icons.home", "Icons.search", "Icons.close", "Icons.edit",
+                 "Icons.add", "Icons.delete"):
+        assert gone not in code, gone
     assert "Icons.settings" in code
+    assert "Icons.star.codePoint" in code
+    assert "m[" in code and "Icons.add" not in code
     assert lits[0].value == "assets/images/logo.png"
+    assert any(l.value == "k" for l in lits)
     print("dart_lex self-test OK")

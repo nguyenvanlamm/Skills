@@ -10,7 +10,7 @@ Licence column is the licence as published at the time of writing. **Re-read it 
 
 | Set | URL | Licence | Formats | Flutter package | API |
 |---|---|---|---|---|---|
-| **Lucide** | lucide.dev | ISC | SVG, font, PNG | `lucide_icons` (const `IconData`; preferred for bulk swap) | yes (unpkg / jsDelivr per-icon SVG) |
+| **Lucide** | lucide.dev | ISC | SVG, font, PNG | `lucide_icons_flutter` (const `IconData`; preferred for bulk swap) | yes (unpkg / jsDelivr per-icon SVG) |
 | **Phosphor** | phosphoricons.com | MIT | SVG, font | `phosphor_flutter` | via GitHub raw |
 | **Tabler** | tabler.io/icons | MIT | SVG, font, PNG | none official — build a font | via GitHub raw |
 | **Material Symbols** | fonts.google.com/icons | Apache-2.0 | SVG, variable font | built in (`Icons.*`) | Google Fonts API |
@@ -20,22 +20,21 @@ Licence column is the licence as published at the time of writing. **Re-read it 
 
 Notes that decide the choice:
 
-- **Lucide** — 1.5px stroke, geometric, 1400+ icons. The safe default for a minimal/modern direction. Prefer the **`lucide_icons`** package for revamps: it exposes const `IconData`, so `const Icon(LucideIcons.house)` stays const (see const hazard in `refactor-patterns.md`). Upstream Lucide renamed `home` → `house` — map `Icons.home` to `LucideIcons.house` and verify against the resolved package version after `flutter pub add`. (`lucide_flutter` exists on pub with a different API surface; do not mix both packages in one app.)
+- **Lucide** — 1.5px stroke, geometric, 1400+ icons. The safe default for a minimal/modern direction. Use the **`lucide_icons_flutter`** package for revamps. It is actively maintained, tracks upstream names (`house`, `circleAlert`, and so on, with the old names kept as aliases), and exposes const `IconData`, so `const Icon(LucideIcons.house)` stays const (see the const hazard in `refactor-patterns.md`). Import it with `package:lucide_icons_flutter/lucide_icons.dart`. **Do not use `lucide_icons`.** It is frozen at 0.257.0 (2023), and `LucideIcons.house` does not exist in it. If the project already depends on `lucide_icons`, migrate it: both packages declare a class named `LucideIcons`, so they cannot coexist in one app. (`lucide_flutter` is a third, unrelated package with a different API surface.)
 - **Phosphor** — six weights (thin → fill) from one family, which is why it wins for playful and for apps that need a filled/outlined tab-bar pair. In `phosphor_flutter` v2 the ergonomic API is a call — `PhosphorIcons.house()` — which is **not const**. Use the const constants (`PhosphorIconsRegular.house`) in bulk replacements.
 - **Iconify** is not an icon set, it is 200 000 icons across ~150 sets with ~15 different licences. Excellent for finding one missing glyph, dangerous as a primary source: you inherit whichever licence that specific set carries.
 - **Material Symbols** ships with Flutter. If the design direction is "clean Material 3", the honest answer is often *keep the icons* and spend the effort on colour, type and motion.
 
-**When to build a custom icon font instead of adding a package:** you need fewer than ~40 icons, or you are mixing two sets deliberately (a brand glyph plus a standard set), or the package's tree-shaking is not trimming the unused thousands. Upload the SVGs to **fluttericon.com**, download the `.ttf` + generated Dart, and follow `integration-flutter.md § Custom icon font`. A 40-icon font is ~8 KB; a full icon package with tree-shaking disabled can be 200 KB+.
+**When to build a custom icon font instead of adding a package:** you need fewer than ~40 icons, or you are mixing two sets deliberately (a brand glyph plus a standard set), or the package's tree-shaking is not trimming the unused thousands. Upload the SVGs to **www.fluttericon.com** (the bare domain does not resolve), download the `.ttf` + generated Dart, and follow `integration-flutter.md § Custom icon font`. A 40-icon font is ~8 KB; a full icon package with tree-shaking disabled can be 200 KB+.
 
 ## Illustrations
 
 | Source | URL | Licence | Formats | Notes |
 |---|---|---|---|---|
-| **unDraw** | undraw.co/illustrations | unDraw open licence (free commercial, no attribution) | SVG, PNG | **Recolour to your seed colour on the site before downloading.** Flat, transparent background — safe in dark mode. |
-| **Storyset** | storyset.com | Freepik free — **attribution required** | SVG, PNG, animated SVG | Editable colour + optional built-in animation. Attribution is not optional; it belongs in CREDITS.md and on the About screen. |
-| **Humaaans** | humaaans.com | CC BY 4.0 | SVG, Sketch, PNG | Mix-and-match human figures. Attribution required. |
+| **unDraw** | undraw.co/illustrations | unDraw licence: free commercial use, no attribution. **No packs, no AI training, no automated downloading** | SVG, PNG | **Download by hand in the browser**, after recolouring to your seed colour on the site. The licence forbids "automated … ways to … download", so do not point `fetch_asset.py` at it. Use a handful as UI illustrations; a product built around unDraw art is outside the licence. Flat, transparent background — safe in dark mode. |
+| **Storyset** | storyset.com | Freepik free — **attribution required**; **no downloads via robots, programs or tools** | SVG, PNG, animated SVG | Editable colour + optional built-in animation. **Download by hand.** Attribution is not optional; it belongs in CREDITS.md and on the About screen. |
+| **Humaaans** | humaaans.com | **CC0** | SVG, Sketch, PNG | Mix-and-match human figures by Pablo Stanley. No attribution required. |
 | **Open Peeps** | openpeeps.com | CC0 | SVG, PNG, PSD | Hand-drawn people, no attribution. Best CC0 human illustration set. |
-| **Popsy** | popsy.co/illustrations | free commercial, no attribution | SVG, PNG | Hand-drawn, playful, transparent. |
 | **Blush** | blush.design | **per-collection**, many require a paid plan | SVG, PNG | Check the individual collection; several are not free. |
 | **DrawKit** | drawkit.com | free packs: no attribution; check per pack | SVG, PNG | |
 
@@ -59,9 +58,9 @@ Pairing, and the hard limit of two families: one display family for headings, on
 
 | Source | URL | Licence | Format | Flutter |
 |---|---|---|---|---|
-| **Rive Community** | rive.app/community | **per-file** — most CC BY, some all-rights-reserved | `.riv` | `rive` package |
+| **Rive Community** | rive.app/community/files | **per-file** — most CC BY, some all-rights-reserved | `.riv` | `rive` package |
 | **LottieFiles Free** | lottiefiles.com/featured-free-animations | per-file; free tier often needs attribution | `.json`, `.lottie` | `lottie` package |
-| **Lordicon free** | lordicon.com/icons?price=free | free with attribution | Lottie JSON, GIF | `lottie` |
+| **Lordicon free** | lordicon.com/icons?price=free | modified **CC BY-ND 4.0**: commercial OK, attribution required, **no derivatives** | Lottie JSON, GIF | `lottie`. ND means you may not recolour or edit the animation to fit the theme. Use it as-is, or pay for the Pro licence. |
 | **useAnimations** | useanimations.com | free, attribution appreciated | Lottie JSON | `lottie` |
 
 Rive is the first choice in Flutter and it is not close: the runtime is a vector renderer with a state machine, so one 12 KB `.riv` covers idle → hover → pressed → success without four separate files or a single `AnimationController`. Lottie is the right tool for a linear, fire-and-forget animation (a splash, a confetti burst, an empty-state loop).
