@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.8.0 — 2026-09-24
+
+For account-gated sources, the user logs in once, creates a key, and every later download is scripted through the site's **official** API.
+
+### Added — `scripts/fetch_api.py`
+- **Providers**: Freesound (API key for HQ previews; OAuth2 for original files, via `fetch_api.py auth freesound`: open the URL, log in, paste the code once, then the token refreshes automatically), Sketchfab (API token; GLB/glTF/USDZ), Pixabay and Pexels (images and video), Poly Pizza (GLB) and Smithsonian Open Access (CC0 images).
+- **The licence comes from the API response**, not from the agent. It is normalised to an SPDX-style id (`CC0`, `CC-BY-4.0`, `CC-BY-NC-3.0`…) and then goes through `fetch_asset.py`'s denylist, so CC-BY-NC Freesound sounds and Sketchfab "Editorial" models are refused. The landing page, not a temporary S3 link, is recorded as the CREDITS source.
+- **Credentials**: read from env vars, then `~/.config/flutter-ui-revamp/credentials`. That file is written with mode 600 (directory 700), and the script refuses to read it if group or others can read it. Values are never printed, logged, or passed on the command line. `fetch_api.py check` reports only set/missing.
+- `fetch_api.py self-test` runs offline checks of licence mapping, denylist and credit inference.
+- **Verified**: Smithsonian end to end with `DEMO_KEY` (real CC0 JPEG written, CREDITS row correct). Every other provider was run with an invalid key and returned a clean 401/400 with nothing written; the Sketchfab response ("Invalid API token") confirms the Token scheme is accepted. Response parsing for Sketchfab, Pixabay, Pexels, Poly Pizza and Freesound was tested against the documented response shapes. **Verified later with real keys**: Freesound (HQ preview; CC-BY-4.0 read from the API, credit level `on-screen`), Pixabay (1280 px JPEG) and Pexels (JPEG). A CC-BY-NC-4.0 Freesound sound was refused with nothing written. Sketchfab, Poly Pizza and Freesound originals (OAuth2) are still unverified with real credentials.
+- **Not covered, by design**: sites with no API (Mixamo, ZapSplat, IconScout, LottieFiles, Rive, Lordicon, Textures.com…) stay hand download + `--local`, because scripting a logged-in browser breaks several sites' terms. Unsplash also stays manual: its API guidelines require hotlinking, which contradicts bundling.
+
+### Changed — `fetch_asset.py`
+- `main(argv, auth)` and `download(url, auth)` can be called from `fetch_api.py`. Auth headers are never logged, and urllib does not forward them on a cross-host redirect.
+- `snake()` transliterates accents: "Le Blessé" becomes `le_blesse`, not `le_bless`, and "Đường Phố" becomes `duong_pho`.
+- `Pixabay Content License`, `Pexels License` and `Unsplash License` now infer credit level `none` (none of them requires attribution) instead of the unknown-licence default `on-screen`.
+
 ## v1.7.0 — 2026-09-24
 
 This release fills the categories that had the fewest options: animation (7 → 11), VFX (2 → 6), tilesets (3 → 8), 3D (10 → 14), PBR (6 → 9), backgrounds (10 → 15), photos (9 → 16) and emoji/avatars (9 → 15). The skill now lists ~245 recommended sources (sources-ui ~154, sources-game ~91) and ~29 checked-and-rejected ones. Licences were read from upstream repos and live pages, as before. Sample downloads went end to end through `fetch_asset.py --apply`: Fluent animated APNG, a Met CC0 image, Notion Avatar, Blobmoji, the Kenney 1-Bit zip with `--only`, and a Khronos GLB.

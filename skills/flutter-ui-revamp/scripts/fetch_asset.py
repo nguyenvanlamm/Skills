@@ -26,6 +26,7 @@ import io
 import os
 import re
 import sys
+import unicodedata
 import zipfile
 from datetime import date
 from pathlib import Path
@@ -38,7 +39,8 @@ from urllib.parse import unquote, urlparse
 #   license-page  licence text shipped via LicenseRegistry + showLicensePage
 #                 (MIT / ISC / BSD / Apache-2.0 / OFL — no on-screen credit)
 #   none          no obligation (CC0 / public domain / Unlicense / unDraw)
-CREDIT_NONE = (r"^CC0\b", r"PUBLIC DOMAIN", r"^UNLICENSE$", r"^UNDRAW\b")
+CREDIT_NONE = (r"^CC0\b", r"PUBLIC DOMAIN", r"^UNLICENSE$", r"^UNDRAW\b",
+               r"^PIXABAY CONTENT LICENSE$", r"^PEXELS LICENSE$", r"^UNSPLASH LICENSE$")
 CREDIT_LICENSE_PAGE = (r"^MIT\b", r"^ISC\b", r"^BSD\b", r"^APACHE\b", r"^OFL\b",
                        r"^SIL OFL\b", r"^ITF\b", r"FONTSHARE")
 CREDIT_LEVELS = ("on-screen", "license-page", "none")
@@ -71,6 +73,9 @@ def snake(name: str) -> str:
     stem, dot, ext = name.rpartition(".")
     if not dot:
         stem, ext = name, ""
+    # "Le Blessé" → "le_blesse", not "le_bless"; Vietnamese "đ" has no NFKD base.
+    stem = unicodedata.normalize("NFKD", stem.replace("đ", "d").replace("Đ", "D"))
+    stem = stem.encode("ascii", "ignore").decode()
     stem = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", stem)
     stem = re.sub(r"[^A-Za-z0-9]+", "_", stem).strip("_").lower()
     stem = re.sub(r"_+", "_", stem) or "asset"
@@ -79,7 +84,10 @@ def snake(name: str) -> str:
     return f"{stem}.{ext.lower()}" if ext else stem
 
 
-def download(url: str) -> bytes:
+def download(url: str, auth: dict | None = None) -> bytes:
+    """`auth` headers (API tokens from fetch_api.py) are never logged and are not
+    forwarded when the server redirects to another host (e.g. a CDN)."""
+    auth = auth or {}
     try:
         import requests  # type: ignore
     except ImportError:
@@ -87,11 +95,13 @@ def download(url: str) -> bytes:
         from urllib.request import Request, urlopen
 
         req = Request(url, headers={"User-Agent": "flutter-ui-revamp/1.0"})
+        for k, v in auth.items():
+            req.add_unredirected_header(k, v)
         with urlopen(req, timeout=60) as resp:  # noqa: S310 (explicit user-supplied URL)
             data = resp.read(MAX_BYTES + 1)
     else:
         resp = requests.get(url, timeout=60, stream=True,
-                            headers={"User-Agent": "flutter-ui-revamp/1.0"})
+                            headers={"User-Agent": "flutter-ui-revamp/1.0", **auth})
         resp.raise_for_status()
         data = b""
         for chunk in resp.iter_content(1 << 16):
@@ -286,7 +296,7 @@ def preview_instead_of_file(url: str) -> str | None:
     return f"{m.group(1)}{m.group(2)}.wav" if m else None
 
 
-def main() -> int:
+def main(argv: List[str] | None = None, auth: dict | None = None) -> int:
     ap = argparse.ArgumentParser(description="Download (or import) and normalise a free asset.")
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--url", help="Direct file URL to download")
@@ -316,7 +326,7 @@ def main() -> int:
     ap.add_argument("--credit", choices=CREDIT_LEVELS,
                     help="Where attribution is satisfied. Default: inferred from --license "
                          "(unknown/custom licences default to on-screen)")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     if not args.credit:
         args.credit = credit_level(args.license)
         log(f"credit level inferred from licence: {args.credit}")
@@ -362,7 +372,7 @@ def main() -> int:
             return 2
         log(f"GET {args.url}")
         try:
-            data = download(args.url)
+            data = download(args.url, auth)
         except SystemExit:
             raise
         except Exception as exc:

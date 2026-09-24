@@ -4,7 +4,7 @@ description: Revamp the UI of an existing Flutter app or game with free assets �
 capabilities: [ui-revamp]
 license: MIT
 metadata:
-  version: 1.7.0
+  version: 1.8.0
 ---
 
 # Flutter UI Revamp
@@ -131,6 +131,19 @@ python3 <skill>/scripts/optimize_flutter.py --project . --dir assets --apply --r
 - **Prints every LICENSE/README** it finds inside a zip. **Read them.**
 - **Names single files sensibly.** Some URLs end in a generic basename: Noto `…/<cp>/lottie.json`, Material Symbols `…/24px.svg`, DiceBear `…/svg?seed=x`. Pass `--filename rocket.json` for these, or each download overwrites the last; the script warns when it sees one. A URL with no extension gets one sniffed from the content.
 - **Writes the `assets/CREDITS.md` row** at download time, the only moment the metadata is reliably known. Re-downloading an asset replaces its row instead of adding a duplicate.
+
+**Account-gated sources with an official API** (Freesound, Sketchfab, Pixabay, Pexels, Poly Pizza, Smithsonian) go through `fetch_api.py`. The user logs in **once** in a browser to create an API key or token and stores it locally. After that, the script resolves title, author, licence and landing page from the API and hands off to `fetch_asset.py`, so the denylist, filenames and CREDITS row are the same:
+
+```bash
+python3 <skill>/scripts/fetch_api.py check                        # which keys are set (never prints values)
+python3 <skill>/scripts/fetch_api.py auth freesound               # one-time OAuth2 for Freesound originals
+python3 <skill>/scripts/fetch_api.py get sketchfab <uid> --dest assets/models --apply
+python3 <skill>/scripts/fetch_api.py get freesound <id> --dest assets/audio/sfx --apply
+```
+
+Keys live in env vars or in `~/.config/flutter-ui-revamp/credentials`, which must be `chmod 600`; the script refuses a group- or world-readable file. **Never ask the user to paste a key into the chat, and never put one in the repo.** The licence comes from the API response, so a CC-BY-NC Freesound sound or an Editorial Sketchfab model is refused like any other denylisted licence. Two things this does not solve:
+- **Sites without an API** (Mixamo, ZapSplat, IconScout, LottieFiles, Rive, Lordicon, Textures.com…) stay hand download + `--local`. Do not script a logged-in browser session: several of these sites' terms forbid automated downloads.
+- **Unsplash** has an API, but its guidelines require hotlinking images from Unsplash, which contradicts bundling. Download Unsplash photos by hand under the Unsplash License.
 
 `optimize_flutter.py` handles each asset type differently:
 
@@ -531,11 +544,12 @@ Plus: grid spinner → six skeleton cards, empty cart → `EmptyState` with an u
 |---|---|
 | `scripts/scan_project.py` | Step 1 and again at Step 7 — writes `.revamp/audit.{json,md}` |
 | `scripts/fetch_asset.py` | Step 4 — download, reject HTML, normalise filenames, write/replace the CREDITS row with a 3-level credit; denylists GPL/NC/ARR |
+| `scripts/fetch_api.py` | Step 4 — official-API downloads for account-gated sources (Freesound incl. OAuth2, Sketchfab, Pixabay, Pexels, Poly Pizza, Smithsonian); licence taken from the API, then hands off to `fetch_asset.py`; keys from env or a chmod-600 file |
 | `scripts/optimize_flutter.py` | Step 4 — density buckets + WebP for widget images, lossless in-place for sprites, svgo, m4a/OGG by platform, rename list, size report, pubspec snippet |
 | `scripts/generate_icon_map.py` | Step 6 — audit.json → `icons.json` for Lucide or Phosphor, verified against the resolved package source; reports collisions |
 | `scripts/apply_icons.py` | Step 6 — bulk icon swap; dry run by default, const-hazard and collision detection |
 
-`fetch_asset`, `optimize_flutter`, and `apply_icons` default to a dry run and write only with `--apply`. `scan_project` and `generate_icon_map` always write their output files (read-only w.r.t. app source).
+`fetch_asset`, `fetch_api get`, `optimize_flutter`, and `apply_icons` default to a dry run and write only with `--apply`. `scan_project` and `generate_icon_map` always write their output files (read-only w.r.t. app source).
 
 ## Scope
 

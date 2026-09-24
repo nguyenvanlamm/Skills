@@ -364,13 +364,14 @@ python3 <skill>/scripts/fetch_asset.py --url https://api.fontshare.com/v2/fonts/
 | 3dicons | Full pack via Gumroad. Site thumbnails come from an undocumented bucket and top out at 400px |
 | SVG Repo | Behind a Vercel bot checkpoint. The licence is also **per icon** (CC0, MIT, CC BY, and some GPL), so read each one |
 | IRA Design, Absurd, Ouch!/Icons8, Vecteezy, LukaszAdam, SVG Silh, Mixkit Art | Per-item download flow in the browser; no stable file URLs |
-| Pexels, Unsplash, Pixabay, StockSnap, Kaboompics, Nappy | Site download buttons or API keys; hotlinking is not a delivery mechanism anyway |
+| Unsplash, StockSnap, Kaboompics, Nappy | Site download buttons. Unsplash has an API, but its guidelines require hotlinking from Unsplash, which contradicts bundling, so download by hand |
+| Pexels, Pixabay | **Use `fetch_api.py get pexels\|pixabay <id>`** with a free API key (see `sources-game.md § Account-gated sources`). Pixabay's full-resolution `imageURL` needs approved full API access; without it you get the 1280 px `largeImageURL` |
 | SVG Backgrounds | The site gives you copy-paste SVG markup, not a file URL — save the markup yourself |
 | Font Squirrel, Fontesk, Font Library, Fontfabric, Free Faces, Use & Modify, Collletttivo, Tunera | Download buttons or links out to foundry pages |
 | Scale (Flexiple), Pixeltrue | Colour picker + per-item export in the browser (Scale); email-gated pack (Pixeltrue) |
 | Burst, Negative Space, Skitterphoto, Rijksmuseum, NASA images | Site download buttons; same bundle-don't-hotlink rule as the other photo sites |
 | Art Institute of Chicago | The IIIF image server (`artic.edu/iiif/2/…`) returns 403 to scripts; the JSON API works, but the image does not |
-| Smithsonian Open Access | Needs an api.data.gov key |
+| Smithsonian Open Access | **Use `fetch_api.py get smithsonian <record id>`** (free api.data.gov key, or `DEMO_KEY` for a few requests). Verified end to end on 2026-09-24 |
 | Multiavatar, facesjs, BGJar, Tossface | Generators or a site download; export the files you need and import them with `--local` |
 
 ## Checked and rejected

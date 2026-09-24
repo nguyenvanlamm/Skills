@@ -204,9 +204,9 @@ Kenney audio packs (Interface Sounds, UI Audio, …) ship **OGG only**. On a pro
 |---|---|
 | itch.io (including KayKit / Kay Lousberg, pixel-boy, Ansimuz), CraftPix, Quaternius, GameArt2D | The download sits behind a JS button or popup, and the page HTML has no file link |
 | Glitch (OpenGameArt) | The link works, but it is a **185 MB `.7z`**. `fetch_asset.py` cannot unpack 7z/rar/tar.gz and refuses them before downloading. Extract by hand, then zip the subset you need |
-| Freesound, Sample Focus, Musopen, BlendSwap | Needs a login or OAuth token (a plain request gets 401) |
-| Pixabay, Uppbeat, Sketchfab | Bot-blocked (403/429) or login-gated |
-| Poly Pizza | Its API (`api.poly.pizza`) returns 401 without an API key. Download models from the site |
+| Sample Focus, Musopen, BlendSwap | Needs a login; no public download API |
+| Uppbeat | Bot-blocked (403/429) and login-gated |
+| Poly Pizza, Sketchfab, Freesound, Pixabay | **Not hand download any more: use `fetch_api.py`** with a free API key (Freesound originals also need a one-time OAuth2 login). See **Account-gated sources (official APIs)** below |
 | Pixel Frog (incl. Tiny Swords), 0x72, Screaming Brain Studios, Brackeys, Pipoya, Cainos, Tallbeard | itch.io download button (JS). Tallbeard's zips are 30–150 MB each, so take one quarter, not the whole bundle |
 | Scott Buckley | Per-track download page |
 | Foozle, pimen | itch.io download button (JS) |
@@ -223,6 +223,19 @@ Kenney audio packs (Interface Sounds, UI Audio, …) ship **OGG only**. On a pro
 | 99Sounds, Audionautix, ende.app, Fesliyan, DOVA-SYNDROME | Site download buttons; some route through JS or a second page |
 | CG Bookcase | Download button per texture, no login — but the file URL is not published in a stable pattern |
 | 3Dassets.one, Lospec | These are indexes, not hosts — they send you to the creator's site |
+
+## Account-gated sources (official APIs)
+
+`scripts/fetch_api.py` downloads through each site's **official** API. You log in once to create a key, the script reads the licence from the API response, and `fetch_asset.py` writes the file and the CREDITS row. Verified 2026-09-24: an invalid key gets a clean 401/400 from each API and nothing is written. The Smithsonian path was run end to end with `DEMO_KEY`.
+
+| Provider | Key (env var) | What `get` downloads | Terms that matter |
+|---|---|---|---|
+| **Freesound** | `FREESOUND_API_KEY`; originals also need `FREESOUND_CLIENT_ID` + `fetch_api.py auth freesound` (OAuth2: log in, paste the code once; the token auto-refreshes) | `--quality original` = the uploaded WAV/FLAC/…; `--quality preview` = lossy HQ preview (OGG ~192 kbps stereo, verified 2026-09-24) with just the key — fine for SFX, since `optimize_flutter.py` re-encodes anyway | Licence per sound (CC0 / CC BY / CC BY-NC); NC is refused. The API terms say commercial use *of the API* is negotiated with UPF, so keep it to downloading assets for your own project |
+| **Sketchfab** | `SKETCHFAB_API_TOKEN` (Settings → Password & API) | `--format glb` (default), `gltf` (zip) or `usdz`; only models marked downloadable | API terms §4.7: show the CC licence and credit the creator + model link. "Editorial" licence is refused (non-commercial) |
+| **Poly Pizza** | `POLY_PIZZA_API_KEY` (poly.pizza/settings/api) | GLB | Poly Pizza describes its API as free for hobby use and pay-as-you-go for commercial use; check your plan before using it for a paid app |
+| **Pixabay** | `PIXABAY_API_KEY` (shown on pixabay.com/api/docs when logged in) | images: `--size web\|large\|full\|vector` (full/vector need approved full access, otherwise 1280 px); `--kind video` | Download and bundle, no permanent hotlinking; no systematic mass downloads; not for a media-focused product |
+| **Pexels** | `PEXELS_API_KEY` (pexels.com/api) | photos: `--size web\|large\|full` (large2x by default); `--kind video` picks the file closest to the size | Pexels License: no attribution required; no unaltered resale |
+| **Smithsonian Open Access** (images) | `DATA_GOV_API_KEY` (free at api.data.gov; falls back to `DEMO_KEY`) | CC0 image media only; screen-size JPEG by default, `--size large` for high-res JPEG (can be 15+ MB) | Records without a CC0 media item are refused. **Smithsonian 3D models (3d.si.edu) are not covered**: that resolver was built and tested for images, so 3D stays hand download |
 
 ## Sprite hygiene, before the assets touch the project
 
