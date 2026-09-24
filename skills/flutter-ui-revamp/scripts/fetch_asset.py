@@ -115,6 +115,16 @@ def is_html(data: bytes) -> bool:
         and b"<svg" not in head
 
 
+def is_lfs_pointer(data: bytes) -> bool:
+    """raw.githubusercontent.com serves Git LFS files as a ~130-byte text pointer."""
+    return len(data) < 1024 and data.startswith(b"version https://git-lfs.github.com/spec/")
+
+
+def lfs_media_url(url: str) -> str | None:
+    m = re.match(r"https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/(.+)", url)
+    return f"https://media.githubusercontent.com/media/{m[1]}/{m[2]}/{m[3]}" if m else None
+
+
 NOTICE_EXT = ("", ".txt", ".md", ".html", ".htm", ".pdf", ".rtf")
 
 
@@ -363,6 +373,12 @@ def main() -> int:
         log("FATAL: the URL returned an HTML page, not an asset file. The site probably "
             "serves the download behind a JS button or login. Find the direct file URL "
             "(browser devtools → Network) or download by hand. Nothing written.")
+        return 1
+    if is_lfs_pointer(data):
+        media = lfs_media_url(args.url or "")
+        log("FATAL: that is a Git LFS pointer file, not the asset. "
+            + (f"Use the LFS media URL instead: --url {media}" if media
+               else "Fetch the file through the host's LFS/media endpoint.") + " Nothing written.")
         return 1
     kind = unsupported_archive(data)
     if kind:

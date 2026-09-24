@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.7.0 — 2026-09-24
+
+This release fills the categories that had the fewest options: animation (7 → 11), VFX (2 → 6), tilesets (3 → 8), 3D (10 → 14), PBR (6 → 9), backgrounds (10 → 15), photos (9 → 16) and emoji/avatars (9 → 15). The skill now lists ~245 recommended sources (sources-ui ~154, sources-game ~91) and ~29 checked-and-rejected ones. Licences were read from upstream repos and live pages, as before. Sample downloads went end to end through `fetch_asset.py --apply`: Fluent animated APNG, a Met CC0 image, Notion Avatar, Blobmoji, the Kenney 1-Bit zip with `--only`, and a Khronos GLB.
+
+### Link audit (2026-09-24)
+- **All 242 source pages were requested; 210 returned 200.** Another 22 returned 401/403/429/202, which is bot protection: the sites work in a browser but block scripts, and they are already listed as hand download. Two sites are really down and are now flagged ⚠️: **market.pmnd.rs** (404) and **gamesounds.xyz** (522). Six landing URLs had moved and were corrected: Carbon, Zendesk Garden, Streamline, facesjs, Absurd Design, and Duoicons (HTTPS dead, so point to the repo). Font Squirrel (502), Fontfabric (timeout) and Uncut (Cloudflare 455) failed from the test machine. Archive.org shows the first two alive in September 2026, so this is likely blocking, not shutdown.
+- **99 sample direct-download URLs were fetched with `fetch_asset.py`'s own User-Agent; 97 returned the real file** (SVG/PNG/ZIP/TTF/GLB/WAV/JSON, magic bytes checked). The two failures: gamesounds.xyz (down), and `openmoji.org/data/…`, which now serves an HTML bot check to scripts, so the OpenMoji pattern switched to the official jsDelivr npm copy. The Fusion Pixel note now says to pick the `-otf-`/`-ttf-` asset by name.
+
+### Fixed — `fetch_asset.py`
+- **Git LFS pointers were saved as assets.** For an LFS-tracked file (e.g. `microsoft/fluentui-emoji-animated`), `raw.githubusercontent.com` returns a ~130-byte text pointer, and the script would have written it out as a `.png`. The script now refuses LFS pointers and prints the `media.githubusercontent.com` URL that returns the real file.
+
+### Added — sources-ui.md
+- **Animation**: Fluent Emoji Animated (MIT, APNG). A Flutter test decode confirmed APNG plays (72 frames), and ffmpeg → animated WebP was 6× smaller. Also Flutter's built-in `AnimatedIcons`, `flutter_animate` (BSD-3), and Glaxnimate (GPL tool, output is yours).
+- **Emoji and avatars**: Fluent Emoji Animated, Blobmoji (Apache-2.0), Tossface (custom Korean licence, bundle the notice), Notion Avatar (CC0 assets), facesjs (Apache-2.0), Multiavatar (custom).
+- **Backgrounds**: Kenney Pattern Packs (CC0), uiGradients (MIT, 382 gradients as JSON), WebGradients (MIT, 174 with angles/stops), BGJar (free tier CC BY 4.0). Get Waves and Blobmaker are noted as merged into Haikei.
+- **Photos**: Negative Space and Skitterphoto (CC0). The Met Open Access (CC0, direct `primaryImage` via API), Art Institute of Chicago (CC0; its IIIF server blocks scripts), Rijksmuseum (per object), Smithsonian Open Access (CC0 items, API key), and the NASA image library (with the insignia, endorsement and identifiable-person limits).
+- **Direct download URLs**: Fluent Emoji Animated (LFS media URL), Blobmoji, Notion Avatar parts, uiGradients/WebGradients JSON, The Met API.
+- **Checked and rejected**: Lottielab free tier (Lottie export is Pro-only), unofficial animated-Fluent re-uploads, Big Heads/Avvvatars (React-only, no asset files).
+
+### Added — sources-game.md
+- **Sprites/tilesets**: Foozle (CC0 series: Void, Spire, Lucifer, Critters, Scallywag), Kenney 1-Bit Pack and the Tiny series (CC0), Hyptosis (CC BY 3.0), Sharm *Tiny 16* (CC BY 4.0/3.0).
+- **VFX**: Kenney Smoke Particles, Splat Pack and Light Masks (CC0), Foozle effects (CC0), pimen free items (custom, no redistribution).
+- **3D**: Kenney 3D kits (CC0), Khronos glTF Sample Assets (per-model licence in `metadata.json` — the Duck is SCEA, not CC), NASA 3D Resources (logo/endorsement limits), TextureCan models (CC0).
+- **PBR**: TextureCan (CC0, 650+), 3DTextures.me (CC0, stylised materials), Kenney Prototype Textures (CC0).
+- **Direct download URLs**: Kenney 1-Bit, Smoke Particles and Prototype Textures zips, Khronos GLB + `metadata.json`, NASA GLB.
+- **Checked and rejected**: Mystic Woods free version (non-commercial).
+
 ## v1.6.0 — 2026-09-24
 
 More sources, checked the same way as 1.5.0. Licences were read from the upstream repo (`gh api repos/<o>/<r>`, LICENSE/README) or the live licence page. Every new URL pattern was fetched live, and a sample of them (Myna UI, TDesign, Mage, Maki, Fluent Color, Kenney Fonts) went end to end through `fetch_asset.py --apply` into a scratch project, with correct CREDITS rows. New Direct-download rows are stamped *(2026-09-24)*.

@@ -4,7 +4,7 @@ description: Revamp the UI of an existing Flutter app or game with free assets â
 capabilities: [ui-revamp]
 license: MIT
 metadata:
-  version: 1.6.0
+  version: 1.7.0
 ---
 
 # Flutter UI Revamp

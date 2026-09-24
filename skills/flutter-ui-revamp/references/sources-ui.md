@@ -27,7 +27,7 @@ Licence column is the licence as published at the time of writing. **Re-read it 
 | **Material Symbols (variable)** | fonts.google.com/icons | Apache-2.0 | variable font | `material_symbols_icons` (`Symbols.home`, with `fill`/`weight`/`grade`) | Google Fonts |
 | **Font Awesome Free** | fontawesome.com | icons **CC BY 4.0** as SVG, **OFL** as font | SVG, font | `font_awesome_flutter` — **`FaIconData`, not `IconData`** | unpkg |
 | **Pictogrammers MDI** | pictogrammers.com | Pictogrammers Free License (Apache-2.0 for most icons) | SVG, font | `material_design_icons_flutter` (last release 2023) | unpkg (`@mdi/svg`) |
-| **Carbon** | carbondesignsystem.com/elements/icons | Apache-2.0 | SVG | none | unpkg (`@carbon/icons`) |
+| **Carbon** | carbondesignsystem.com/elements/icons/library | Apache-2.0 | SVG | none | unpkg (`@carbon/icons`) |
 | **Octicons** | primer.style/octicons | MIT | SVG | none maintained (`octicons` is from 2016) | unpkg (`@primer/octicons`) |
 | **Boxicons** | boxicons.com | MIT | SVG, font | `boxicons` (2021, stale) | unpkg |
 | **Pixelarticons** | pixelarticons.com | MIT (free set) | SVG | none — build a font | via GitHub raw |
@@ -57,14 +57,14 @@ Licence column is the licence as published at the time of writing. **Re-read it 
 | **Mage Icons** | mageicons.com | Apache-2.0 | SVG, stroke + bulk (duotone), ~1 000 | none | via GitHub raw — **file names are Title Case with spaces** |
 | **Lineicons** (free set) | lineicons.com | MIT — the ~600-icon free set only; Lineicons Pro is paid | SVG, font | none (`line_icons` on pub is Line Awesome, not Lineicons) | via GitHub raw |
 | **Qlementine Icons** | github.com/oclero/qlementine-icons | MIT | SVG at 12/16 px, ~900 | none | via GitHub raw |
-| **Duoicons** | duoicons.com | MIT | SVG, duotone, ~90 | none | via GitHub raw |
-| **Zendesk Garden** | garden.zendesk.com/components/icons | Apache-2.0 | SVG at 12/16 px, `-stroke` + `-fill` | none | via GitHub raw |
+| **Duoicons** | duoicons.com (the HTTPS site did not answer on 2026-09-24; the GitHub repo `fazdiu/duo-icons` is the reliable source) | MIT | SVG, duotone, ~90 | none | via GitHub raw |
+| **Zendesk Garden** | garden.zendesk.com · `zendeskgarden/svg-icons` | Apache-2.0 | SVG at 12/16 px, `-stroke` + `-fill` | none | via GitHub raw |
 | **System UIcons** | systemuicons.com | **Unlicense** (public domain) | SVG, ~430 | none | via GitHub raw — last update 2023 |
 | **Fluent UI System Color** | github.com/microsoft/fluentui-system-icons | MIT | SVG, multi-colour, ~500 | none (the `fluentui_system_icons` font is monochrome) | via GitHub raw, `_color.svg` suffix |
 | **Flat Color Icons** (Icons8) | github.com/icons8/flat-color-icons | MIT, or Icons8's "Good Boy License" — pick MIT | SVG, full colour, ~330 | none | via GitHub raw |
 | **Maki** / **Temaki** | labs.mapbox.com/maki-icons · github.com/rapideditor/temaki | **CC0** (both) | SVG, map POI glyphs | none | via GitHub raw |
 | **Pepicons** | pepicons.com | **CC BY 4.0** | SVG, "pop" + "pencil" styles, 1 200+ | none | via GitHub raw |
-| **Streamline free sets** (Core, Flex, Plump, Sharp free lines) | streamlinehq.com/free-icons | **CC BY 4.0** — credit **with a link to streamlinehq.com** | SVG | none | via GitHub raw (`webalys-hq/streamline-vectors`) |
+| **Streamline free sets** (Core, Flex, Plump, Sharp free lines) | streamlinehq.com · `webalys-hq/streamline-vectors` | **CC BY 4.0** — credit **with a link to streamlinehq.com** | SVG | none | via GitHub raw (`webalys-hq/streamline-vectors`) |
 | **coolicons** | coolicons.cool | **CC BY 4.0** | SVG, PNG, font, ~440 | none | via GitHub raw — last update 2023 |
 | **HackerNoon Pixel Icon Library** | pixeliconlibrary.com | icons **CC BY 4.0** — the repo's MIT covers only non-icon files | SVG, PNG, pixel style | none | via GitHub raw |
 
@@ -123,7 +123,7 @@ Notes that decide the choice:
 | **Charco** | charco.design | free for personal & commercial, **no resell/redistribution** | PNG (SVG in the paid set) | 16 hand-drawn empty-state/error spots (404, offline, under construction). Gumroad — **hand download**. |
 | **Mixkit Art** | mixkit.co/free-stock-art | Mixkit licence — free, no attribution; no standalone resale | PNG up to ~4000 px | Painterly and editorial illustration, raster only. Good for hero art, not for tintable UI spots. |
 | **SVG Silh** | svgsilh.com | per image — the Pixabay-era stock is CC0; **check the licence line on each image page** | SVG, PNG | Silhouettes and cut-outs, single-colour by nature — they recolour cleanly to a seed colour. |
-| **Absurd Design** | absurddesign.com | free tier **requires a visible credit** | PNG, SVG | Surreal, editorial-style illustrations; one free chapter per series. |
+| **Absurd Design** | absurd.design | free tier **requires a visible credit** | PNG, SVG | Surreal, editorial-style illustrations; one free chapter per series. |
 | **Ouch! and other Icons8 free products** | icons8.com/ouch | free **with a link back to Icons8**; paid removes it | PNG, SVG | Covers Ouch!, Growww and the Icons8 free galleries — the link-back applies to all of them. |
 | **Vecteezy** | vecteezy.com | Vecteezy licence — **attribution required** on the free tier | SVG, PNG | Filter "License: Free". Huge catalogue, mixed quality — curate hard. |
 | **Doodle Ipsum** | doodleipsum.com | custom free licence — read the terms page | SVG, PNG | Random doodle compositions (people, objects, abstract) via a URL API — see Direct download URLs. |
@@ -145,6 +145,12 @@ The dark-mode trap: an illustration exported with a baked white rectangle behind
 | **DiceBear** | dicebear.com | **per style**: 42 CC0, 14 CC BY 4.0, 1 MIT, 4 "artist's own terms" | SVG, PNG via HTTP API | Deterministic avatars from a seed, good for placeholder profile pictures. Check the style on dicebear.com/licenses. Notionists, Lorelei, Open Peeps, Thumbs and Shapes are CC0; Adventurer, Micah, Big Smile and Personas need credit; Avataaars/Bottts use the artist's own terms. Every SVG also embeds its licence in `<metadata>`. **Fetch at build time and bundle.** Calling `api.dicebear.com` at runtime sends every user's seed to a third party, the same privacy problem as `google_fonts` (trap 7). |
 | **Boring Avatars** | boringavatars.com | MIT | SVG (generated) | Abstract geometric avatars. It is a React library with no Flutter port, so export the SVGs you need from the site and bundle them. |
 | **Personas** | personas.draftbit.com | **MIT** | SVG | Draftbit's mix-and-match flat avatar generator — deterministic: the same URL params always give the same avatar. Generate the set you need, export SVG/PNG, and bundle it; do not resolve avatar URLs at runtime (same third-party-request trap as DiceBear). |
+| **Fluent Emoji Animated** | github.com/microsoft/fluentui-emoji-animated | **MIT** | animated PNG (APNG) 256×256 | Microsoft's official animated versions of the 3D Fluent Emoji (a subset is animated). Flutter's `Image` plays APNG: a test decode gave all 72 frames. Each file is ~1.4 MB, though, so convert to animated WebP before shipping (`ffmpeg -i x.png -c:v libwebp -loop 0 -quality 70 x.webp` came out 6× smaller with the same 72 frames). The files are in **Git LFS**, so use the `media.githubusercontent.com` URL (below). |
+| **Blobmoji** | github.com/C1710/blobmoji | **Apache-2.0** | SVG, font | A community continuation of Google's retired "blob" emoji (~3 750 SVGs). Archived in 2024, so the set is complete but frozen. Only `license-page` credit needed. |
+| **Tossface** | toss.im/tossface | custom **Tossface licence** (Korean): free to use, study and redistribute bundled with other software **if the copyright notice + licence text ship with it**; no selling the font itself, no unauthorised modified versions | emoji font (TTF/WOFF) | Toss's flat emoji font. Ship the licence text in `assets/` and register it with `LicenseRegistry`. The licence is only in Korean, so read it (with a translation) before relying on it. |
+| **Notion Avatar** | notion-avatar.app · `Mayandev/notion-avatar` | assets **CC0** (per the README; the illustrations come from the "Noto avatar" pack by Felix Wong), code MIT | SVG parts (face, eyes, hair, accessories… ~210 files) | Notion-style hand-drawn avatars. Compose them on the site, or layer the SVG parts yourself in a `Stack`. |
+| **facesjs** | zengm.com/facesjs · `zengm-games/facesjs` | **Apache-2.0** | SVG (generated by a JS library) | Procedural cartoon faces. Generate them at build time (Node script), then bundle the SVGs. |
+| **Multiavatar** | multiavatar.com | custom **Multiavatar License v1.0** — commercial OK; **no competing avatar product, no repackaging or rebranding the design set** | SVG (generated) | Fine as profile placeholders inside an app, but not as the product itself. |
 
 Avatar-as-a-service endpoints (DiceBear at runtime, ui-avatars.com, pravatar-style placeholder services) all share one problem: every app launch sends a third party the user's seed or username. Generate the avatars at build time, or at worst once, and bundle the files.
 
@@ -186,6 +192,10 @@ Pairing, and the hard limit of two families: one display family for headings, on
 | **Noto Animated Emoji** | googlefonts.github.io/noto-emoji-animation | **CC BY 4.0** | Lottie JSON | `lottie`, or `animated_emoji`. The only source here with a stable direct Lottie URL (below). |
 | **IconScout Lottie** | iconscout.com/lottie-animations | IconScout Simple License — same terms as Unicons: commercial OK, no republishing as a pack | Lottie JSON, GIF | `lottie`; account needed for downloads |
 | **Creattie** | creattie.com | custom licence — free tier exists; commercial use allowed up to 500 000 reproductions and $10 000 video-production budgets; account required | Lottie JSON, GIF, MP4 | `lottie`; the caps matter for a breakout app — re-read the licence if installs grow |
+| **Fluent Emoji Animated** | github.com/microsoft/fluentui-emoji-animated | **MIT** | APNG → convert to animated WebP | `Image.asset` plays either format. It is the one MIT source of polished character animation, good for celebrations, empty states and reactions. See Emoji and avatars. |
+| **`AnimatedIcons`** (built into Flutter) | api.flutter.dev/flutter/material/AnimatedIcons-class.html | Flutter's BSD-3 — nothing to credit beyond the licence page Flutter already registers | vector, driven by an `AnimationController` | 14 Material morphs (`menu_arrow`, `play_pause`, `search_ellipsis`, `add_event`…). Zero bytes added, and they theme with `IconTheme`. Check these before downloading a Lottie for a simple toggle. |
+| **`flutter_animate`** | pub.dev/packages/flutter_animate | **BSD-3** | code (effects), no asset files | Fade, slide, shimmer, shake, blur and scale chains on any widget, e.g. `.animate().fadeIn().slideY()`. Often the right answer to "add motion" in place of an asset. The last release (4.5.2) is from 2024: stable, but not actively developed. |
+| **Glaxnimate** (KDE) | glaxnimate.org | tool **GPL-3.0-or-later**. GPL covers the program, not what you draw with it, so exported animations are yours | exports Lottie JSON, animated WebP/GIF, SVG | Free desktop editor for making or editing your own Lottie files, including recolouring an MIT/CC0 Lottie to the seed colour. Record the output in CREDITS as your own work. |
 
 Rive is the first choice in Flutter and it is not close: the runtime is a vector renderer with a state machine, so one 12 KB `.riv` covers idle → hover → pressed → success without four separate files or a single `AnimationController`. Lottie is the right tool for a linear, fire-and-forget animation (a splash, a confetti burst, an empty-state loop).
 
@@ -215,6 +225,11 @@ These inform decisions about density, spacing and state; they are not assets to 
 | **Coolors** | coolors.co | palette exploration | free |
 | **Realtime Colors** | realtimecolors.com | palette previewed on a real layout | free |
 | **Material Theme Builder** | material-foundation.github.io/material-theme-builder | full M3 `ColorScheme` from a seed, exportable as Dart | Apache-2.0 |
+| **Kenney Pattern Packs** (Pattern Pack, Lines, Pixel) | kenney.nl/assets/pattern-pack | tileable PNG + vector patterns | **CC0** (checked on Pattern Pack; confirm the Lines/Pixel pages too). Seamless tiles meant for `DecorationImage(repeat: ImageRepeat.repeat)`. |
+| **uiGradients** | uigradients.com · `ghosh/uiGradients` | 382 named gradients as **JSON** (`gradients.json`) | **MIT**. Copy the hex stops into a `LinearGradient`, so no asset file ships at all. |
+| **WebGradients** | webgradients.com · `itmeo/webgradients` | 174 gradients as JSON with angle + stop positions (`gradients-parsed.json`) | **MIT**. The angle (`deg`) and `pos` values map directly onto `LinearGradient` `begin/end` and `stops`. |
+| **BGJar** | bgjar.com | SVG background generator (waves, blobs, circuit, stars…) | free tier **CC BY 4.0: attribution required**; paid tiers remove it. No reselling or giving away the raw items, and no competing service |
+| **Get Waves / Blobmaker** | getwaves.io · blobmaker.app | SVG waves and blobs | Both now point to **Haikei** (same studio). Treat them as Haikei and use its terms. |
 
 **Material Theme Builder is the one to actually use.** It emits a complete light + dark `ColorScheme` from a seed colour, tonally correct, with the contrast pairs already solved. Paste its Dart output into `lib/theme/app_colors.dart` rather than hand-picking hexes — hand-picked schemes are where the 3.1:1 body text comes from.
 
@@ -233,6 +248,13 @@ Most revamps should not reach for stock photos: flat illustration plus good typo
 | **Nappy** | nappy.co | free for personal & commercial | diverse representation, small catalogue |
 | **Openverse** | openverse.org | **search engine** — 800M+ CC/PD images and audio, licence per result and *not* verified by Openverse | verify the licence on the source page before using a result; has an API (below) |
 | **Wikimedia Commons** | commons.wikimedia.org | **per file** — PD / CC0 / CC BY / CC BY-SA | licence lives on the file page; BY-SA edits stay BY-SA |
+| **Negative Space** | negativespace.co | **CC0** (all photos and their raw files) | tech, workspace and city shots |
+| **Skitterphoto** | skitterphoto.com | **CC0** (every upload) | small general catalogue |
+| **The Met Open Access** | metmuseum.org/art/collection · `metmuseum/openaccess` | **CC0** for objects flagged `isPublicDomain` | 400 000+ public-domain artworks. The API returns a direct `primaryImage` URL (below). Good for editorial, culture and journaling apps. |
+| **Art Institute of Chicago** | artic.edu/open-access | **CC0** for `is_public_domain` works (the API's own `license_text` says so; the `description` field is CC BY) | The IIIF image server returns 403 to scripts, so download by hand |
+| **Rijksmuseum** | rijksmuseum.nl · data.rijksmuseum.nl | **per object**: Public Domain / CC0 for much of the collection, CC BY 4.0 for some, and a named rights holder where copyright still applies | read the copyright notice on each object page |
+| **Smithsonian Open Access** | si.edu/openaccess | **CC0** for items marked CC0. The GitHub metadata dump (`Smithsonian/OpenAccess`) is CC0 and archived | The API needs a free api.data.gov key. Unmarked items keep their restrictions. |
+| **NASA Image and Video Library** | images.nasa.gov | "generally not subject to copyright in the United States" (NASA media guidelines) — **but** the NASA insignia/logotype is protected, no implied endorsement, and identifiable people need consent for commercial use | space imagery; pick shots without logos or crew faces |
 
 Two rules stand regardless of source: **bundle the file** (hotlinking to a stock CDN from an app is fragile and sometimes forbidden), and **watch for baked-in IP** — a stock photo of a branded product or a recognisable person brings rights the licence cannot grant.
 
@@ -268,7 +290,7 @@ Two rules stand regardless of source: **bundle the file** (hotlinking to a stock
 | **Noto Emoji** | `https://raw.githubusercontent.com/googlefonts/noto-emoji/main/<2D\|3D>/png/<32\|128\|512>/emoji_u<codepoint>.png`, or `…/2D/svg/emoji_u<codepoint>.svg` | PNG / SVG | Lower-case hex code point, with sequences joined by `_` (`emoji_u1f468_200d_1f4bb`). |
 | **Noto Animated Emoji** | `https://fonts.gstatic.com/s/e/notoemoji/latest/<codepoint>/lottie.json` (also `512.webp`, `512.gif`) | Lottie JSON | **Pass `--filename <name>.json`**, since every file is `lottie.json`. CC BY 4.0, so it needs on-screen credit. `latest` is a rolling endpoint, so bundle the file; do not point `Lottie.network` at it. |
 | **Twemoji** | `https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/<svg\|72x72>/<codepoint>.<svg\|png>` | SVG / PNG | CC BY 4.0. |
-| **OpenMoji** | `https://openmoji.org/data/color/svg/<CODEPOINT>.svg` | SVG | Upper-case code point. CC BY-SA 4.0, so do not edit. |
+| **OpenMoji** | `https://cdn.jsdelivr.net/npm/openmoji@latest/color/svg/<CODEPOINT>.svg` | SVG | Upper-case code point. CC BY-SA 4.0, so do not edit. **Do not use `openmoji.org/data/…` from the script**: on 2026-09-24 it served a 7 KB HTML bot check to non-browser user agents, which `fetch_asset.py` refuses. The jsDelivr copy (the official npm package) returns the same SVG. |
 | **DiceBear** | `https://api.dicebear.com/10.x/<style>/<svg\|png>?seed=<seed>` | SVG / PNG | **Pass `--filename <seed>.svg`**. The URL path ends in `svg`, which would otherwise become the filename. Check the style's licence first (see Emoji and avatars). |
 | **Open Doodles** | `https://opendoodles.s3-us-west-1.amazonaws.com/<name>.<svg\|png\|gif>` | SVG / PNG | Names are on the page's SVG/PNG links (`coffee`, `reading-side`, `meditating`, …). CC0. |
 | **GitHub font releases** | `https://github.com/<owner>/<repo>/releases/download/<tag>/<asset>.zip`, e.g. `vercel/geist-font` `v1.7.2` `geist-font-v1.7.2.zip` | zip | Get `<tag>` and `<asset>` from `api.github.com/repos/<o>/<r>/releases/latest`. Filter with `--only 'ttf/.*Geist-(Regular\|Medium\|SemiBold)\.ttf$\|OFL\.txt$' --flatten`. |
@@ -311,6 +333,11 @@ Two rules stand regardless of source: **bundle the file** (hotlinking to a stock
 | **coolicons** | `https://raw.githubusercontent.com/krystonschwarze/coolicons/master/coolicons%20SVG/<Category>/<Name>.svg` | SVG | Folder name has a space; names are `Snake_Title` (`Arrow_Circle_Down`). CC BY 4.0. *(2026-09-24)* |
 | **Pixel Icon Library** | `https://raw.githubusercontent.com/hackernoon/pixel-icon-library/main/icons/SVG/<regular\|solid\|brands\|purcats>/<name>.svg` | SVG | Icons CC BY 4.0 (not the repo's MIT). `brands/` is trap 6. *(2026-09-24)* |
 | **Firefox OS Emoji** | `https://raw.githubusercontent.com/mozilla/fxemoji/gh-pages/svgs/FirefoxEmoji/<name>.svg` | SVG | Skip the `.layerN.svg` files — they are colour separations of the same glyph. CC BY 4.0. *(2026-09-24)* |
+| **Fluent Emoji Animated** | `https://media.githubusercontent.com/media/microsoft/fluentui-emoji-animated/main/assets/<Name>/animated/<name>_animated.png` | APNG, ~1.4 MB | **Git LFS**: the `raw.githubusercontent.com` URL returns a 132-byte pointer, which `fetch_asset.py` now refuses while printing the `media.` URL. `<Name>` is the Title Case folder (URL-encode spaces). Convert to WebP afterwards. *(2026-09-24)* |
+| **Blobmoji** | `https://raw.githubusercontent.com/C1710/blobmoji/main/svg/emoji_u<codepoint>.svg` | SVG | Lower-case hex code point, same scheme as Noto. *(2026-09-24)* |
+| **Notion Avatar** | `https://raw.githubusercontent.com/Mayandev/notion-avatar/main/public/avatar/part/<part>/<part>-<n>.svg` | SVG part | `<part>` is e.g. `face`, `eyes`, `hair`, `accessories`. *(2026-09-24)* |
+| **uiGradients / WebGradients** | `https://raw.githubusercontent.com/ghosh/uiGradients/master/gradients.json` · `https://raw.githubusercontent.com/itmeo/webgradients/master/gradients-parsed.json` | JSON | Data, not an asset: read the stops and write a `LinearGradient`. Nothing to bundle. *(2026-09-24)* |
+| **The Met** | `https://collectionapi.metmuseum.org/public/collection/v1/objects/<id>` → JSON → `primaryImage` (`https://images.metmuseum.org/CRDImages/…/original/<file>.jpg`) | JPEG, full resolution | Use only objects where `isPublicDomain` is `true`. Pass `--filename`, `--license CC0` and the object page as `--source`. Originals are often over 1 MB (the test file was 1.4 MB), so resize before bundling. *(2026-09-24)* |
 | **Omnibus-Type** | `https://github.com/Omnibus-Type/<Family>/raw/master/fonts/<ttf\|variable>/<File>.ttf`, e.g. `Archivo/…/variable/Archivo%5Bwdth%2Cwght%5D.ttf` | TTF | List files with `api.github.com/repos/Omnibus-Type/<Family>/contents/fonts/<ttf\|variable>`, URL-encode the brackets, and fetch `…/raw/master/OFL.txt` too. *(2026-09-24)* |
 
 A Fontshare zip holds every format and weight. Filter it down to what you ship:
@@ -341,7 +368,10 @@ python3 <skill>/scripts/fetch_asset.py --url https://api.fontshare.com/v2/fonts/
 | SVG Backgrounds | The site gives you copy-paste SVG markup, not a file URL — save the markup yourself |
 | Font Squirrel, Fontesk, Font Library, Fontfabric, Free Faces, Use & Modify, Collletttivo, Tunera | Download buttons or links out to foundry pages |
 | Scale (Flexiple), Pixeltrue | Colour picker + per-item export in the browser (Scale); email-gated pack (Pixeltrue) |
-| Burst | Site download button; same bundle-don't-hotlink rule as the other photo sites |
+| Burst, Negative Space, Skitterphoto, Rijksmuseum, NASA images | Site download buttons; same bundle-don't-hotlink rule as the other photo sites |
+| Art Institute of Chicago | The IIIF image server (`artic.edu/iiif/2/…`) returns 403 to scripts; the JSON API works, but the image does not |
+| Smithsonian Open Access | Needs an api.data.gov key |
+| Multiavatar, facesjs, BGJar, Tossface | Generators or a site download; export the files you need and import them with `--local` |
 
 ## Checked and rejected
 
@@ -364,6 +394,9 @@ These show up in "free asset" lists. Each was checked on **2026-09-23** and fail
 | **Fresh Folk** (Leni Kauffman) | *Checked 2026-09-24.* **CC BY-NC-ND 4.0** on the free tier: no commercial use and no edits. It often appears next to Humaaans and Open Peeps in lists, but it is not their licence twin. |
 | **IconaMoon** | *Checked 2026-09-24.* The repo has no licence file, and the README only says "do whatever you want", while Iconify lists it as CC BY 4.0. There is no binding instrument, so the default applies (all-rights-reserved). Pick Myna UI or Mage instead. |
 | **Animated SVG sets** — `line-md` (Material Line Icons), `svg-spinners` | *Checked 2026-09-24.* MIT, so the licence is fine. The format is the problem: the motion is SMIL/CSS inside the SVG, and `flutter_svg` does not run SVG animation, so you get a static frame at best. For motion use Lottie or Rive. For a spinner use `CircularProgressIndicator` or a Rive file. |
+| **Lottielab free tier** | *Checked 2026-09-24.* The pricing page lists "Export to lottie" as a **Pro** feature; the free tier exports only GIF/MP4, which is the wrong format for the `lottie` package. Use Glaxnimate for free Lottie authoring. |
+| **"Animated Fluent Emojis" re-uploads** (e.g. `Tarikul-Islam-Anik/Animated-Fluent-Emojis`) | *Checked 2026-09-24.* Unofficial repacks of the Microsoft Teams animations, with no licence of their own. Microsoft now publishes the official MIT set (`microsoft/fluentui-emoji-animated`), so use that one. |
+| **Big Heads / Avvvatars** | *Checked 2026-09-24.* MIT, but they are React-only components with no exported asset set. Use DiceBear, Notion Avatar or Personas, which give SVG files you can bundle. |
 | **LottieFlow** (Finsweet) | *Checked 2026-09-24.* Built for Webflow and gated behind sign-up. `lottieflow.com/license` returns 404, and no licence text for the JSON files is published. Absence of a licence is not permission. |
 
 **Tools, not downloads.** Haikei, Hero Patterns, SVG Backgrounds, Pattern Monster, fffuel, Coolors, Realtime Colors, Material Theme Builder, Get Waves, Blobmaker, Boring Avatars and Personas are generators: you configure the result on the site and export it. The licence that matters is the one on the *output*, not the tool — check each tool's terms for what it grants. The Figma kits are layout reference only.

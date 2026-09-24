@@ -19,6 +19,7 @@ Read at Step 3 when `audit.json → derived.app_type` is `flame_game`, or when t
 | **Brackeys' Platformer Bundle** | brackeysgames.itch.io/brackeys-platformer-bundle | **CC0** (stated on the page) | ✅ small | Knight, slime, tiles, coins, platforms, plus music, SFX and a pixel font. A complete first-game kit in one 1 MB zip. |
 | **Pipoya** — *FREE RPG Tileset 32x32* (and 16x16) | pipoya.itch.io | custom: commercial OK, edit freely; **no redistribution/resale** | ✅ | JRPG outdoor + indoor tiles with Tiled sample maps. |
 | **Cainos** — *Pixel Art Top Down – Basic* | cainos.itch.io/pixel-art-top-down-basic | custom: commercial OK, credit optional; **no redistribution/resale** | ✅ | 32px top-down props, grass, stone and wall tilesets with separate shadow sprites. The zip includes plain textures for non-Unity engines. |
+| **Foozle** | foozlecc.itch.io | **CC0** ("public domain license" on the studio page; each item page repeats CC0, checked on *Pixel Magic Effects*) | ✅ per series | Commissioned pixel-art series that match within themselves: *Void* (space shooter ships, layered backgrounds, pickups), *Spire* (tower defense), *Lucifer* (32px RPG tiles, heroes, bosses, UI, effects), *Critters* (platformer + pixel UI), *Scallywag* (pirates). Credit optional, and the artist is named per page. |
 | **0x72** — *16x16 DungeonTileset II* | 0x72.itch.io/dungeontileset-ii | assets **CC0**, code MIT | ✅ | The standard free roguelike tileset, with heroes, monsters, weapons and UI hearts. |
 | **Screaming Brain Studios** | screamingbrainstudios.itch.io | **CC0** (all assets, per the studio page) | ✅ per pack | Isometric tiles, procedural planets, space backgrounds, textures. |
 | **itch.io, CC0 filter** | itch.io/game-assets/free/tag-cc0 | CC0 as tagged, **still confirm on the page** | varies | The tag is set by the author and is not audited. It turns itch.io from "read every readme" into "confirm one line". |
@@ -42,8 +43,13 @@ Companion packs in the same visual voice: *UI Pack: RPG Expansion*, *Game Icons*
 | Kenney (*Platformer Pack*, *Tiny Town*, *Pixel Platformer*) | CC0 | Tiles are power-of-two and grid-aligned — imports into Tiled with no fiddling. |
 | itch.io tilesets | per-author | Check the tile size before downloading; a 17px grid is a week of pain. |
 | OpenGameArt | per-submission | |
+| **Kenney 1-Bit Pack** | CC0 | 1 078 tiles on a 16×16 grid, with monochrome and coloured tilesheets: roguelike and RPG terrain, characters, items and UI in one sheet. Direct zip below. |
+| **Kenney Tiny Dungeon** / *Tiny Town* | CC0 | 16px "Tiny" series drawn in the same style, so a town and a dungeon look like one game. |
+| **Foozle** tilesets (*Lucifer* 32px, *Green Valley* 16px, *Cave and Desert*, *Critters* platformer sets, *Scallywag* water/islands) | CC0 | Each tileset has matching characters and enemies in the same series (see sprites above). |
+| **Hyptosis** — *Lots of free 2D tiles and sprites* | **CC BY 3.0** | Large 32px (one 16px batch) fantasy RPG tile collection on OpenGameArt. Credit "Hyptosis" (and "Zabin" for the bomb frames) on the Credits screen. |
+| **Sharm (Lanea Zimmerman)** — *Tiny 16: Basic* | **CC BY 4.0 / CC BY 3.0 / OGA-BY 3.0** (your pick) | 16px DawnBringer-16 RPG set: terrain, town, characters, monsters and a bitmap font. Credit "Lanea Zimmerman". The CC BY 3.0 anti-DRM clause is waived, which matters for store builds. |
 
-Parallax backgrounds: Kenney *Background Elements*, or itch.io "parallax background" — take a layered set, never a single flattened image, or the depth is gone.
+Parallax backgrounds: Kenney *Background Elements*, Foozle *Void – Environment Pack* (layered, animated space backgrounds, CC0), or itch.io "parallax background" — take a layered set, never a single flattened image, or the depth is gone.
 
 Palettes for recolouring work: **lospec.com/palette-list** collects community-submitted palettes (Lospec states they are free to use). A palette is a colour direction, not an asset — record the palette name in CREDITS if one is used.
 
@@ -68,12 +74,16 @@ Relevant only if the project uses `flutter_scene`, `flutter_3d_controller` or a 
 | **Kay Lousberg** | kaylousberg.com | CC0 | glTF, FBX |
 | **Poly Pizza** | poly.pizza | CC0 and CC BY, filterable | glTF, OBJ |
 | **Sketchfab** | sketchfab.com — **filter to CC0** | per-model | glTF, USDZ |
-| **market.pmnd.rs** | market.pmnd.rs | **CC0** | optimized GLB, HDRI, textures — direct CDN links on each asset page |
+| **market.pmnd.rs** | market.pmnd.rs | **CC0** | optimized GLB, HDRI, textures. ⚠️ **The site returned 404 on 2026-09-24** (last archive.org snapshot: 2025-11); the `pmndrs/market` repo is still active. Check it before proposing, and skip it if it is still down. |
 | **Smithsonian 3D** | 3d.si.edu | **CC0** when filtered to `media_usage:CC0` | glTF, OBJ, USD — 3 000+ museum scans; unfiltered models have usage conditions |
 | **Polytope Studio free packs** | Unity Asset Store / Fab listings | store EULA — usable in end products, **no raw redistribution** | `.unitypackage` — extract by hand (it is a gzipped tar of per-GUID files) |
 | **Mixamo** | mixamo.com | Adobe royalty-free for projects, games included; **no raw-file redistribution, no ML training** | FBX, glTF — rigged characters + a large animation library; Adobe ID needed |
 | **TurboSquid / CGTrader / Free3D free sections** | per-marketplace | per-model royalty-free — read the model page | account required |
 | **BlendSwap** | blendswap.com | per file — CC0 through CC BY-SA | `.blend` — login required |
+| **Kenney 3D kits** | kenney.nl/assets/category:3D | **CC0** | glTF/GLB, FBX, OBJ — four catalogue pages of kits (City, Car, Platformer, Pirate, Space, Dungeon, Graveyard, Cube Pets…), all in one consistent low-poly voice |
+| **Khronos glTF Sample Assets** | github.com/KhronosGroup/glTF-Sample-Assets | **per model**: each folder's `metadata.json` has a machine-readable `legal` block (CC0, CC BY 4.0, SCEA, …) | GLB/glTF, 160 model folders. Useful as renderer test assets and a few showcase pieces. **Read `metadata.json` before shipping one**: the famous Duck is under the SCEA Shared Source License, not CC. Direct raw URLs work (below). |
+| **NASA 3D Resources** | github.com/nasa/NASA-3D-Resources · science.nasa.gov/3d-resources | NASA media guidelines: "generally not subject to copyright in the United States"; **the NASA insignia/logotype is protected**, no implied endorsement | GLB (250+ spacecraft, planets, asteroids), plus textures. Strip or avoid the meatball logo on the models. |
+| **TextureCan models** | texturecan.com/models | **CC0** (site-wide terms) | a small set of models next to its textures |
 
 Quaternius and Kay Lousberg are both CC0 *and* stylistically consistent across their whole catalogue, which is the rare combination.
 
@@ -87,6 +97,9 @@ Quaternius and Kay Lousberg are both CC0 *and* stylistically consistent across t
 | **3Dassets.one** | **search engine** — licence-filterable | Indexes ambientCG, Poly Haven, CG Bookcase, ShareTextures, Texture Can, PBRPX, NoEmotion HDRs and more. Search here first, filter to CC0, then fetch from the creator's site. |
 | **ShareTextures** | custom licence — commercial OK, **no redistribution** | Free account needed. |
 | **Textures.com free** | restrictive own licence — free daily credits, no redistribution, no OSS asset packs | Last resort; prefer the CC0 sites. |
+| **TextureCan** | **CC0** (terms page: commercial OK, no credit, redistribution with your project allowed) | 650+ PBR sets, including stylised tiles, paper and fabric patterns that also work as flat app backgrounds. |
+| **3DTextures.me** | **CC0** (FAQ/licence page) | 1 300+ PBR and *stylised/hand-painted* materials, a rarer find than photoreal. Downloads are one by one; the bulk folder is a Ko-fi perk. |
+| **Kenney Prototype Textures** | **CC0** | 75 grid/checker textures for blocking out levels, 2D and 3D. Direct zip below. |
 
 ## Particles and VFX
 
@@ -94,6 +107,10 @@ Quaternius and Kay Lousberg are both CC0 *and* stylistically consistent across t
 |---|---|---|
 | **Kenney Particle Pack** | CC0 | Individual particle sprites; drive them from Flame's `ParticleSystemComponent` rather than shipping pre-rendered sheets. |
 | **Mixkit VFX** | Mixkit free licence | Video overlays — rarely the right shape for a Flutter game. |
+| **Kenney Smoke Particles** | CC0 | 70 files of smoke, puff and explosion sprites, and a natural pairing with Flame particles. Direct zip below (6 MB, so filter it). |
+| **Kenney Splat Pack** / *Light Masks* | CC0 | Paint and blood splats for hit feedback; soft light masks for fake lighting with `BlendMode` layers. |
+| **Foozle** — *Pixel Magic Effects*, *Lucifer – Effects* | CC0 | Pre-rendered pixel spell/explosion/portal sheets with matching icons, for a pixel-art game where procedural particles would look off-style. |
+| **pimen** (free items, e.g. *Fire Spell Effect 01*) | custom per item (checked on *Fire Spell Effect 01*): personal + commercial, credit optional; **no resale or redistribution of the sprites** | Hand-drawn pixel VFX. Most of the catalogue is paid, so check that the item says free and read its licence block. |
 
 In Flame, prefer generating particles from one small sprite over importing an animation sheet: a 4 KB `smoke.webp` plus `AcceleratedParticle` beats a 600 KB 60-frame sheet, and it responds to game state.
 
@@ -110,7 +127,7 @@ In Flame, prefer generating particles from one small sprite over importing an an
 | **Kevin MacLeod / incompetech** | incompetech.com | **CC BY 4.0** for the free tier | Large library of music loops. The free tier needs an on-screen credit in the exact form the site gives; a paid licence removes it. The download pages are JS, so download by hand. |
 | **jsfxr** | sfxr.me (github.com/chr15m/jsfxr) | tool: Unlicense | A generator, not a library. You synthesise 8-bit SFX in the browser and export WAV. The output is your own work, so there is no third-party licence to track. Record it in CREDITS.md as "generated with jsfxr". |
 | **Sonniss GDC Game Audio Bundle** | sonniss.com/gameaudiogdc | sonniss.com/gdc-bundle-license: royalty-free, commercial, no attribution; **no resale as raw files**; no AI/ML training | Several GB of professional SFX each year (7.47 GB in 2026; over 200 GB in the archive). Hand download only: the site returns 403 to scripts, and the bundle is too large for `fetch_asset.py`. Take the few files you need. |
-| **gamesounds.xyz** | gamesounds.xyz | **CC0 packs** (Kenney's Sound Pack, Shapeforms and friends) | A browseable directory index of royalty-free game-audio packs, with direct file links — fetchable (below). Every pack folder carries its `readme.txt`; fetch it, the licence lives there. |
+| **gamesounds.xyz** | gamesounds.xyz | **CC0 packs** (Kenney's Sound Pack, Shapeforms and friends) | A browseable directory index of royalty-free game-audio packs, with direct file links — fetchable (below). ⚠️ **Down on 2026-09-24** (Cloudflare 522, origin unreachable; last archived 2026-09-04). If it is still down, get Kenney's packs from kenney.nl instead. Every pack folder carries its `readme.txt`; fetch it, the licence lives there. |
 | **ZapSplat** | zapsplat.com | Standard License — free tier requires **visible credit** (premium removes it) | Huge SFX/music library. Free accounts get MP3 only and a download cap. The credit must be inside the project — a Credits screen line. |
 | **SoundImage (Eric Matyas)** | soundimage.org | custom attribution licence — **credit inside the game is mandatory**, e.g. `Music by Eric Matyas — www.soundimage.org` | Thousands of music tracks and SFX in OGG + MP3, plus 4 000 images. Non-attribution licences can be bought per track. |
 | **99Sounds** | 99sounds.org | royalty-free, no attribution | Small catalogue of themed packs (cinematic, drones, retro). |
@@ -155,10 +172,15 @@ Mono for SFX is not a compromise — game SFX are positioned by the engine, and 
 | **Pixelarticons** (pixel UI icons) | `https://raw.githubusercontent.com/halfmage/pixelarticons/master/svg/<name>.svg` | SVG | MIT. Matches pixel-art HUDs better than any app icon set. |
 | **Open Duelyst** | `https://raw.githubusercontent.com/open-duelyst/duelyst/main/app/resources/<dir>/<file>` | PNG + `.plist` frame data, audio | 45 resource dirs — list them with `api.github.com/repos/open-duelyst/duelyst/contents/app/resources/<dir>`. A unit's sheet pairs a `.png` with a `.plist` of frame rects; both are needed. |
 | **Superpowers packs** | `https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/<pack>/<path>` | PNG, audio | Packs: `ninja-adventure`, `space-shooter`, `medieval-fantasy`, `rpg-battle-system`, `top-down-shooter`, `western-fps-2d`, `prehistoric-platformer`, `backgrounds`. `LICENSE.txt` (CC0) sits at the repo root — fetch it once. |
-| **gamesounds.xyz** | `https://gamesounds.xyz/<Pack%20Name>/<file>` | WAV / OGG / MP3 | Browseable directory index. Every pack folder has a `readme.txt` stating the licence — fetch it and keep it next to the sounds. |
-| **Fusion Pixel** | `https://github.com/TakWolf/fusion-pixel-font/releases/download/<tag>/fusion-pixel-font-<size>px-<variant>-otf-v<tag>.zip` | OTF zip | Resolve `<tag>` and the asset name via `api.github.com/repos/TakWolf/fusion-pixel-font/releases/latest`. `<size>` is 8/10/12, `<variant>` e.g. `monospaced`. OFL. |
+| **gamesounds.xyz** | `https://gamesounds.xyz/<Pack%20Name>/<file>` | WAV / OGG / MP3 | ⚠️ Returned 522 on 2026-09-24. Browseable directory index. Every pack folder has a `readme.txt` stating the licence — fetch it and keep it next to the sounds. |
+| **Fusion Pixel** | `https://github.com/TakWolf/fusion-pixel-font/releases/download/<tag>/fusion-pixel-font-<size>px-<variant>-otf-v<tag>.zip` | OTF zip | Resolve `<tag>` and the asset name via `api.github.com/repos/TakWolf/fusion-pixel-font/releases/latest`. `<size>` is 8/10/12, `<variant>` e.g. `monospaced`. OFL. The release also ships `-bdf-`, `-pcf-`, `-otf.woff` and `-ttf` zips, so pick the `-otf-` (or `-ttf-`) asset by name, not `assets[0]`. Use `gh api` or a token: the unauthenticated API hits its rate limit quickly (403). |
 | **Cubic 11** | `https://raw.githubusercontent.com/ACh-K/Cubic-11/master/fonts/ttf/Cubic_11.ttf` | TTF | OFL — `OFL.txt` sits at the repo root. |
 | **Kenney Fonts** | `https://kenney.nl/media/pages/assets/kenney-fonts/8d5435c213-1677661710/kenney_kenney-fonts.zip` | zip, 57 KB: `Fonts/*.ttf` + `License.txt` | CC0. `--only 'Kenney Future\.ttf$\|License\.txt' --flatten` gives `kenney_future.ttf` + `license.txt`. The hash changes if Kenney re-uploads the pack; if it 404s, copy the link from the Download button. *(fetched through `fetch_asset.py` on 2026-09-24)* |
+| **Kenney 1-Bit Pack** | `https://kenney.nl/media/pages/assets/1-bit-pack/aa867a1f37-1677578516/kenney_1-bit-pack.zip` | zip, 640 KB | `Tilesheet/` has `colored`/`monochrome` × `transparent` × `_packed` variants. `_packed` sheets have no gaps between tiles; the others have spacing, described in `Tilesheet.txt`, so set Flame's `SpriteSheet(spacing:)` to match. `--only 'Tilesheet/colored-transparent_packed\.png$\|License\.txt' --flatten`. *(fetched through `fetch_asset.py` 2026-09-24)* |
+| **Kenney Smoke Particles** | `https://kenney.nl/media/pages/assets/smoke-particles/23249a0d35-1677695171/kenney_smoke-particles.zip` | zip, 6 MB | Folders `PNG/<Explosion\|Flash\|…>/`; filter to one, e.g. `--only 'PNG/Explosion/\|License\.txt'`. *(2026-09-24)* |
+| **Kenney Prototype Textures** | `https://kenney.nl/media/pages/assets/prototype-textures/a88c69fa18-1677578307/kenney_prototype-textures.zip` | zip, 430 KB | CC0. *(2026-09-24)* |
+| **Khronos glTF Sample Assets** | `https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/<Name>/glTF-Binary/<Name>.glb` + `…/Models/<Name>/metadata.json` | GLB + licence JSON | Fetch `metadata.json` first and pass its `legal[].license` as `--license`. *(2026-09-24)* |
+| **NASA 3D Resources** | `https://raw.githubusercontent.com/nasa/NASA-3D-Resources/master/3D%20Models/<Folder>/<File>.glb` | GLB | Paths contain spaces (URL-encode); list them with `api.github.com/repos/nasa/NASA-3D-Resources/git/trees/master?recursive=1`. Not LFS. *(2026-09-24)* |
 | **SoundImage** | the direct `.ogg` / `.mp3` link on each track page | audio | Credit inside the app is mandatory. |
 | **Openverse API** | `https://api.openverse.org/v1/images/?q=<q>&license_type=commercial` and `/v1/audio/?…` | JSON → `url` per result | Search engine, not a source — verify each result's licence on its own page. |
 | **Wikimedia Commons** | `https://upload.wikimedia.org/wikipedia/commons/<h>/<hh>/<File>` | original file | Copy the "Original file" link from the file page. Licence is per file. |
@@ -187,6 +209,9 @@ Kenney audio packs (Interface Sounds, UI Audio, …) ship **OGG only**. On a pro
 | Poly Pizza | Its API (`api.poly.pizza`) returns 401 without an API key. Download models from the site |
 | Pixel Frog (incl. Tiny Swords), 0x72, Screaming Brain Studios, Brackeys, Pipoya, Cainos, Tallbeard | itch.io download button (JS). Tallbeard's zips are 30–150 MB each, so take one quarter, not the whole bundle |
 | Scott Buckley | Per-track download page |
+| Foozle, pimen | itch.io download button (JS) |
+| Hyptosis, Sharm *Tiny 16* | The OpenGameArt file links work with `--url` (`opengameart.org/sites/default/files/<file>`), one PNG at a time. Pass the item page as `--source` |
+| TextureCan, 3DTextures.me | Per-texture download button; no stable file-URL pattern |
 | ChipTone, Bfxr, jsfxr | Generators: you export WAV from the tool, then import with `--local` |
 | incompetech, Sonniss | JS download page / 403 to scripts |
 | Lost Garden | Zip links scattered across blog posts — copy each file link from the post |
@@ -221,6 +246,7 @@ Game-asset lists recycle the same bad sources. Each of these was checked on **20
 | **Orange Free Sounds** | Most files are CC BY-NC — unusable in a monetised or ad-funded app. |
 | **"Free SFX pack" videos on YouTube/TikTok** | Unverifiable provenance — frequently re-uploads of copyrighted libraries. No licence page, no deal. |
 | **Sprout Lands** (Cup Nooble) — free Basic Pack | *Checked 2026-09-24.* The free tier is **non-commercial only**. Commercial use needs the premium pack (≥ $3.99). It is one of the most recommended "free" farming packs, so reject it explicitly for any monetised game. |
+| **Mystic Woods** (Game Endeavor) — free version | *Checked 2026-09-24.* The free zip is **non-commercial only**; commercial use needs the paid version (≥ $3.99). The author confirms this in the comments. It is a very popular "free" top-down pack, so it gets rejected here explicitly. |
 | **FreePD** | *Checked 2026-09-24.* freepd.com shut down in 2025 ("permanently closed"). Old mirrors of its public-domain music have no provenance you can cite, so use the Tallbeard CC0 bundle instead. |
 | **Universal LPC spritesheet and most LPC art** | CC BY-SA 3.0 and/or GPL — the share-alike and attribution load is real work, and the base LPC licence blocks many commercial uses. Read the licence tree before using anything tagged LPC on OpenGameArt. |
 
