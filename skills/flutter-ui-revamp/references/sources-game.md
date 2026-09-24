@@ -14,7 +14,11 @@ Read at Step 3 when `audit.json → derived.app_type` is `flame_game`, or when t
 | **CraftPix free** | craftpix.net/freebies | custom — free-with-restrictions | ✅ | Free section forbids redistribution and some resale scenarios. Read the licence page, not the tag. |
 | **Game-icons.net** | game-icons.net | **CC BY 3.0** | ✅ 4000+ one style | Attribution mandatory → the game needs a Credits screen. SVG, recolourable, single visual voice. |
 | **Glitch** | opengameart.org/content/glitch-sprite-assets-huge-collection (+ github.com/tinyspeck, archived) | **CC0** | ✅ | The entire art library of a shut-down MMO. Distinctive, hand-painted, huge. The original glitchthegame.com page now redirects to slack.com; use the OpenGameArt PNG uploads, since much of the Tiny Speck source is Flash `.fla`. |
-| **Pixel Frog** — *Pixel Adventure 1/2* | pixelfrog-assets.itch.io/pixel-adventure-1 | **CC0** (stated on the page) | ✅ | Complete 32px platformer: characters, enemies, terrain, items, UI buttons, 20 FPS animation strips. Do not confuse it with Pixel Frog's *Tiny Swords*, which has its own terms. |
+| **Pixel Frog** — *Pixel Adventure 1/2* | pixelfrog-assets.itch.io/pixel-adventure-1 | **CC0** (stated on the page) | ✅ | Complete 32px platformer: characters, enemies, terrain, items, UI buttons, 20 FPS animation strips. Do not confuse it with Pixel Frog's *Tiny Swords*, which has its own terms (next row). |
+| **Pixel Frog** — *Tiny Swords* (Free Pack) | pixelfrog-assets.itch.io/tiny-swords | custom: personal + commercial, credit optional; **no redistribution, resale or repackaging, even modified** | ✅ | 64px top-down RTS kit: units in 5 faction colours, buildings, terrain, FX, and a UI set whose banners, panels and buttons are drawn to stretch (9-slice them; see `integration-flutter.md § 9-slice`). The page also offers a file named `TS_old version_CC0 Licensed` — the **old** version is CC0; the current Free Pack is not. The Enemy Pack is paid. |
+| **Brackeys' Platformer Bundle** | brackeysgames.itch.io/brackeys-platformer-bundle | **CC0** (stated on the page) | ✅ small | Knight, slime, tiles, coins, platforms, plus music, SFX and a pixel font. A complete first-game kit in one 1 MB zip. |
+| **Pipoya** — *FREE RPG Tileset 32x32* (and 16x16) | pipoya.itch.io | custom: commercial OK, edit freely; **no redistribution/resale** | ✅ | JRPG outdoor + indoor tiles with Tiled sample maps. |
+| **Cainos** — *Pixel Art Top Down – Basic* | cainos.itch.io/pixel-art-top-down-basic | custom: commercial OK, credit optional; **no redistribution/resale** | ✅ | 32px top-down props, grass, stone and wall tilesets with separate shadow sprites. The zip includes plain textures for non-Unity engines. |
 | **0x72** — *16x16 DungeonTileset II* | 0x72.itch.io/dungeontileset-ii | assets **CC0**, code MIT | ✅ | The standard free roguelike tileset, with heroes, monsters, weapons and UI hearts. |
 | **Screaming Brain Studios** | screamingbrainstudios.itch.io | **CC0** (all assets, per the studio page) | ✅ per pack | Isometric tiles, procedural planets, space backgrounds, textures. |
 | **itch.io, CC0 filter** | itch.io/game-assets/free/tag-cc0 | CC0 as tagged, **still confirm on the page** | varies | The tag is set by the author and is not audited. It turns itch.io from "read every readme" into "confirm one line". |
@@ -51,6 +55,7 @@ Palettes for recolouring work: **lospec.com/palette-list** collects community-su
 | **DotGothic16** | Google Fonts | OFL | Japanese pixel font — the only sensible choice for a pixel-art game with JP copy. |
 | **Fusion Pixel** | github.com/TakWolf/fusion-pixel-font | OFL | CJK pixel font at 8/10/12 px; releases ship OTF zips (below). |
 | **Cubic 11** | github.com/ACh-K/Cubic-11 | OFL | Traditional-Chinese pixel font; TTF at `fonts/ttf/Cubic_11.ttf`. |
+| **Kenney Fonts** | kenney.nl/assets/kenney-fonts | **CC0** | 12 TTFs (Future, Pixel, Mini, High, Rocket, Blocks, with Square/Narrow/Mono variants) in the same voice as the Kenney UI packs. The obvious pairing for a Kenney-skinned game. Direct zip below. |
 | **itch.io pixel fonts** | itch.io | per-author | m6x11, m5x7 (Daniel Linssen), VCR OSD Mono and friends — read each page. |
 
 ## Low-poly 3D
@@ -116,6 +121,10 @@ In Flame, prefer generating particles from one small sprite over importing an an
 | **Audionautix** | audionautix.com | **CC BY** | Jason Shaw's genre-sorted loops. |
 | **Fesliyan Studios** | fesliyanstudios.com | free **with attribution**; a paid licence removes it | Casual/mobile-friendly loops. |
 | **DOVA-SYNDROME** | dova-s.jp | custom free licence — commercial use allowed (Japanese terms page) | Enormous JP-style BGM library. The terms are in Japanese; budget the translation or pick another source. |
+| **Abstraction / Tallbeard Studios** — *FREE Music Loop Bundle* | tallbeard.itch.io/music-loop-bundle | **CC0** | 200+ seamless game-music loops (chiptune, ambient, upbeat), split into quarterly zips of 30–150 MB. Credit is optional ("Abstraction"). The authors ask, but the licence does not require, that the music not be used for NFT/AI projects or resold unmodified. |
+| **Scott Buckley** | scottbuckley.com.au/library | **CC BY 4.0** | Orchestral, cinematic and ambient tracks with a genre/mood search. Needs an on-screen credit. Without it, his YouTube Content ID can flag the app's trailer. |
+| **ChipTone** | sfbgames.itch.io/chiptone | tool is free; **sounds you make are CC0** (stated on the page) | Browser/desktop SFX generator by SFB Games, a step up from sfxr/jsfxr. Record it as "generated with ChipTone (CC0)". |
+| **Bfxr** | bfxr.net (github.com/increpare/bfxr2) | tool **MIT**; output is your own work | The sfxr descendant with more synth parameters and a footstep generator. Same CREDITS treatment as jsfxr. |
 
 **Not allowed: BBC Sound Effects.** The 16 000 BBC archive sounds are under the RemArc licence, which permits only non-commercial, personal, research or formal-education use. Any monetised or ad-funded app needs a paid licence from Pro Sound Effects. They appear in many "free SFX" lists, so reject them explicitly.
 
@@ -149,6 +158,7 @@ Mono for SFX is not a compromise — game SFX are positioned by the engine, and 
 | **gamesounds.xyz** | `https://gamesounds.xyz/<Pack%20Name>/<file>` | WAV / OGG / MP3 | Browseable directory index. Every pack folder has a `readme.txt` stating the licence — fetch it and keep it next to the sounds. |
 | **Fusion Pixel** | `https://github.com/TakWolf/fusion-pixel-font/releases/download/<tag>/fusion-pixel-font-<size>px-<variant>-otf-v<tag>.zip` | OTF zip | Resolve `<tag>` and the asset name via `api.github.com/repos/TakWolf/fusion-pixel-font/releases/latest`. `<size>` is 8/10/12, `<variant>` e.g. `monospaced`. OFL. |
 | **Cubic 11** | `https://raw.githubusercontent.com/ACh-K/Cubic-11/master/fonts/ttf/Cubic_11.ttf` | TTF | OFL — `OFL.txt` sits at the repo root. |
+| **Kenney Fonts** | `https://kenney.nl/media/pages/assets/kenney-fonts/8d5435c213-1677661710/kenney_kenney-fonts.zip` | zip, 57 KB: `Fonts/*.ttf` + `License.txt` | CC0. `--only 'Kenney Future\.ttf$\|License\.txt' --flatten` gives `kenney_future.ttf` + `license.txt`. The hash changes if Kenney re-uploads the pack; if it 404s, copy the link from the Download button. *(fetched through `fetch_asset.py` on 2026-09-24)* |
 | **SoundImage** | the direct `.ogg` / `.mp3` link on each track page | audio | Credit inside the app is mandatory. |
 | **Openverse API** | `https://api.openverse.org/v1/images/?q=<q>&license_type=commercial` and `/v1/audio/?…` | JSON → `url` per result | Search engine, not a source — verify each result's licence on its own page. |
 | **Wikimedia Commons** | `https://upload.wikimedia.org/wikipedia/commons/<h>/<hh>/<File>` | original file | Copy the "Original file" link from the file page. Licence is per file. |
@@ -175,7 +185,9 @@ Kenney audio packs (Interface Sounds, UI Audio, …) ship **OGG only**. On a pro
 | Freesound, Sample Focus, Musopen, BlendSwap | Needs a login or OAuth token (a plain request gets 401) |
 | Pixabay, Uppbeat, Sketchfab | Bot-blocked (403/429) or login-gated |
 | Poly Pizza | Its API (`api.poly.pizza`) returns 401 without an API key. Download models from the site |
-| Pixel Frog, 0x72, Screaming Brain Studios | itch.io download button (JS) |
+| Pixel Frog (incl. Tiny Swords), 0x72, Screaming Brain Studios, Brackeys, Pipoya, Cainos, Tallbeard | itch.io download button (JS). Tallbeard's zips are 30–150 MB each, so take one quarter, not the whole bundle |
+| Scott Buckley | Per-track download page |
+| ChipTone, Bfxr, jsfxr | Generators: you export WAV from the tool, then import with `--local` |
 | incompetech, Sonniss | JS download page / 403 to scripts |
 | Lost Garden | Zip links scattered across blog posts — copy each file link from the post |
 | ZapSplat, Free Music Archive | Login required, plus download caps on free tiers |
@@ -208,6 +220,8 @@ Game-asset lists recycle the same bad sources. Each of these was checked on **20
 | **System fonts as pixel fonts** (W95FA, MS Sans Serif, Chicago, San Francisco) | Proprietary OS fonts; bundling them breaches the OS licence. Use Fusion Pixel, Cubic 11 or DotGothic16 instead. |
 | **Orange Free Sounds** | Most files are CC BY-NC — unusable in a monetised or ad-funded app. |
 | **"Free SFX pack" videos on YouTube/TikTok** | Unverifiable provenance — frequently re-uploads of copyrighted libraries. No licence page, no deal. |
+| **Sprout Lands** (Cup Nooble) — free Basic Pack | *Checked 2026-09-24.* The free tier is **non-commercial only**. Commercial use needs the premium pack (≥ $3.99). It is one of the most recommended "free" farming packs, so reject it explicitly for any monetised game. |
+| **FreePD** | *Checked 2026-09-24.* freepd.com shut down in 2025 ("permanently closed"). Old mirrors of its public-domain music have no provenance you can cite, so use the Tallbeard CC0 bundle instead. |
 | **Universal LPC spritesheet and most LPC art** | CC BY-SA 3.0 and/or GPL — the share-alike and attribution load is real work, and the base LPC licence blocks many commercial uses. Read the licence tree before using anything tagged LPC on OpenGameArt. |
 
 ## Verification before proposing anything

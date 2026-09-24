@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.6.0 — 2026-09-24
+
+More sources, checked the same way as 1.5.0. Licences were read from the upstream repo (`gh api repos/<o>/<r>`, LICENSE/README) or the live licence page. Every new URL pattern was fetched live, and a sample of them (Myna UI, TDesign, Mage, Maki, Fluent Color, Kenney Fonts) went end to end through `fetch_asset.py --apply` into a scratch project, with correct CREDITS rows. New Direct-download rows are stamped *(2026-09-24)*.
+
+### Added — sources-ui.md
+- **Icons**: Myna UI (MIT, 2 600+), TDesign (MIT; const `TDIcons.*` inside `tdesign_flutter`), Gravity UI, ProIcons, Humbleicons, Qlementine, Duoicons (MIT), Mage (Apache-2.0, stroke + bulk), Lineicons free set (MIT), Zendesk Garden (Apache-2.0), System UIcons (Unlicense), Fluent UI System **Color** (MIT), Flat Color Icons (MIT), Maki + Temaki (CC0 map glyphs), and the CC BY 4.0 group: Pepicons, Streamline free, coolicons, HackerNoon Pixel Icon Library.
+- **Licence findings**: the Pixel Icon Library repo is tagged MIT, but its icons are CC BY 4.0 (trap 11 inside one repo). Streamline's credit must link to streamlinehq.com. The pub package `line_icons` is Line Awesome, not Lineicons.
+- **Illustrations**: Scale by Flexiple (free commercial, no attribution), Pixeltrue free (no redistribution in templates).
+- **Emoji**: Firefox OS Emoji (art CC BY 4.0).
+- **Fonts**: Omnibus-Type (OFL, GitHub-fetchable), Tunera (OFL), Atkinson Hyperlegible Next (OFL).
+- **Photos**: Burst by Shopify.
+- **Direct download URLs** for all new icon sets, Firefox OS Emoji and Omnibus-Type.
+- **Checked and rejected**: Reshot (retired January 2026), Fresh Folk (CC BY-NC-ND), IconaMoon (no licence file), animated-SVG sets `line-md`/`svg-spinners` (MIT, but `flutter_svg` does not run SMIL/CSS animation), LottieFlow (no published licence).
+
+### Added — sources-game.md
+- **Sprites**: Brackeys' Platformer Bundle (CC0). Pixel Frog *Tiny Swords* Free Pack (custom, no redistribution; the old version is CC0). Pipoya RPG tilesets and Cainos Top Down Basic (custom: commercial OK, no redistribution).
+- **Pixel fonts**: Kenney Fonts (CC0), with a verified direct zip and `--only` filter.
+- **Audio**: Abstraction/Tallbeard Music Loop Bundle (CC0, 200+ loops), Scott Buckley (CC BY 4.0), ChipTone (output CC0), Bfxr (MIT tool).
+- **Checked and rejected**: Sprout Lands free tier (non-commercial), FreePD (closed 2025).
+
 ## v1.5.0 — 2026-09-23
 
 A much wider source net, checked the same way as 1.4.0: every licence was read from the live page or the upstream repo, and every new URL pattern was fetched live. The date stamp on the Direct download sections stays 2026-09-23 because the new patterns were verified today.
