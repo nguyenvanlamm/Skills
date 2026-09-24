@@ -18,6 +18,12 @@ Read at Step 3 when `audit.json → derived.app_type` is `flame_game`, or when t
 | **0x72** — *16x16 DungeonTileset II* | 0x72.itch.io/dungeontileset-ii | assets **CC0**, code MIT | ✅ | The standard free roguelike tileset, with heroes, monsters, weapons and UI hearts. |
 | **Screaming Brain Studios** | screamingbrainstudios.itch.io | **CC0** (all assets, per the studio page) | ✅ per pack | Isometric tiles, procedural planets, space backgrounds, textures. |
 | **itch.io, CC0 filter** | itch.io/game-assets/free/tag-cc0 | CC0 as tagged, **still confirm on the page** | varies | The tag is set by the author and is not audited. It turns itch.io from "read every readme" into "confirm one line". |
+| **Open Duelyst** | github.com/open-duelyst/duelyst | **CC0** | ✅ huge | A shipped CCG's entire art drop: 600+ animated pixel-art units (idle/run/attack/death), VFX, UI, music and SFX, all under `app/resources/`. `Jordyfel/duelyst-animated-sprites-godot` repacks the sheets with parsed frame data — also CC0. |
+| **Superpowers asset packs** | github.com/sparklinlabs/superpowers-asset-packs | **CC0** (`LICENSE.txt` at repo root) | ✅ per pack | ninja-adventure, space-shooter, medieval-fantasy, rpg-battle-system, top-down-shooter, western-fps-2d, prehistoric-platformer, backgrounds, plus 3 low-poly 3D packs. Fetchable from GitHub (below). |
+| **pixel-boy — Ninja Adventure** | pixel-boy.itch.io/ninja-adventure-asset-pack | **CC0** | ✅ | 16×16 top-down action pack: characters, tileset, UI, icons, SFX. Continues the superpowers `ninja-adventure` pack. **Other pixel-boy packs use a custom "commercial OK, no resell" licence — check each item page.** |
+| **GameArt2D freebies** | gameart2d.com/freebies.html | **CC0** (stated on the licence page) | ✅ | Tilesets, GUI packs and characters with vector sources (AI/EPS/CDR) plus PNG. Casual/mobile-flavoured. |
+| **Lost Garden** | lostgarden.home.blog/tag/free-game-graphics | **CC BY 3.0** | ⚠️ per collection | Daniel Cook's classic prototyping sets (Small World, PlanetCute, Space Cute). Visible credit required, in the form the licence page gives. One clause is unusual: **do not use the art in a clone of one of his commercial games.** |
+| **Ansimuz** | ansimuz.itch.io | custom: commercial OK; **no resell/redistribute, no AI/NFT, no engine tools** | ⚠️ varies | Large free pixel-art catalogue (top-down and side-view). Some packs are tagged CC0 on their own pages — the item page wins. |
 
 ### Kenney UI Pack — why it is the default answer for game UI
 
@@ -35,6 +41,18 @@ Companion packs in the same visual voice: *UI Pack: RPG Expansion*, *Game Icons*
 
 Parallax backgrounds: Kenney *Background Elements*, or itch.io "parallax background" — take a layered set, never a single flattened image, or the depth is gone.
 
+Palettes for recolouring work: **lospec.com/palette-list** collects community-submitted palettes (Lospec states they are free to use). A palette is a colour direction, not an asset — record the palette name in CREDITS if one is used.
+
+## Pixel fonts
+
+| Font | Source | Licence | Notes |
+|---|---|---|---|
+| **Press Start 2P** | Google Fonts | OFL | The default arcade pixel face; Latin only. |
+| **DotGothic16** | Google Fonts | OFL | Japanese pixel font — the only sensible choice for a pixel-art game with JP copy. |
+| **Fusion Pixel** | github.com/TakWolf/fusion-pixel-font | OFL | CJK pixel font at 8/10/12 px; releases ship OTF zips (below). |
+| **Cubic 11** | github.com/ACh-K/Cubic-11 | OFL | Traditional-Chinese pixel font; TTF at `fonts/ttf/Cubic_11.ttf`. |
+| **itch.io pixel fonts** | itch.io | per-author | m6x11, m5x7 (Daniel Linssen), VCR OSD Mono and friends — read each page. |
+
 ## Low-poly 3D
 
 Relevant only if the project uses `flutter_scene`, `flutter_3d_controller` or a model viewer — Flame is 2D.
@@ -45,6 +63,12 @@ Relevant only if the project uses `flutter_scene`, `flutter_3d_controller` or a 
 | **Kay Lousberg** | kaylousberg.com | CC0 | glTF, FBX |
 | **Poly Pizza** | poly.pizza | CC0 and CC BY, filterable | glTF, OBJ |
 | **Sketchfab** | sketchfab.com — **filter to CC0** | per-model | glTF, USDZ |
+| **market.pmnd.rs** | market.pmnd.rs | **CC0** | optimized GLB, HDRI, textures — direct CDN links on each asset page |
+| **Smithsonian 3D** | 3d.si.edu | **CC0** when filtered to `media_usage:CC0` | glTF, OBJ, USD — 3 000+ museum scans; unfiltered models have usage conditions |
+| **Polytope Studio free packs** | Unity Asset Store / Fab listings | store EULA — usable in end products, **no raw redistribution** | `.unitypackage` — extract by hand (it is a gzipped tar of per-GUID files) |
+| **Mixamo** | mixamo.com | Adobe royalty-free for projects, games included; **no raw-file redistribution, no ML training** | FBX, glTF — rigged characters + a large animation library; Adobe ID needed |
+| **TurboSquid / CGTrader / Free3D free sections** | per-marketplace | per-model royalty-free — read the model page | account required |
+| **BlendSwap** | blendswap.com | per file — CC0 through CC BY-SA | `.blend` — login required |
 
 Quaternius and Kay Lousberg are both CC0 *and* stylistically consistent across their whole catalogue, which is the rare combination.
 
@@ -54,6 +78,10 @@ Quaternius and Kay Lousberg are both CC0 *and* stylistically consistent across t
 |---|---|---|
 | **ambientCG** | CC0 | Full PBR sets, 1K–8K. Ship 1K on mobile; 4K is desktop-only weight. |
 | **Poly Haven** | CC0 | HDRIs, textures, models. |
+| **CG Bookcase** | CC0 | Full PBR sets, 1K–4K, with all map types. |
+| **3Dassets.one** | **search engine** — licence-filterable | Indexes ambientCG, Poly Haven, CG Bookcase, ShareTextures, Texture Can, PBRPX, NoEmotion HDRs and more. Search here first, filter to CC0, then fetch from the creator's site. |
+| **ShareTextures** | custom licence — commercial OK, **no redistribution** | Free account needed. |
+| **Textures.com free** | restrictive own licence — free daily credits, no redistribution, no OSS asset packs | Last resort; prefer the CC0 sites. |
 
 ## Particles and VFX
 
@@ -77,6 +105,17 @@ In Flame, prefer generating particles from one small sprite over importing an an
 | **Kevin MacLeod / incompetech** | incompetech.com | **CC BY 4.0** for the free tier | Large library of music loops. The free tier needs an on-screen credit in the exact form the site gives; a paid licence removes it. The download pages are JS, so download by hand. |
 | **jsfxr** | sfxr.me (github.com/chr15m/jsfxr) | tool: Unlicense | A generator, not a library. You synthesise 8-bit SFX in the browser and export WAV. The output is your own work, so there is no third-party licence to track. Record it in CREDITS.md as "generated with jsfxr". |
 | **Sonniss GDC Game Audio Bundle** | sonniss.com/gameaudiogdc | sonniss.com/gdc-bundle-license: royalty-free, commercial, no attribution; **no resale as raw files**; no AI/ML training | Several GB of professional SFX each year (7.47 GB in 2026; over 200 GB in the archive). Hand download only: the site returns 403 to scripts, and the bundle is too large for `fetch_asset.py`. Take the few files you need. |
+| **gamesounds.xyz** | gamesounds.xyz | **CC0 packs** (Kenney's Sound Pack, Shapeforms and friends) | A browseable directory index of royalty-free game-audio packs, with direct file links — fetchable (below). Every pack folder carries its `readme.txt`; fetch it, the licence lives there. |
+| **ZapSplat** | zapsplat.com | Standard License — free tier requires **visible credit** (premium removes it) | Huge SFX/music library. Free accounts get MP3 only and a download cap. The credit must be inside the project — a Credits screen line. |
+| **SoundImage (Eric Matyas)** | soundimage.org | custom attribution licence — **credit inside the game is mandatory**, e.g. `Music by Eric Matyas — www.soundimage.org` | Thousands of music tracks and SFX in OGG + MP3, plus 4 000 images. Non-attribution licences can be bought per track. |
+| **99Sounds** | 99sounds.org | royalty-free, no attribution | Small catalogue of themed packs (cinematic, drones, retro). |
+| **Sample Focus** | samplefocus.com | per sample — "Standard Royalty-Free" or CC0, tagged on the page | Login needed to download. |
+| **Free Music Archive** | freemusicarchive.org | **per-track CC** — much of it NC or ND | Use the built-in licence filter ("commercial allowed", "remix allowed") and read the track page anyway. |
+| **Musopen** | musopen.org | per recording — filter to Public Domain / CC0 | Classical recordings and sheet music; account needed. |
+| **ende.app** (was filmmusic.io) | ende.app | **CC BY 4.0** — the author explicitly makes attribution voluntary | ~1 300 tracks by Sascha Ende, video game and film oriented. |
+| **Audionautix** | audionautix.com | **CC BY** | Jason Shaw's genre-sorted loops. |
+| **Fesliyan Studios** | fesliyanstudios.com | free **with attribution**; a paid licence removes it | Casual/mobile-friendly loops. |
+| **DOVA-SYNDROME** | dova-s.jp | custom free licence — commercial use allowed (Japanese terms page) | Enormous JP-style BGM library. The terms are in Japanese; budget the translation or pick another source. |
 
 **Not allowed: BBC Sound Effects.** The 16 000 BBC archive sounds are under the RemArc licence, which permits only non-commercial, personal, research or formal-education use. Any monetised or ad-funded app needs a paid licence from Pro Sound Effects. They appear in many "free SFX" lists, so reject them explicitly.
 
@@ -105,6 +144,14 @@ Mono for SFX is not a compromise — game SFX are positioned by the engine, and 
 | **OpenGameArt** | `https://opengameart.org/sites/default/files/<filename>` from the item's "File(s)" list | whatever the uploader attached | The licence is **per submission**. Read it on the item page. The server is slow: a 20 MB zip takes about a minute. |
 | **Juhani Junkala 512 SFX** | `https://opengameart.org/sites/default/files/The%20Essential%20Retro%20Video%20Game%20Sound%20Effects%20Collection%20%5B512%20sounds%5D.zip` | zip, 20 MB of WAV | There is no licence file inside; the CC0 is stated on the item page, so pass that page as `--source`. Filter by folder, e.g. `--only '(?i)/coins/' --flatten`. |
 | **Pixelarticons** (pixel UI icons) | `https://raw.githubusercontent.com/halfmage/pixelarticons/master/svg/<name>.svg` | SVG | MIT. Matches pixel-art HUDs better than any app icon set. |
+| **Open Duelyst** | `https://raw.githubusercontent.com/open-duelyst/duelyst/main/app/resources/<dir>/<file>` | PNG + `.plist` frame data, audio | 45 resource dirs — list them with `api.github.com/repos/open-duelyst/duelyst/contents/app/resources/<dir>`. A unit's sheet pairs a `.png` with a `.plist` of frame rects; both are needed. |
+| **Superpowers packs** | `https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/<pack>/<path>` | PNG, audio | Packs: `ninja-adventure`, `space-shooter`, `medieval-fantasy`, `rpg-battle-system`, `top-down-shooter`, `western-fps-2d`, `prehistoric-platformer`, `backgrounds`. `LICENSE.txt` (CC0) sits at the repo root — fetch it once. |
+| **gamesounds.xyz** | `https://gamesounds.xyz/<Pack%20Name>/<file>` | WAV / OGG / MP3 | Browseable directory index. Every pack folder has a `readme.txt` stating the licence — fetch it and keep it next to the sounds. |
+| **Fusion Pixel** | `https://github.com/TakWolf/fusion-pixel-font/releases/download/<tag>/fusion-pixel-font-<size>px-<variant>-otf-v<tag>.zip` | OTF zip | Resolve `<tag>` and the asset name via `api.github.com/repos/TakWolf/fusion-pixel-font/releases/latest`. `<size>` is 8/10/12, `<variant>` e.g. `monospaced`. OFL. |
+| **Cubic 11** | `https://raw.githubusercontent.com/ACh-K/Cubic-11/master/fonts/ttf/Cubic_11.ttf` | TTF | OFL — `OFL.txt` sits at the repo root. |
+| **SoundImage** | the direct `.ogg` / `.mp3` link on each track page | audio | Credit inside the app is mandatory. |
+| **Openverse API** | `https://api.openverse.org/v1/images/?q=<q>&license_type=commercial` and `/v1/audio/?…` | JSON → `url` per result | Search engine, not a source — verify each result's licence on its own page. |
+| **Wikimedia Commons** | `https://upload.wikimedia.org/wikipedia/commons/<h>/<hh>/<File>` | original file | Copy the "Original file" link from the file page. Licence is per file. |
 
 Filter large packs down to what the screen actually uses:
 
@@ -123,13 +170,22 @@ Kenney audio packs (Interface Sounds, UI Audio, …) ship **OGG only**. On a pro
 
 | Source | Why |
 |---|---|
-| itch.io (including KayKit / Kay Lousberg), CraftPix, Quaternius | The download sits behind a JS button or popup, and the page HTML has no file link |
+| itch.io (including KayKit / Kay Lousberg, pixel-boy, Ansimuz), CraftPix, Quaternius, GameArt2D | The download sits behind a JS button or popup, and the page HTML has no file link |
 | Glitch (OpenGameArt) | The link works, but it is a **185 MB `.7z`**. `fetch_asset.py` cannot unpack 7z/rar/tar.gz and refuses them before downloading. Extract by hand, then zip the subset you need |
-| Freesound | Needs a login or OAuth token (a plain request gets 401) |
+| Freesound, Sample Focus, Musopen, BlendSwap | Needs a login or OAuth token (a plain request gets 401) |
 | Pixabay, Uppbeat, Sketchfab | Bot-blocked (403/429) or login-gated |
 | Poly Pizza | Its API (`api.poly.pizza`) returns 401 without an API key. Download models from the site |
 | Pixel Frog, 0x72, Screaming Brain Studios | itch.io download button (JS) |
 | incompetech, Sonniss | JS download page / 403 to scripts |
+| Lost Garden | Zip links scattered across blog posts — copy each file link from the post |
+| ZapSplat, Free Music Archive | Login required, plus download caps on free tiers |
+| Mixamo | Adobe ID + export flow in the browser |
+| Polytope Studio, TurboSquid, CGTrader, Free3D | Store checkout / account even for $0 items; `.unitypackage` files need manual unpacking |
+| ShareTextures, Textures.com | Account required; Textures.com also caps free daily downloads |
+| Smithsonian 3D | Per-object download UI assembles multiple files |
+| 99Sounds, Audionautix, ende.app, Fesliyan, DOVA-SYNDROME | Site download buttons; some route through JS or a second page |
+| CG Bookcase | Download button per texture, no login — but the file URL is not published in a stable pattern |
+| 3Dassets.one, Lospec | These are indexes, not hosts — they send you to the creator's site |
 
 ## Sprite hygiene, before the assets touch the project
 
@@ -139,6 +195,20 @@ The four rules that turn "the sprites look wrong and I can't say why" into a fix
 2. **1–2 px transparent padding around every sprite in an atlas.** Without it, bilinear filtering samples the neighbour and you get a bright seam along the edge — "texture bleeding", and it only shows on some devices, which is why it survives to production.
 3. **Panels and buttons need a 9-slice spec** — the four border insets, in pixels, recorded next to the file. Without it the corners stretch. Kenney documents these; for anything else, measure once and write it down.
 4. **One atlas per screen or per state**, not one per sprite. Every separate image is a draw-call batch break.
+
+## Checked and rejected
+
+Game-asset lists recycle the same bad sources. Each of these was checked on **2026-09-23** and fails for the stated reason. Do not propose them without new evidence.
+
+| Source | Why not |
+|---|---|
+| **The Spriters Resource / Textures Resource / Models Resource / Sounds Resource** (vg-resource) | Ripped commercial-game files, hosted "for reference and educational purposes". The uploader cannot grant rights the publisher owns; shipping them is plain infringement, placeholder or not. |
+| **RPG Maker RTP and official DLC** | The KADOKAWA licence allows the assets only inside games built with the RPG Maker engine. A Flutter app is not one, and "it is just a placeholder" does not change that. |
+| **ThreeDScans** | Beautiful museum scans, but the site publishes **no licence text** — only interviews in which the author disclaims copyright. No instrument means the default: all-rights-reserved. |
+| **System fonts as pixel fonts** (W95FA, MS Sans Serif, Chicago, San Francisco) | Proprietary OS fonts; bundling them breaches the OS licence. Use Fusion Pixel, Cubic 11 or DotGothic16 instead. |
+| **Orange Free Sounds** | Most files are CC BY-NC — unusable in a monetised or ad-funded app. |
+| **"Free SFX pack" videos on YouTube/TikTok** | Unverifiable provenance — frequently re-uploads of copyrighted libraries. No licence page, no deal. |
+| **Universal LPC spritesheet and most LPC art** | CC BY-SA 3.0 and/or GPL — the share-alike and attribution load is real work, and the base LPC licence blocks many commercial uses. Read the licence tree before using anything tagged LPC on OpenGameArt. |
 
 ## Verification before proposing anything
 

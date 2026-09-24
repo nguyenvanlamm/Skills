@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.5.0 — 2026-09-23
+
+A much wider source net, checked the same way as 1.4.0: every licence was read from the live page or the upstream repo, and every new URL pattern was fetched live. The date stamp on the Direct download sections stays 2026-09-23 because the new patterns were verified today.
+
+### Added — sources-ui.md
+- **Icons**: Akar, Teenyicons, Jam, Radix, Flowbite (`flowbite_icons`), CoreUI free set, IconPark (Apache-2.0, archived repo noted), Health Icons (CC0), Unicons (IconScout Simple License), Codicons (CC BY 4.0), Majesticons free set, PrimeIcons, CSS.gg, Weather Icons, Fork Awesome, Line Awesome, Flag Icons, Devicon. Each row states the Flutter package (or "build a font") and a fetchable URL.
+- **Licence findings that change choices**: **PrimeIcons** relicensed at v8 to the custom PrimeUI License — pin `primeicons@7` / `prime_icons` (still MIT). **CSS.gg** relicensed at 2.1.2 — attribution is now mandatory; ≤2.1.1 stays MIT. **Majesticons** MIT covers only the 760-icon npm package, not the site's 11 000-icon set. **Unicons** uses the IconScout Simple License (commercial OK, no republishing as a pack, no competing service).
+- **Illustrations**: illlustrations (MIT), IRA Design (MIT), LukaszAdam (CC0), Charco (free commercial, no resell), Mixkit Art (Mixkit licence), SVG Silh, Absurd Design, Ouch!/Icons8 (link-back), Vecteezy (attribution), Doodle Ipsum (URL API, fetchable).
+- **Emoji and avatars**: Personas by Draftbit (MIT), plus a note that avatar-as-a-service endpoints have the same third-party-request problem as DiceBear/runtime fonts.
+- **Fonts**: Collletttivo (OFL), Font Squirrel, Font Library, Use & Modify, Free Faces, Fontesk (default personal-use — per-font readme required), Fontfabric; the GitHub OFL releases row now names Cascadia Code, Intel One Mono, Commit Mono and Maple Mono too.
+- **Animation**: IconScout Lottie (IconScout Simple License), Creattie (custom licence with reproduction/budget caps).
+- **Backgrounds**: SVG Backgrounds (free tier needs attribution), Pattern Monster (MIT generator), Subtle Patterns (CC BY-SA 3.0 — flagged).
+- **New "Photos" section**: Pexels, Unsplash, Pixabay, StockSnap, Kaboompics, Nappy, Openverse, Wikimedia Commons — with the bundle-don't-hotlink and depicted-IP rules.
+- **Direct download URLs**: verified patterns for Majesticons, Teenyicons, Jam, Akar, Radix, Flowbite, IconPark, Codicons, Health Icons (whole-set `icons.zip`, with `--strip` hint), Unicons, PrimeIcons@7, CoreUI, Weather Icons, Line Awesome, Flag Icons, Devicon, DotGothic16/Press Start 2P, Doodle Ipsum, Wikimedia Commons, Openverse API.
+- **Checked and rejected**: DaFont/1001Fonts-style aggregators (default "personal use"), Noun Project free tier (per-icon CC BY format), Gridicons (GPL), Typicons/Entypo (BY-SA), Designstripe (sunset), IcoMoon free pack.
+
+### Added — sources-game.md
+- **Sprites**: Open Duelyst (CC0 — a shipped CCG's full art drop: 600+ animated units, VFX, UI, music, SFX), Superpowers asset packs (CC0, GitHub-fetchable), pixel-boy Ninja Adventure (CC0), GameArt2D freebies (CC0), Lost Garden (CC BY 3.0, with the no-clones clause), Ansimuz (custom free / some CC0).
+- **New "Pixel fonts" section**: Press Start 2P, DotGothic16, Fusion Pixel, Cubic 11 (all OFL), itch.io per-author fonts.
+- **Low-poly 3D**: market.pmnd.rs (CC0), Smithsonian 3D (CC0 filter), Polytope Studio (store EULA), Mixamo (royalty-free, no raw redistribution, no ML training), TurboSquid/CGTrader/Free3D free sections, BlendSwap.
+- **PBR**: CG Bookcase (CC0), 3Dassets.one (licence-filterable search engine over the CC0 sites), ShareTextures, Textures.com free (restrictive — last resort).
+- **Audio**: gamesounds.xyz (CC0 packs, fetchable directory index), ZapSplat (attribution), SoundImage/Eric Matyas (credit inside the game), 99Sounds, Sample Focus, Free Music Archive (per-track CC), Musopen (PD filter), ende.app (CC BY, attribution voluntary), Audionautix (CC BY), Fesliyan (credit), DOVA-SYNDROME.
+- **Direct download URLs**: Open Duelyst and Superpowers (GitHub raw + contents API), gamesounds.xyz directory files, Fusion Pixel releases, Cubic 11 raw TTF, SoundImage file links, Openverse API, Wikimedia Commons.
+- **New "Checked and rejected" section**: Spriters/Textures/Models/Sounds Resource (ripped assets), RPG Maker RTP (engine-locked), ThreeDScans (no licence published), OS system fonts as pixel fonts, Orange Free Sounds (CC BY-NC), YouTube/TikTok SFX packs (no provenance), LPC art (BY-SA/GPL).
+
 ## v1.4.0 — 2026-09-23
 
 More sources, each checked the same way as in 1.3.0. The licence was read from the live page or the upstream repo, every URL pattern was fetched, and pub packages were checked by downloading their archives. Testing the new URLs exposed two `fetch_asset.py` bugs.

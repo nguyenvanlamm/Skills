@@ -31,6 +31,24 @@ Licence column is the licence as published at the time of writing. **Re-read it 
 | **Octicons** | primer.style/octicons | MIT | SVG | none maintained (`octicons` is from 2016) | unpkg (`@primer/octicons`) |
 | **Boxicons** | boxicons.com | MIT | SVG, font | `boxicons` (2021, stale) | unpkg |
 | **Pixelarticons** | pixelarticons.com | MIT (free set) | SVG | none — build a font | via GitHub raw |
+| **Akar Icons** | akaricons.com | MIT | SVG | none — build a font | via GitHub raw |
+| **Teenyicons** | teenyicons.com | MIT | SVG, outline + solid | none — build a font | unpkg (`teenyicons`) |
+| **Jam Icons** | jam-icons.com | MIT | SVG, font | none | unpkg (`jam-icons`) |
+| **Radix Icons** | radix-ui.com/icons | MIT | SVG, 15px grid | none | via GitHub raw |
+| **Flowbite Icons** | flowbite.com/icons | MIT | SVG, outline + solid | `flowbite_icons` — **check the API shape first** | via GitHub raw |
+| **CoreUI Icons** (free set) | coreui.io/icons | MIT | SVG, font | none | unpkg (`@coreui/icons`) |
+| **IconPark** | iconpark.oceanengine.com | Apache-2.0 | SVG, one source → outline/filled/two-tone themes | none | via GitHub raw — **repo archived since 2023** |
+| **Health Icons** | healthicons.org | **CC0** | SVG, PNG, filled + outline + negative | none | whole-set `icons.zip` on GitHub |
+| **Unicons** | iconscout.com/unicons | **IconScout Simple License** — commercial OK, no republishing as an icon pack, no competing service | SVG, font | `unicons` (`UniconsLine.*`, const `IconData`) | unpkg (`@iconscout/unicons`) |
+| **Codicons** | microsoft.github.io/vscode-codicons | **CC BY 4.0** glyphs, MIT code | SVG, font | none | via GitHub raw |
+| **Majesticons** (free set) | majesticons.com | the 760-icon npm package is **MIT**; the 11 000-icon set on the site is paid | SVG | none | unpkg (`majesticons`) |
+| **PrimeIcons** | primeicons.dev | **MIT up to v7**; v8 switched to the custom PrimeUI License | font, raw SVG | `prime_icons` (const `IconData`) | unpkg — **pin `primeicons@7`** |
+| **CSS.gg** | css.gg | **custom licence since 2.1.2 — attribution mandatory**; versions ≤ 2.1.1 were MIT | SVG, CSS | none | unpkg (`css.gg`) |
+| **Weather Icons** | erikflowers.github.io/weather-icons | font **OFL-1.1**, code MIT | SVG, font | `weather_icons` (const `IconData`, stale but works) | via GitHub raw |
+| **Fork Awesome** | forkaweso.me | OFL-1.1 | font | none | unpkg (`fork-awesome`) |
+| **Line Awesome** | icons8.com/line-awesome | Font Awesome 4.7 fork — glyphs **CC BY 4.0**, font OFL | SVG, font | `line_awesome_flutter` (const `IconData`, stale) | via GitHub raw |
+| **Flag Icons** | flagicons.lipis.dev | MIT | SVG, 4×3 and 1×1 | none | jsDelivr (`lipis/flag-icons`) |
+| **Devicon** | devicon.dev | MIT — **every glyph is a third-party tech logo** | SVG, font | none | jsDelivr (`devicons/devicon`) |
 
 Notes that decide the choice:
 
@@ -49,6 +67,16 @@ Notes that decide the choice:
 - **Font Awesome Free** licenses its icons differently by format: the SVG/JS files are **CC BY 4.0** (on-screen credit), and the font files are **OFL** (licence page). `font_awesome_flutter` ships the font, so `--license OFL-1.1` is correct for the package, while hand-copied SVGs need CC BY credit. This is trap 10 in `licensing.md`.
 - **Remix Icon** moved from Apache-2.0 to its own **Remix Icon License v1.0** in January 2026. Using it in an app is allowed, with attribution optional. Two clauses matter: you **may not use an icon as a logo, brand mark or app icon** (§3.3), and you may not redistribute the set as an icon pack. Keep Remix glyphs out of `flutter_launcher_icons` and the splash logo.
 - **Pixelarticons** is the one UI set that fits a pixel-art game's menus. Its 24px grid matches Kenney's pixel packs.
+- **IconPark** generates outline, filled and two-tone versions from one SVG source, which is a cheap way to get a selected/unselected tab-bar pair. The GitHub repo was archived in 2023 — the set is complete and Apache-2.0, so archive status is a feature freeze, not a licence problem.
+- **Health Icons** is CC0 and covers a domain nothing else does — medical, public-health and humanitarian glyphs. For a health app it beats adapting Lucide.
+- **Majesticons** publishes 760 icons on npm under MIT; the 11 000-icon set on majesticons.com is paid. The MIT line ends exactly at the npm package boundary — an icon that exists only on the site is not covered.
+- **PrimeIcons** relicensed at v8 to the custom "PrimeUI License". `prime_icons` on pub and `primeicons@7` on unpkg are still MIT — pin the 7.x line, and record the version in CREDITS.
+- **CSS.gg** relicensed at 2.1.2: current versions require visible attribution to Astrit / CSS.GG / glyf.app, stylisation intact. If you cannot place that credit, versions ≤ 2.1.1 are still MIT — or pick an MIT set instead.
+- **Unicons** uses the IconScout Simple License: commercial use is fine, but you may not republish the set as an icon pack or build a competing icon service. Attribution on the About screen is requested, not required.
+- **Codicons** is the Visual Studio Code set — CC BY 4.0, so it needs on-screen credit. It fits developer tools and editor-flavoured UIs, where its glyph vocabulary (debug, source control, terminal) is unmatched.
+- **Line Awesome** inherits Font Awesome's split licence: glyphs **CC BY 4.0**, font OFL. Same trap as Font Awesome (trap 10) — `line_awesome_flutter` ships the font (OFL, license-page), hand-copied SVGs need on-screen credit.
+- **Devicon** is MIT, but MIT covers Devicon's *files* — every glyph is someone else's technology logo (trap 6). Legitimate for a dev-tool app ("built with X" credits, language icons); wrong for general-purpose UI.
+- **Flag Icons** is the safe way to show country flags — MIT, consistent rendering, no emoji-flag fallback problem. Country flags are not third-party trademarks, so trap 6 does not apply.
 
 **When to build a custom icon font instead of adding a package:** you need fewer than ~40 icons, or you are mixing two sets deliberately (a brand glyph plus a standard set), or the package's tree-shaking is not trimming the unused thousands. Upload the SVGs to **www.fluttericon.com** (the bare domain does not resolve), download the `.ttf` + generated Dart, and follow `integration-flutter.md § Custom icon font`. A 40-icon font is ~8 KB; a full icon package with tree-shaking disabled can be 200 KB+.
 
@@ -65,6 +93,16 @@ Notes that decide the choice:
 | **Open Doodles** | opendoodles.com | **CC0** | SVG, PNG, GIF | Pablo Stanley's sketchy people. Direct S3 links (below). Pairs with Open Peeps and Humaaans, which come from the same author. |
 | **3dicons** | 3dicons.co | **CC0** | PNG, Blender, Figma | 1400+ 3D renders by Vijay Verma, in clay/colour/gradient styles. They make good empty-state and onboarding hero art. Take the full pack from the "Download V1" link (Gumroad, hand download). The per-icon thumbnails on the site are 400px WebP served from an undocumented storage bucket, so do not script against them. |
 | **Microsoft Fluent Emoji** | github.com/microsoft/fluentui-emoji | **MIT** | 3D PNG, colour/flat/high-contrast SVG | 1500+ glyphs in four styles. The 3D PNGs (256×256) work well as friendly empty-state and achievement art. MIT, so `license-page` credit. |
+| **illlustrations** | illlustrations.co | **MIT** | SVG | 120+ flat scene illustrations by Vijay Verma, drawn over a 100-day challenge. Distributed through Gumroad — **hand download**. |
+| **IRA Design** | iradesign.io | **MIT** | SVG, PNG, AI | Build-a-scene gradient illustrations (characters + objects + 5 gradients) plus a ready-made gallery. By Creative Tim. |
+| **LukaszAdam** | lukaszadam.com/illustrations | **CC0** | SVG | Large library of flat scenes and small icon sets; no attribution, donations optional. |
+| **Charco** | charco.design | free for personal & commercial, **no resell/redistribution** | PNG (SVG in the paid set) | 16 hand-drawn empty-state/error spots (404, offline, under construction). Gumroad — **hand download**. |
+| **Mixkit Art** | mixkit.co/free-stock-art | Mixkit licence — free, no attribution; no standalone resale | PNG up to ~4000 px | Painterly and editorial illustration, raster only. Good for hero art, not for tintable UI spots. |
+| **SVG Silh** | svgsilh.com | per image — the Pixabay-era stock is CC0; **check the licence line on each image page** | SVG, PNG | Silhouettes and cut-outs, single-colour by nature — they recolour cleanly to a seed colour. |
+| **Absurd Design** | absurddesign.com | free tier **requires a visible credit** | PNG, SVG | Surreal, editorial-style illustrations; one free chapter per series. |
+| **Ouch! and other Icons8 free products** | icons8.com/ouch | free **with a link back to Icons8**; paid removes it | PNG, SVG | Covers Ouch!, Growww and the Icons8 free galleries — the link-back applies to all of them. |
+| **Vecteezy** | vecteezy.com | Vecteezy licence — **attribution required** on the free tier | SVG, PNG | Filter "License: Free". Huge catalogue, mixed quality — curate hard. |
+| **Doodle Ipsum** | doodleipsum.com | custom free licence — read the terms page | SVG, PNG | Random doodle compositions (people, objects, abstract) via a URL API — see Direct download URLs. |
 
 The dark-mode trap: an illustration exported with a baked white rectangle behind it shows a hard white slab on a dark surface. Every source above can export transparent — verify the exported file, do not assume it. `undraw` and `openpeeps` are transparent by default.
 
@@ -79,6 +117,9 @@ The dark-mode trap: an illustration exported with a baked white rectangle behind
 | **OpenMoji** | openmoji.org | **CC BY-SA 4.0** | SVG, PNG | **Share-alike.** Recolouring or editing makes the derivative BY-SA too (`licensing.md` trap 8). Use as-is, or pick Fluent/Noto. |
 | **DiceBear** | dicebear.com | **per style**: 42 CC0, 14 CC BY 4.0, 1 MIT, 4 "artist's own terms" | SVG, PNG via HTTP API | Deterministic avatars from a seed, good for placeholder profile pictures. Check the style on dicebear.com/licenses. Notionists, Lorelei, Open Peeps, Thumbs and Shapes are CC0; Adventurer, Micah, Big Smile and Personas need credit; Avataaars/Bottts use the artist's own terms. Every SVG also embeds its licence in `<metadata>`. **Fetch at build time and bundle.** Calling `api.dicebear.com` at runtime sends every user's seed to a third party, the same privacy problem as `google_fonts` (trap 7). |
 | **Boring Avatars** | boringavatars.com | MIT | SVG (generated) | Abstract geometric avatars. It is a React library with no Flutter port, so export the SVGs you need from the site and bundle them. |
+| **Personas** | personas.draftbit.com | **MIT** | SVG | Draftbit's mix-and-match flat avatar generator — deterministic: the same URL params always give the same avatar. Generate the set you need, export SVG/PNG, and bundle it; do not resolve avatar URLs at runtime (same third-party-request trap as DiceBear). |
+
+Avatar-as-a-service endpoints (DiceBear at runtime, ui-avatars.com, pravatar-style placeholder services) all share one problem: every app launch sends a third party the user's seed or username. Generate the avatars at build time, or at worst once, and bundle the files.
 
 ## Fonts
 
@@ -89,7 +130,14 @@ The dark-mode trap: an illustration exported with a baked white rectangle behind
 | **Fontsource** | fontsource.org | mirrors OFL/Apache fonts | TTF, WOFF2 | yes — npm/jsDelivr |
 | **Uncut.wtf** | uncut.wtf | per-font, mostly OFL | TTF, OTF, variable | no |
 | **Velvetyne** | velvetyne.fr | OFL | TTF, OTF | no |
-| **GitHub releases (OFL foundries)** | Geist (`vercel/geist-font`), Inter (`rsms/inter`), IBM Plex (`IBM/plex`), JetBrains Mono, Monaspace (`githubnext/monaspace`), The League of Moveable Type (`theleagueof/*`) | OFL-1.1 (all checked) | zip of TTF/OTF/variable | yes: `api.github.com/repos/<o>/<r>/releases/latest` |
+| **Collletttivo** | collletttivo.it | **OFL-1.1** on every family | TTF, OTF, variable | no |
+| **Font Squirrel** | fontsquirrel.com | per-font — use the "free for commercial use" filters | TTF, OTF, WOFF | no |
+| **Font Library** | fontlibrary.org | mostly OFL, some other libre licences — check the font page | TTF, OTF | no |
+| **Use & Modify** | usemodify.com | libre licences only, stated per font | per font | no |
+| **Free Faces** | freefaces.gallery | curated list, licence on each card | links out to the source | no |
+| **Fontesk** | fontesk.com | **default is personal use** — commercial only where the zip's readme or an OFL file says so | TTF, OTF | no |
+| **Fontfabric free fonts** | fontfabric.com/free-fonts | per-font free licence | TTF, OTF | no |
+| **GitHub releases (OFL foundries)** | Geist + Geist Mono (`vercel/geist-font`), Inter (`rsms/inter`), IBM Plex (`IBM/plex`), JetBrains Mono, Monaspace (`githubnext/monaspace`), Cascadia Code (`microsoft/cascadia-code`), Intel One Mono (`intel/intel-one-mono`), Commit Mono (`eigilnikolajsen/commit-mono`), Maple Mono (`subframe7536/maple-font`), The League of Moveable Type (`theleagueof/*`) | OFL-1.1 (all checked) | zip of TTF/OTF/variable | yes: `api.github.com/repos/<o>/<r>/releases/latest` |
 
 GitHub releases are the upstream source, and they are often newer than the Google Fonts copy. Inter 4.x and Geist, for example, ship there first. Resolve the asset name from the API instead of guessing the tag.
 
@@ -106,6 +154,8 @@ Pairing, and the hard limit of two families: one display family for headings, on
 | **Lordicon free** | lordicon.com/icons?price=free | modified **CC BY-ND 4.0**: commercial OK, attribution required, **no derivatives** | Lottie JSON, GIF | `lottie`. ND means you may not recolour or edit the animation to fit the theme. Use it as-is, or pay for the Pro licence. |
 | **useAnimations** | useanimations.com | free, attribution appreciated | Lottie JSON | `lottie` |
 | **Noto Animated Emoji** | googlefonts.github.io/noto-emoji-animation | **CC BY 4.0** | Lottie JSON | `lottie`, or `animated_emoji`. The only source here with a stable direct Lottie URL (below). |
+| **IconScout Lottie** | iconscout.com/lottie-animations | IconScout Simple License — same terms as Unicons: commercial OK, no republishing as a pack | Lottie JSON, GIF | `lottie`; account needed for downloads |
+| **Creattie** | creattie.com | custom licence — free tier exists; commercial use allowed up to 500 000 reproductions and $10 000 video-production budgets; account required | Lottie JSON, GIF, MP4 | `lottie`; the caps matter for a breakout app — re-read the licence if installs grow |
 
 Rive is the first choice in Flutter and it is not close: the runtime is a vector renderer with a state machine, so one 12 KB `.riv` covers idle → hover → pressed → success without four separate files or a single `AnimationController`. Lottie is the right tool for a linear, fire-and-forget animation (a splash, a confetti burst, an empty-state loop).
 
@@ -129,11 +179,31 @@ These inform decisions about density, spacing and state; they are not assets to 
 | **Hero Patterns** | heropatterns.com | tileable SVG patterns | CC BY 4.0 |
 | **Transparent Textures** | transparenttextures.com | tileable PNG textures | free, attribution appreciated |
 | **fffuel** | fffuel.co | noise, blob, gradient, wave, pattern generators as SVG | fffuel licence: personal and commercial use, no attribution; **no standalone redistribution** of the images. Embedding in an app is fine; publishing them as a background pack is not |
+| **SVG Backgrounds** | svgbackgrounds.com | customizable SVG backgrounds and patterns | custom licence — use inside an end product, **no standalone redistribution**; free graphics need attribution, a subscription removes it |
+| **Pattern Monster** | pattern.monster | seamless SVG pattern generator | the tool is **MIT**; the pattern it exports is your output |
+| **Subtle Patterns** | toptal.com/designers/subtlepatterns | tileable PNG textures | **CC BY-SA 3.0** — credit plus share-alike on any edit (trap 8). Prefer Transparent Textures when you can |
 | **Coolors** | coolors.co | palette exploration | free |
 | **Realtime Colors** | realtimecolors.com | palette previewed on a real layout | free |
 | **Material Theme Builder** | material-foundation.github.io/material-theme-builder | full M3 `ColorScheme` from a seed, exportable as Dart | Apache-2.0 |
 
 **Material Theme Builder is the one to actually use.** It emits a complete light + dark `ColorScheme` from a seed colour, tonally correct, with the contrast pairs already solved. Paste its Dart output into `lib/theme/app_colors.dart` rather than hand-picking hexes — hand-picked schemes are where the 3.1:1 body text comes from.
+
+## Photos — for the rare screen that wants one
+
+Most revamps should not reach for stock photos: flat illustration plus good typography carries a UI further than a generic handshake stock image. When the locked direction genuinely calls for photography (onboarding slides, a hero card, an editorial header):
+
+| Source | URL | Licence | Notes |
+|---|---|---|---|
+| **Pexels** | pexels.com | Pexels licence — free, no attribution; **no unaltered resale, no trademark use, no compiling a competing service, no ML datasets** | photos + video |
+| **Unsplash** | unsplash.com | Unsplash licence — same shape as Pexels | rights in *depicted* trademarks, people and artworks are not granted (trap 6) |
+| **Pixabay** | pixabay.com | Pixabay Content Licence — no attribution; not for a media-focused product | photos, vectors, video, audio |
+| **StockSnap** | stocksnap.io | **CC0** | smaller catalogue, clean licence |
+| **Kaboompics** | kaboompics.com | own licence — free for commercial use, no resale | lifestyle/interior stock |
+| **Nappy** | nappy.co | free for personal & commercial | diverse representation, small catalogue |
+| **Openverse** | openverse.org | **search engine** — 800M+ CC/PD images and audio, licence per result and *not* verified by Openverse | verify the licence on the source page before using a result; has an API (below) |
+| **Wikimedia Commons** | commons.wikimedia.org | **per file** — PD / CC0 / CC BY / CC BY-SA | licence lives on the file page; BY-SA edits stay BY-SA |
+
+Two rules stand regardless of source: **bundle the file** (hotlinking to a stock CDN from an app is fragile and sometimes forbidden), and **watch for baked-in IP** — a stock photo of a branded product or a recognisable person brings rights the licence cannot grant.
 
 ## Direct download URLs
 
@@ -171,6 +241,26 @@ These inform decisions about density, spacing and state; they are not assets to 
 | **DiceBear** | `https://api.dicebear.com/10.x/<style>/<svg\|png>?seed=<seed>` | SVG / PNG | **Pass `--filename <seed>.svg`**. The URL path ends in `svg`, which would otherwise become the filename. Check the style's licence first (see Emoji and avatars). |
 | **Open Doodles** | `https://opendoodles.s3-us-west-1.amazonaws.com/<name>.<svg\|png\|gif>` | SVG / PNG | Names are on the page's SVG/PNG links (`coffee`, `reading-side`, `meditating`, …). CC0. |
 | **GitHub font releases** | `https://github.com/<owner>/<repo>/releases/download/<tag>/<asset>.zip`, e.g. `vercel/geist-font` `v1.7.2` `geist-font-v1.7.2.zip` | zip | Get `<tag>` and `<asset>` from `api.github.com/repos/<o>/<r>/releases/latest`. Filter with `--only 'ttf/.*Geist-(Regular\|Medium\|SemiBold)\.ttf$\|OFL\.txt$' --flatten`. |
+| **Majesticons** | `https://unpkg.com/majesticons@latest/<line\|solid>/<name>.svg` | SVG | Line files carry a `-line` suffix (`home-line.svg`). Only the npm package's 760 icons are MIT. |
+| **Teenyicons** | `https://unpkg.com/teenyicons@latest/<outline\|solid>/<name>.svg` | SVG | |
+| **Jam Icons** | `https://unpkg.com/jam-icons@latest/svg/<name>.svg` | SVG | |
+| **Akar Icons** | `https://raw.githubusercontent.com/artcoholic/akar-icons/master/src/svg/<name>.svg` | SVG | Branch is `master`. |
+| **Radix Icons** | `https://raw.githubusercontent.com/radix-ui/icons/main/packages/radix-icons/icons/<name>.svg` | SVG | |
+| **Flowbite Icons** | `https://raw.githubusercontent.com/themesberg/flowbite-icons/main/src/<outline\|solid>/<category>/<name>.svg` | SVG | `<category>` e.g. `general`, `arrows`, `e-commerce`. |
+| **IconPark** | `https://raw.githubusercontent.com/bytedance/IconPark/master/source/<Category>/<name>.svg` | SVG | `<Category>` is Title Case (`Arrows`, `Base`). Repo archived since 2023. |
+| **Codicons** | `https://raw.githubusercontent.com/microsoft/vscode-codicons/main/src/icons/<name>.svg` | SVG | CC BY 4.0 — on-screen credit. |
+| **Health Icons** | `https://github.com/resolvetosavelives/healthicons/raw/main/public/icons.zip` | zip, ~7.5 MB, whole set | CC0. Inside: `icons/<svg\|png>/<filled\|filled-24px\|outline\|outline-24px>/<category>/<name>`. `--only 'icons/svg/filled-24px/' --strip 2` keeps `filled-24px/<category>/<name>.svg`. |
+| **Unicons** | `https://unpkg.com/@iconscout/unicons@latest/svg/<line\|solid\|thinline>/<name>.svg` | SVG | IconScout Simple License. |
+| **PrimeIcons** | `https://unpkg.com/primeicons@7.0.0/raw-svg/<name>.svg` | SVG | **Pin 7.x** — v8 relicensed to the custom PrimeUI License. |
+| **CoreUI** | `https://unpkg.com/@coreui/icons@latest/svg/<free\|brand\|flag>/<prefix>-<name>.svg` | SVG | Prefixes: `cil-` free, `cib-` brand (third-party marks — trap 6), `cif-` flags. |
+| **Weather Icons** | `https://raw.githubusercontent.com/erikflowers/weather-icons/master/svg/wi-<name>.svg` | SVG | Font is OFL — the `weather_icons` pub package is old but works. |
+| **Line Awesome** | `https://raw.githubusercontent.com/icons8/line-awesome/master/svg/<name>.svg` | SVG | Names follow FA4 (`heart.svg`, not `house.svg`). Glyphs CC BY 4.0 — on-screen credit. |
+| **Flag Icons** | `https://cdn.jsdelivr.net/gh/lipis/flag-icons@latest/flags/<4x3\|1x1>/<cc>.svg` | SVG | `<cc>` is the ISO country code. |
+| **Devicon** | `https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/<name>/<name>-<original\|plain>.svg` | SVG | All glyphs are third-party tech logos — brand-guideline territory. |
+| **DotGothic16 / Press Start 2P** | `https://github.com/google/fonts/raw/main/ofl/<dotgothic16\|pressstart2p>/<File>.ttf` | TTF | OFL pixel fonts — Japanese (DotGothic16) and arcade (Press Start 2P). Fetch `OFL.txt` too. |
+| **Doodle Ipsum** | `https://doodleipsum.com/<w>x<h>/<flat\|outline\|doodle>?<params>` | PNG / SVG | Returns the image itself. Read the licence page first. |
+| **Wikimedia Commons** | `https://upload.wikimedia.org/wikipedia/commons/<h>/<hh>/<File>` | original file | Copy the "Original file" link from the file page — the two hash folders are not guessable. Licence is per file. |
+| **Openverse API** | `https://api.openverse.org/v1/images/?q=<q>&license_type=commercial` | JSON → `url` per result | Works unauthenticated at low rate; `/v1/audio/` for sound. A search engine, not a source — verify each result's licence on its own page. |
 
 A Fontshare zip holds every format and weight. Filter it down to what you ship:
 
@@ -190,11 +280,15 @@ python3 <skill>/scripts/fetch_asset.py --url https://api.fontshare.com/v2/fonts/
 | Source | Why |
 |---|---|
 | unDraw, Storyset (Freepik), Flaticon | The terms forbid scripted downloads, and `fetch_asset.py` refuses these hosts (`licensing.md` trap 9) |
-| Humaaans | Distributed through Gumroad, so the link is an HTML checkout page |
-| Rive Community, LottieFiles, Lordicon | Download sits behind a JS button and usually a login |
+| Humaaans, illlustrations, Charco | Distributed through Gumroad, so the link is an HTML checkout page |
+| Rive Community, LottieFiles, Lordicon, IconScout, Creattie | Download sits behind a JS button and usually a login |
 | Blush, DrawKit, HugeIcons (web) | Per-item download flow in the browser (HugeIcons is also available as the `hugeicons` pub package) |
 | 3dicons | Full pack via Gumroad. Site thumbnails come from an undocumented bucket and top out at 400px |
 | SVG Repo | Behind a Vercel bot checkpoint. The licence is also **per icon** (CC0, MIT, CC BY, and some GPL), so read each one |
+| IRA Design, Absurd, Ouch!/Icons8, Vecteezy, LukaszAdam, SVG Silh, Mixkit Art | Per-item download flow in the browser; no stable file URLs |
+| Pexels, Unsplash, Pixabay, StockSnap, Kaboompics, Nappy | Site download buttons or API keys; hotlinking is not a delivery mechanism anyway |
+| SVG Backgrounds | The site gives you copy-paste SVG markup, not a file URL — save the markup yourself |
+| Font Squirrel, Fontesk, Font Library, Fontfabric, Free Faces, Use & Modify, Collletttivo | Download buttons or links out to foundry pages |
 
 ## Checked and rejected
 
@@ -207,8 +301,14 @@ These show up in "free asset" lists. Each was checked on **2026-09-23** and fail
 | **Iconsax** (`iconsax`, `iconsax_flutter`) | Same problem: the upstream repo (`lusaxweb/iconsax`) has no licence. The package's BSD-3 covers only the wrapper. |
 | **Simple Icons** | The SVG files are CC0, but every icon is a third-party brand mark (trap 6). Use one only where that brand's own guidelines allow it, such as a "Sign in with …" button, and follow those guidelines rather than the CC0. |
 | **Feather** | MIT, but it has 287 icons and no longer grows; the last release, 4.29.2 in 2024, was maintenance only. Lucide is its maintained fork, with the same visual style and 1400+ icons. |
+| **DaFont, 1001Fonts and similar aggregators** | "Free for personal use" is the *default* licence on these sites. Commercial use needs a separate licence negotiated with the author — per font, manually. A UI font pulled from DaFont is one of the most common font-piracy accidents. |
+| **The Noun Project (free tier)** | Per-icon CC BY with a required credit *format*, not just a line of thanks. Thirty icons means thirty formatted credits. The paid plan removes the requirement — budget for it or pick an MIT set. |
+| **Gridicons** (Automattic) | GPL — viral over the app's own code. |
+| **Typicons, Entypo** | CC BY-SA — usable untouched with credit, but recolouring keeps the art BY-SA (trap 8), and there are MIT alternatives with more icons. |
+| **Designstripe** | The illustration marketplace was sunset after the 2025 acquisition; the free gallery is gone. DrawKit (same team) is still live. |
+| **IcoMoon free pack** | Mixed GPL/CC BY terms depending on the bundle — the attribution and share-alike load is not worth it next to MIT sets of similar coverage. |
 
-**Tools, not downloads.** Haikei, Hero Patterns, Coolors, Realtime Colors and Material Theme Builder are generators: you configure the result on the site and export it. The Figma kits are layout reference only.
+**Tools, not downloads.** Haikei, Hero Patterns, SVG Backgrounds, Pattern Monster, fffuel, Coolors, Realtime Colors, Material Theme Builder, Get Waves, Blobmaker, Boring Avatars and Personas are generators: you configure the result on the site and export it. The licence that matters is the one on the *output*, not the tool — check each tool's terms for what it grants. The Figma kits are layout reference only.
 
 ## Verification before proposing anything
 
