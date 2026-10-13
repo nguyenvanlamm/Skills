@@ -1,10 +1,10 @@
-# Quy trình clone game (bản 1.1.1)
+# Quy trình clone game (bản 1.3.0)
 
-Biến một game casual/puzzle đang thành công thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
+Biến một game casual/puzzle đang thành công, hoặc một ý tưởng game (đặt cạnh các game thành công gần nhất), thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
 
 ## Nguyên tắc
 
-1. **Chỉ lấy sự kiện và cơ chế.** REA và video cho ra luật chơi và thông số. Không chép asset, ảnh, âm thanh, font, câu chữ, file level hay code của game gốc. `.clone/reference/` và `.clone/apk/` không đưa vào git; riêng `.clone/status.md` được commit để phiên sau chạy tiếp.
+1. **Chỉ lấy sự kiện và cơ chế.** APK, data game, video và mô tả cho ra luật chơi và thông số. Không chép asset, ảnh, âm thanh, font, câu chữ, file level hay code của game gốc. `.clone/reference/`, `.clone/apk/` và `.clone/data/` không đưa vào git; riêng `.clone/status.md` được commit để phiên sau chạy tiếp.
 2. **Tạo khác biệt trước khi vẽ.** Chủ đề, bảng màu, tên gọi và một cơ chế riêng được chốt ở bước S2. Core làm bằng hình tạm; giao diện thật áp vào ở S4.
 3. **Thiết kế kinh tế game cùng vòng chơi.** Phải có điều kiện thua thì booster và IAP mới có giá trị.
 4. **Game chỉ làm tiếng Anh**: chữ trong game, store listing (en-US), gói IAP, landing page, privacy, support. Tài liệu nội bộ được viết tiếng Việt.
@@ -17,8 +17,8 @@ Biến một game casual/puzzle đang thành công thành một game Flutter **k
 
 | Bước | Ai | Làm gì | Skill / công cụ | Cổng |
 |---|---|---|---|---|
-| S0 | Agent → Người | Chọn game: đang lên, hợp Flutter 2D, còn chỗ cho twist, chưa quá bão hoà | `idea-validator` | **G0** duyệt game |
-| S1 | Agent + Người | Phân tích APK bằng REA; người chơi và quay 30–60 phút; agent làm contact sheet rồi viết `SPEC.md` | `reverse-engineer-anything`, `scripts/contact-sheet.sh` | **G0b** duyệt SPEC |
+| S0 | Agent → Người | Chọn game (hoặc ý tưởng) và game tham chiếu: đang lên, hợp Flutter 2D, còn chỗ cho twist, chưa quá bão hoà | `idea-validator` | **G0** duyệt game + tham chiếu |
+| S1 | Agent + Người | Dùng những gì bạn có (APK, data game, video vài phút, mô tả); agent lấy thêm trang store rồi viết `SPEC.md` | `reverse-engineer-anything`, `scripts/contact-sheet.sh` | **G0b** duyệt SPEC |
 | S2 | Agent → Người | `DESIGN.md`: bảng khác biệt, kinh tế game, mục tiêu độ khó, tên game | `brand-name-checker` | **G1** duyệt thiết kế |
 | S3 | Agent | Tạo project ngay trong repo game đã có (use in place, không `git init` lại, gộp `.gitignore`); core Flutter với hình tạm: luật bằng Dart thuần, test, bot, `tool/simulate.dart` | `flutter-init`, `test-coverage` | analyze + test exit 0 |
 | S4 | Agent → Người | 3 hướng UI → chọn 1 → áp vào Flutter → làm icon | `huashu-design` (hoặc `lam-design`), `flutter-ui-revamp`, `logo-designer` | **G2** chọn hướng |
@@ -28,14 +28,36 @@ Biến một game casual/puzzle đang thành công thành một game Flutter **k
 | S8 | Agent + Người | iOS: chuẩn bị trên Ubuntu, **build và upload trên Mac**, TestFlight, ảnh store, ASO, soát, ship, nộp | `flutter-ios-release`, `appstore-assets`, `aso-marketing`, `appstore-review-checker`, `asc`, `/ship` | **G4** duyệt nộp |
 | S9 | Agent | Hoàn thiện landing, theo dõi review và số liệu | `search-optimizer`, `design-optimizer`, `asc reviews` | |
 
-## Bước S1: ai làm gì
+## Ô các bước
 
-0. **Agent phân tích APK bằng REA.** Bạn đưa file APK, hoặc agent kéo qua adb. REA đọc manifest, quyền, SDK, engine, product ID và các file config đọc được. Kết quả ghi vào SPEC mục "Từ APK", kèm đường dẫn file làm bằng chứng. Nếu logic nằm trong IL2CPP hoặc trên remote config thì ghi "không lấy được từ APK".
-1. **Bạn chơi và quay.** Chơi 30–60 phút qua nhiều level, cố tình thua một lần, mở cửa hàng/booster. Bỏ video vào `.clone/reference/`.
-2. **Agent viết SPEC.** Chạy `contact-sheet.sh` (1 khung/giây, có mốc giờ), đọc ảnh, lấy trang store, rồi viết `SPEC.md`. Mỗi luật kèm mốc giây; chỗ nào đoán thì đánh dấu ❓; cuối SPEC là danh sách việc cần quay thêm.
-3. **Bạn duyệt.** Trả lời các ❓ hoặc quay thêm, tối đa 2 vòng. ❓ còn lại ghi thành giả định trong `DESIGN.md`.
+Khi chạy trong herdr, agent tách pane của mình và mở một ô bên phải tên `clone-steps`. Ô này liệt kê S0–S9 và tự vẽ lại mỗi khi `.clone/status.md` thay đổi:
 
-Khi APK và video mâu thuẫn thì tin video.
+- `✓` là bước đã xong, `▶` là bước đang làm, `·` là bước chưa tới;
+- cột cổng có `✓` khi cổng đã duyệt, và hiện `⏸` khi agent đang chờ bạn;
+- dòng cuối ghi "Đang làm" (dòng `Now:` trong status.md) và "Chờ bạn" (dòng `Waiting on:`).
+
+Nếu lỡ đóng ô, mở lại bằng `python3 ~/.claude/skills/game-clone-pipeline/scripts/steps_pane.py open .` trong repo game. Khi không có herdr, agent in khối này vào chat mỗi lần đổi bước.
+
+## Bước S1: dùng những gì bạn có
+
+Chỉ cần một nguồn là bắt đầu được. Có thêm nguồn nào thì bớt được ❓ chừng đó. Agent không bắt bạn kiếm thứ bạn không có.
+
+| Bạn có | Bỏ vào | Agent làm gì | Cho ra |
+|---|---|---|---|
+| File APK / XAPK / AAB | `.clone/apk/` | Đọc bằng REA: manifest, quyền, SDK, engine, product ID, config đọc được. Logic trong IL2CPP hay remote config thì ghi "không lấy được từ APK" | engine, SDK, gói IAP, thông số gốc |
+| Data game: file config JSON/CSV, file level, bản dump remote config hay save, asset bundle | `.clone/data/` | Đọc bằng Python/jq, file nhị phân thì dùng REA. Chỉ lấy con số và phân bố, không lấy nguyên bố cục level | kích thước bàn, bảng spawn, giá, thời gian, đường độ khó |
+| Video chơi game, vài phút là đủ | `.clone/reference/` | Chạy `contact-sheet.sh` (1 khung/giây, có mốc giờ) rồi đọc ảnh | luật chơi, nhịp, hiệu ứng, điều kiện thua |
+| Tên hoặc link game | — | Tự lấy trang store, ảnh store, video công khai | thông tin store, cách kiếm tiền, giao diện cần tránh |
+| Mô tả game hoặc ý tưởng bằng chữ | gõ vào chat | Chép từng luật vào SPEC, ghi nguồn "description"; chỗ còn bỏ ngỏ đánh ❓ | luật theo ý bạn |
+
+Sau đó:
+
+1. **Agent viết SPEC.** Mỗi luật ghi nguồn (mốc giây, file + key, ảnh store, hay "description"). Chỗ nào đoán thì đánh ❓. Cuối SPEC là danh sách việc nhỏ nhất cần thêm, ví dụ "1 clip 1 phút lấp đầy bàn", "ảnh màn hình cửa hàng".
+2. **Bạn duyệt (G0b).** Trả lời ❓, gửi thêm, hoặc chấp nhận để trống; tối đa 2 vòng. ❓ còn lại ghi thành giả định trong `DESIGN.md`.
+
+Khi các nguồn mâu thuẫn: video thắng data game và APK; data game thắng con số ước từ video; mô tả thua mọi nguồn khác.
+
+Nếu chỉ có ý tưởng mà không có game gốc: ở S0 agent tìm 1–3 game thành công gần nhất làm tham chiếu và bạn chốt ở G0. SPEC và cổng khác biệt sẽ so với các game đó.
 
 ## Bước S8: build iOS
 
@@ -61,9 +83,9 @@ Chi tiết lệnh ở `references/ios-release-runbook.md`.
 
 | Flow cũ | Quy trình mới |
 |---|---|
-| Tải APK | S1 bước 0 |
-| Dùng REA | S1 bước 0: `reverse-engineer-anything` |
-| Lấy thông tin, thông số | `SPEC.md` mục "Từ APK" và các luật quan sát |
+| Tải APK | S1: một trong các nguồn (APK, data game, video, mô tả) |
+| Dùng REA | S1: `reverse-engineer-anything` cho APK và data nhị phân |
+| Lấy thông tin, thông số | `SPEC.md` mục 2 (APK và data game) và mục 4 (luật chơi) |
 | Flutter clone game tương tự | S3 |
 | Đổi một ít cho hay hơn, đỡ giống | S2, có cổng khác biệt chặt hơn (`references/differentiation-gate.md`) |
 | `huashu-design` ra 3 bản UI/UX | S4 |

@@ -1,19 +1,18 @@
 ---
 name: game-clone-pipeline
 description: >-
-  Clone a successful mobile casual/puzzle game into a differentiated, English-only Flutter game
-  and take it to the App Store with a landing page, in 10 gated
-  stages: pick the target → APK facts with REA + human gameplay recording → evidence-backed
-  SPEC → differentiation and economy design → Flutter core with tests, bot and simulator →
-  3 UI directions (huashu-design) → flutter-ui-revamp + icon → IAP and playtest →
-  codebase-modernizer → plan-to-issues → fixes → privacy/support pages → iOS kit built and
-  uploaded on a Mac → appstore-assets, aso-marketing, appstore-review-checker, asc validate →
-  ship → submit → search-optimizer and design-optimizer on the landing repo. Pauses at human
-  gates, commits after every stage with the commit skill, resumes from `.clone/status.md`.
-  Use when asked to "clone a game", "make a game like X", "làm game giống X", "clone game",
-  "quy trình clone game", "chạy quy trình clone", "game clone pipeline". Don't use for original
-  game ideas with no reference game (flutter-factory, android-game-forge), non-Flutter stacks,
-  web apps, or a single step on its own (call that skill directly).
+  Turn a successful mobile casual/puzzle game, or a game idea set against the closest hits, into
+  a differentiated, English-only Flutter game on the App Store with a landing page, in 10 gated
+  stages: pick target and reference games → evidence from whatever the human has (APK via REA,
+  game data, a short video, a description) → SPEC → differentiation and economy design →
+  Flutter core with tests, bot and simulator → 3 UI directions (huashu-design) →
+  flutter-ui-revamp + icon → IAP and playtest → codebase-modernizer, plan-to-issues, fixes →
+  privacy/support pages → iOS built on a Mac → appstore-assets, aso-marketing,
+  appstore-review-checker → ship and submit → search-optimizer, design-optimizer.
+  Pauses at human gates, commits each stage, resumes from `.clone/status.md`. Use when
+  asked to "clone a game", "make a game like X", "làm game giống X", "làm game từ ý tưởng này",
+  "chạy quy trình clone". Don't use for non-game apps (flutter-factory), Kotlin games
+  (android-game-forge), web apps, or a single step on its own.
 license: MIT
 effort: high
 capabilities:
@@ -23,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.1.1
+  version: 1.3.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -32,18 +31,20 @@ permissions:
   secrets: { required: false } # Apple keys stay with the human; never written to the repo
 ---
 
-# game-clone-pipeline: reference game → differentiated Flutter game → App Store
+# game-clone-pipeline: reference game or idea → differentiated Flutter game → App Store
 
-The agent orchestrates; sibling skills do the specialised work. The human plays the original,
-approves six gates, and builds/uploads on a Mac. `PROCESS.md` (Vietnamese) is the one-page
+The agent orchestrates; sibling skills do the specialised work. The human brings what they have
+about the game (an APK, data files, a video, a description), approves six gates, and
+builds/uploads on a Mac. "The original" below means the reference game(s) chosen at S0. `PROCESS.md` (Vietnamese) is the one-page
 version for people; this file is the operating manual.
 
 ## Hard rules
 
-1. **Facts and mechanics only.** REA and recordings feed `SPEC.md` with rules and numbers. No
-   asset, frame, sound, font, string, level file or code from the original (APK, ads, store
-   page) ever enters the game repo's tracked files. `.clone/reference/` and `.clone/apk/` are
-   git-ignored; `.clone/status.md` is tracked so any session can resume.
+1. **Facts and mechanics only.** APK, data files, recordings and descriptions feed `SPEC.md`
+   with rules and numbers. No asset, frame, sound, font, string, level file or code from the
+   original (APK, data files, ads, store page) ever enters the game repo's tracked files.
+   `.clone/reference/`, `.clone/apk/` and `.clone/data/` are git-ignored; `.clone/status.md` is
+   tracked so any session can resume.
 2. **Differ before you draw.** Theme, palette, naming and an own mechanic are decided at S2 and
    checked against `references/differentiation-gate.md`. The core is built on placeholder art;
    the real look arrives at S4.
@@ -62,12 +63,17 @@ version for people; this file is the operating manual.
    project are left as generated.
 9. **Human-only decisions stay human:** gates G0, G0b, G1, G2 (UI direction), G3 (prices), G4
    (submit), every App Store submission, every secret value, every paid action.
+10. **Keep the steps pane current.** `.clone/status.md` drives the steps pane: rewrite its
+    `Now:` line when a stage or a numbered step starts (`Now: S1 · 2 contact sheets`), and its
+    `Waiting on:` line with the human's next action whenever the run stops for them
+    (`Waiting on: G0b: trả lời ❓ trong SPEC.md`), back to `—` once they answered. The pane
+    redraws by itself.
 
 ## Roles
 
 | Who | Does |
 |---|---|
-| Human | Plays the original and records it, answers ❓, approves gates, provides Apple account access, builds and uploads on a Mac |
+| Human | Brings what they have (APK, data files, a gameplay clip, a description), answers ❓, approves gates, provides Apple account access, builds and uploads on a Mac |
 | Agent | Runs every other step: REA analysis, contact sheets, SPEC, DESIGN, code, tests, sibling skills, `asc` from Ubuntu, commits |
 
 ## Workspace (inside the game repo)
@@ -75,56 +81,86 @@ version for people; this file is the operating manual.
 ```
 SPEC.md                 # S1: evidence-backed research (references/spec-template.md)
 DESIGN.md               # S2: differentiation table, economy, difficulty targets, name
-.clone/status.md        # stage checklist + gate log (from templates/status.md) — read first
+.clone/status.md        # stage checklist, Now / Waiting on, gate log (from templates/) — read first
 .clone/reference/       # recordings, store screenshots, contact sheets  (git-ignored)
 .clone/apk/             # the original's APK and REA notes                 (git-ignored)
+.clone/data/            # game data the human gave: config, levels, saves  (git-ignored)
 tool/simulate.dart      # S3: plays many seeded games with a bot and a careless player
 scripts/build-ios.sh    # S8: from templates/, archive/export/upload on a Mac
 docs/IOS-BUILD-ON-MAC.md
 ```
 
-Add `.clone/reference/` and `.clone/apk/` to `.gitignore` at S1, before anything is copied in.
+Add `.clone/reference/`, `.clone/apk/` and `.clone/data/` to `.gitignore` at S0, before
+anything is copied in.
 
 ## Start or resume
 
 1. If `.clone/status.md` exists, read it and continue at the first unchecked stage. Re-run the
    last stage's verification before trusting a checked box from an older session.
-2. Otherwise ask for the target (store URL or name) and the repo location, copy
+2. Otherwise ask for the target (a store URL or name, or a description of the game idea), what
+   the human already has about it (S1's sources), and the repo location; copy
    `templates/status.md` to `.clone/status.md`, fill the header, start at S0.
-3. **Sibling skills**: invoke them by name with the Skill tool. If one is missing, do its step
+3. **Steps pane**: `python3 <skill-dir>/scripts/steps_pane.py open <repo>` splits the agent's
+   herdr pane and shows S0–S9 on the right with the current stage marked, reusing one already
+   open. Exit 69 means no herdr: then show the output of `steps_pane.py once <repo>` in the chat
+   at every stage change and gate stop instead.
+4. **Sibling skills**: invoke them by name with the Skill tool. If one is missing, do its step
    inline with the same output, and log it under "Fallbacks" in status.md. A missing skill
    lowers quality; it never stops the run.
 
 ## Stages
 
-### S0 — Pick the game → gate G0
+### S0 — Pick the game and its references → gate G0
 
-- `idea-validator` on "a differentiated clone of <original>": demand, competition, feasibility.
+- Reference games: the named original. For an idea with no original, the 1–3 closest
+  successful games from `idea-validator`'s competitor list, confirmed by the human at G0.
+- `idea-validator` on "a differentiated clone of <original>", or on the idea itself: demand,
+  competition, feasibility.
 - Fit check (write the answers in status.md): 2D and rule-based (Flutter + CustomPainter or
   Flame can do it), a twist is possible, the category is not flooded with near-identical clones
-  (Guideline 4.3), the original's monetization is understood from its store page.
-- **G0**: human approves the target and the twist hypothesis. Commit (`docs: start clone of …`).
+  (Guideline 4.3), the reference games' monetization is understood from their store pages.
+- **G0**: human approves the target, the reference games and the twist hypothesis. Commit
+  (`docs: start clone of …`).
 
-### S1 — Evidence: APK + recording → SPEC → gate G0b
+### S1 — Evidence from what the human has → SPEC → gate G0b
 
-0. **APK via REA** (`reverse-engineer-anything`). Get the APK from the human, or with a phone
-   attached `pull_adb_package` (REA). Use REA's Android tools (manifest, resources via Apktool,
-   JADX classes) to record: engine (Unity IL2CPP/Mono, Flutter, native), SDKs (ads, mediation,
+One source is enough to start; each extra one turns ❓ into facts. Use what the human named at
+the start, ask once for anything else they may have, and never wait for a source they lack.
+
+| Source | Put in | Read with | Best for |
+|---|---|---|---|
+| APK / XAPK / AAB | `.clone/apk/` | REA (step 1) | engine, SDKs, IAP product IDs, permissions, shipped config |
+| Game data: config JSON/CSV, level files, remote-config or save dumps, asset bundles | `.clone/data/` | Python or `jq`; binary bundles with REA `inspect_artifact` (step 3) | exact numbers: board sizes, spawn tables, prices, timers, difficulty curve |
+| Gameplay video of any length; a few minutes of the core loop is enough to start | `.clone/reference/` | `scripts/contact-sheet.sh` (step 2) | rules, flow, timings, feedback, fail state |
+| Store pages, screenshots, public gameplay videos | `.clone/reference/` | fetched by the agent for every named reference game | store facts, monetization, the look to avoid |
+| Written description of the game or the idea | quoted in SPEC §4 | as given (step 4) | rules as the human knows or wants them |
+
+1. **APK via REA** (`reverse-engineer-anything`). From the human, or with a phone attached
+   `pull_adb_package` (REA). Use REA's Android tools (manifest, resources via Apktool, JADX
+   classes) to record: engine (Unity IL2CPP/Mono, Flutter, native), SDKs (ads, mediation,
    analytics, IAP), product IDs, permissions, readable config numbers. Logic inside
-   `libil2cpp.so` or values from remote config → write "not recoverable from the APK" and rely
-   on observation. Record facts with the file path as evidence in SPEC §2. Copy nothing else.
-   REA's own terms limit it to lawful research and authorized analysis; stay within them.
-1. **Human records gameplay**: 30–60 min across several levels or difficulty tiers, including
-   one deliberate loss and the booster/shop screens. Phone screen recorder, or with a cable the
-   agent runs `adb shell screenrecord` / REA `capture_adb_screen`. Files go to `.clone/reference/`.
-2. **Agent**: `scripts/contact-sheet.sh <video> .clone/reference/sheets [--at t1,t2]` (1 fps
+   `libil2cpp.so` or values from remote config → write "not recoverable from the APK". Record
+   facts with the file path as evidence in SPEC §2. Copy nothing else. REA's own terms limit it
+   to lawful research and authorized analysis; stay within them.
+2. **Video**: `scripts/contact-sheet.sh <video> .clone/reference/sheets [--at t1,t2]` (1 fps
    sheets with burned-in timestamps, 4 fps strips around key moments); read the sheets with
-   vision; fetch the store pages and screenshots; write `SPEC.md` from
-   `references/spec-template.md`. Every rule cites a timestamp or path; guesses are ❓.
-   Observation beats the APK when they disagree.
-3. End SPEC with the ❓ list as concrete requests ("record filling the board completely").
-- **G0b**: human answers or records more; agent updates SPEC (at most 2 rounds); what remains
-  becomes an explicit assumption in DESIGN.md. Commit (`docs(spec): …`).
+   vision. With a cable the agent can record itself (`adb shell screenrecord` / REA
+   `capture_adb_screen`). A loss and the shop/booster screens settle most economy ❓: ask for
+   them as short clips, not a long session.
+3. **Game data**: take numbers and distributions (colours per level band, capacity, timers,
+   prices), never the level layouts themselves. Cite file and key
+   (`.clone/data/levels.json → levels[12].capacity`) in SPEC §2.
+4. **Description**: quote it rule by rule in SPEC §4 with "description" as the evidence;
+   whatever it leaves open is ❓. For an idea, SPEC §1, §3 and §5 cover the reference games
+   from their store pages and public videos.
+5. Write `SPEC.md` from `references/spec-template.md`; every rule cites its source, guesses are
+   ❓. When sources disagree, the video beats data files and the APK (remote config may override
+   shipped values), data files beat numbers estimated from a video, a description loses to any
+   of them; note both values.
+6. End SPEC with the ❓ list as the cheapest concrete requests ("a 1-minute clip filling the
+   board completely", "the shop screen", "the file behind …").
+- **G0b**: human answers, sends more, or accepts the gaps; agent updates SPEC (at most 2
+  rounds); what remains becomes an explicit assumption in DESIGN.md. Commit (`docs(spec): …`).
 
 ### S2 — Differentiation and economy → gate G1
 
@@ -149,7 +185,7 @@ Add `.clone/reference/` and `.clone/apk/` to `.gitignore` at S1, before anything
   - skip its `git init` (the repo and its remote exist since S0), keep the credential lines it
     appends to `.gitignore`;
   - before committing, `git status --short` shows nothing from `.clone/reference/`,
-    `.clone/apk/`, `build/` or `.dart_tool/`.
+    `.clone/apk/`, `.clone/data/`, `build/` or `.dart_tool/`.
 - Rules in pure Dart (no Flutter imports) so tests and the simulator run on the VM; seeded,
   platform-identical RNG (xorshift-style) for deals/levels; UI replays rule "steps".
 - Tests for every rule in SPEC §4 that we keep; a heuristic bot; `tool/simulate.dart` printing
@@ -220,7 +256,8 @@ Follow `references/ios-release-runbook.md`. In short:
 
 Stage reached, gates passed with dates, commands run and their exit codes, fallbacks, open
 assumptions, what the human must do next (record, approve, build on the Mac). Tick boxes in
-`.clone/status.md` and commit it.
+`.clone/status.md` and commit it. Once S9 is done, `steps_pane.py close <repo>`; before that
+leave the pane open.
 
 ## Files in this skill
 
@@ -232,6 +269,7 @@ assumptions, what the human must do next (record, approve, build on the Mac). Ti
 | `references/economy-and-monetization.md` | fail state, boosters, IAP, ads, analytics (S2, S5) |
 | `references/ios-release-runbook.md` | Ubuntu prep + Mac build/upload + `asc` commands (S8) |
 | `scripts/contact-sheet.sh` | recording → timestamped contact sheets and strips (S1) |
+| `scripts/steps_pane.py` | steps pane in herdr, redrawn from status.md: `open`, `close`, `once` (all stages) |
 | `templates/status.md` | `.clone/status.md` starter |
 | `templates/build-ios.sh`, `templates/ExportOptions.plist` | Mac archive/export/upload kit (S8) |
 | `templates/privacy.html`, `templates/support.html` | App Store privacy and support pages (S7) |

@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.3.0 — 2026-10-13
+
+- S1 takes whatever the human has, one source being enough: APK (REA), game data files in the
+  new git-ignored `.clone/data/`, a gameplay video of any length (short clips replace the 30–60
+  min session), store pages the agent fetches, or a written description. A precedence rule
+  settles conflicts (video > data > APK > description) and ❓ requests ask for the cheapest
+  missing piece.
+- Ideas with no original are in scope: S0 picks the 1–3 closest successful games as references,
+  confirmed at G0, and SPEC and the differentiation gate compare against them. The skill
+  description no longer sends such ideas to flutter-factory.
+- `.gitignore` entries for `.clone/` are added at S0, since the human may hand files over at the
+  start; status.md template carries the reference games and evidence sources.
+- Skill description cut to 1,019 characters (it was 1,118, over the 1,024 limit).
+
+## 1.2.0 — 2026-10-13
+
+- Steps pane: `scripts/steps_pane.py open <repo>` splits the agent's herdr pane and shows S0–S9
+  on the right (done ✓, current ▶, gate passed ✓, waiting on the human ⏸), redrawn whenever
+  `.clone/status.md` changes; it reuses an open pane, and `close` removes it. Without herdr,
+  `once` prints the same block for the chat.
+- `status.md` gains `Now:` and `Waiting on:` lines; hard rule 10 has the agent keep them current.
+
 ## 1.1.1 — 2026-10-13
 
 - S3 runs `flutter-init` in place inside the existing game repo: `--project-name` in snake_case
