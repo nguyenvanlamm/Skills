@@ -86,5 +86,5 @@ Turn each one into a concrete request for the human (stage S1, gate G0b):
 ## 8. Legal notes
 
 - Mechanics are not protected; the original's name, logo, art, audio, text, level data and
-  code are. None of them enters the build. `.clone/` is git-ignored.
+  code are. None of them enters the build. `.clone/reference/` and `.clone/apk/` are git-ignored.
 ```

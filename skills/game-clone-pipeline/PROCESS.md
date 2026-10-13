@@ -1,10 +1,10 @@
-# Quy trình clone game (bản 1.0)
+# Quy trình clone game (bản 1.1.1)
 
 Biến một game casual/puzzle đang thành công thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
 
 ## Nguyên tắc
 
-1. **Chỉ lấy sự kiện và cơ chế.** REA và video cho ra luật chơi và thông số. Không chép asset, ảnh, âm thanh, font, câu chữ, file level hay code của game gốc. Thư mục `.clone/` không đưa vào git.
+1. **Chỉ lấy sự kiện và cơ chế.** REA và video cho ra luật chơi và thông số. Không chép asset, ảnh, âm thanh, font, câu chữ, file level hay code của game gốc. `.clone/reference/` và `.clone/apk/` không đưa vào git; riêng `.clone/status.md` được commit để phiên sau chạy tiếp.
 2. **Tạo khác biệt trước khi vẽ.** Chủ đề, bảng màu, tên gọi và một cơ chế riêng được chốt ở bước S2. Core làm bằng hình tạm; giao diện thật áp vào ở S4.
 3. **Thiết kế kinh tế game cùng vòng chơi.** Phải có điều kiện thua thì booster và IAP mới có giá trị.
 4. **Game chỉ làm tiếng Anh**: chữ trong game, store listing (en-US), gói IAP, landing page, privacy, support. Tài liệu nội bộ được viết tiếng Việt.
@@ -20,7 +20,7 @@ Biến một game casual/puzzle đang thành công thành một game Flutter **k
 | S0 | Agent → Người | Chọn game: đang lên, hợp Flutter 2D, còn chỗ cho twist, chưa quá bão hoà | `idea-validator` | **G0** duyệt game |
 | S1 | Agent + Người | Phân tích APK bằng REA; người chơi và quay 30–60 phút; agent làm contact sheet rồi viết `SPEC.md` | `reverse-engineer-anything`, `scripts/contact-sheet.sh` | **G0b** duyệt SPEC |
 | S2 | Agent → Người | `DESIGN.md`: bảng khác biệt, kinh tế game, mục tiêu độ khó, tên game | `brand-name-checker` | **G1** duyệt thiết kế |
-| S3 | Agent | Core Flutter với hình tạm: luật bằng Dart thuần, test, bot, `tool/simulate.dart` | `flutter-init`, `test-coverage` | analyze + test exit 0 |
+| S3 | Agent | Tạo project ngay trong repo game đã có (use in place, không `git init` lại, gộp `.gitignore`); core Flutter với hình tạm: luật bằng Dart thuần, test, bot, `tool/simulate.dart` | `flutter-init`, `test-coverage` | analyze + test exit 0 |
 | S4 | Agent → Người | 3 hướng UI → chọn 1 → áp vào Flutter → làm icon | `huashu-design` (hoặc `lam-design`), `flutter-ui-revamp`, `logo-designer` | **G2** chọn hướng |
 | S5 | Agent + Người | IAP + Restore, booster chống farm, analytics (nếu chọn), người thật chơi thử, chỉnh lại độ khó | | **G3** duyệt gói và giá |
 | S6 | Agent | Soát codebase → issue → sửa | `codebase-modernizer`, `plan-to-issues`, `issue-work-loop` | test xanh |

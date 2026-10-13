@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.1 — 2026-10-13
+
+- S3 runs `flutter-init` in place inside the existing game repo: `--project-name` in snake_case
+  (a `<game>-clone` folder name makes `flutter create .` exit 1), no second `git init`, and our
+  `.gitignore` moved aside and appended back, because `flutter create` keeps an existing one and
+  would leave `build/` and `.dart_tool/` unignored.
+- Hard rule 1 names the ignored folders (`.clone/reference/`, `.clone/apk/`); `.clone/status.md`
+  is tracked so a run can resume. It used to say all of `.clone/` was ignored, contradicting the
+  "commit status.md" steps.
+- Six gates, not five; PROCESS.md title shows the current version.
+
 ## 1.1.0 — 2026-10-13
 
 - Drop the Google Play stage: the pipeline releases to the App Store only.

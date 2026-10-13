@@ -23,7 +23,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.1.0
+  version: 1.1.1
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -35,14 +35,15 @@ permissions:
 # game-clone-pipeline: reference game → differentiated Flutter game → App Store
 
 The agent orchestrates; sibling skills do the specialised work. The human plays the original,
-approves five gates, and builds/uploads on a Mac. `PROCESS.md` (Vietnamese) is the one-page
+approves six gates, and builds/uploads on a Mac. `PROCESS.md` (Vietnamese) is the one-page
 version for people; this file is the operating manual.
 
 ## Hard rules
 
 1. **Facts and mechanics only.** REA and recordings feed `SPEC.md` with rules and numbers. No
    asset, frame, sound, font, string, level file or code from the original (APK, ads, store
-   page) ever enters the game repo's tracked files. `.clone/` is git-ignored.
+   page) ever enters the game repo's tracked files. `.clone/reference/` and `.clone/apk/` are
+   git-ignored; `.clone/status.md` is tracked so any session can resume.
 2. **Differ before you draw.** Theme, palette, naming and an own mechanic are decided at S2 and
    checked against `references/differentiation-gate.md`. The core is built on placeholder art;
    the real look arrives at S4.
@@ -136,7 +137,19 @@ Add `.clone/reference/` and `.clone/apk/` to `.gitignore` at S1, before anything
 
 ### S3 — Core in Flutter (placeholder art)
 
-- New project: `flutter-init` (org from the user's other apps, e.g. `com.nguyenvanlam`).
+- New project: `flutter-init` inside the game repo (org from the user's other apps, e.g.
+  `com.nguyenvanlam`). The folder already holds `.git`, `.gitignore`, `.clone/`, `SPEC.md` and
+  `DESIGN.md` from S0–S2, so:
+  - when it asks about the existing directory, answer **use in place**: run its create command
+    with `--project-name <snake_case> .` (a `<game>-clone` folder name is not a valid Dart
+    package name, and `flutter create .` exits 1 on it);
+  - `flutter create` keeps an existing `.gitignore`, so move ours aside first and append it back
+    afterwards; otherwise `build/` and `.dart_tool/` are not ignored:
+    `mv .gitignore .gitignore.clone` → create → `cat .gitignore.clone >> .gitignore && rm .gitignore.clone`;
+  - skip its `git init` (the repo and its remote exist since S0), keep the credential lines it
+    appends to `.gitignore`;
+  - before committing, `git status --short` shows nothing from `.clone/reference/`,
+    `.clone/apk/`, `build/` or `.dart_tool/`.
 - Rules in pure Dart (no Flutter imports) so tests and the simulator run on the VM; seeded,
   platform-identical RNG (xorshift-style) for deals/levels; UI replays rule "steps".
 - Tests for every rule in SPEC §4 that we keep; a heuristic bot; `tool/simulate.dart` printing
