@@ -2,7 +2,9 @@
 
 Read at Step 3, after the design direction is locked. Reading it earlier leads to picking assets you like rather than assets that match a decision.
 
-**The selection rule: one pack per category.** A screen assembled from Lucide arrows, Phosphor tabs and one stray Material icon looks exactly like what it is. Pick the pack whose *whole set* fits, then live with its weaker icons — internal consistency beats per-icon perfection every time.
+**The selection rule: one pack per category — unless the locked direction deliberately mixes.** A screen assembled from Lucide arrows, Phosphor tabs and one stray Material icon looks exactly like what it is. Pick the pack whose *whole set* fits, then live with its weaker icons — internal consistency beats per-icon perfection every time.
+
+Mixing *sources* is allowed when it is a decision, not an accident: a general set beside a domain set (Lucide + Health Icons in a medical app, Maki in a maps app), illustrations from one source beside a photo or background texture from another. Coherence is judged per surface — one screen should still read as one icon vocabulary and one illustration style. Whatever the mix, write it into `design-direction.md`; that file is what makes a second source a design choice rather than a leftover, and it is what stops Step 6 from "fixing" it.
 
 Licence column is the licence as published at the time of writing. **Re-read it on the page before downloading** — projects relicense, and a stale line in this file is not a defence.
 
@@ -232,6 +234,8 @@ These inform decisions about density, spacing and state; they are not assets to 
 | **Get Waves / Blobmaker** | getwaves.io · blobmaker.app | SVG waves and blobs | Both now point to **Haikei** (same studio). Treat them as Haikei and use its terms. |
 
 **Material Theme Builder is the one to actually use.** It emits a complete light + dark `ColorScheme` from a seed colour, tonally correct, with the contrast pairs already solved. Paste its Dart output into `lib/theme/app_colors.dart` rather than hand-picking hexes — hand-picked schemes are where the 3.1:1 body text comes from.
+
+A background does not have to come from this table. Any file from the **Photos** section or a Direct-download pattern below — a Transparent Textures tile, a Wikimedia texture, a Met CC0 artwork, a Pexels/Pixabay image via `fetch_api.py` — can serve as a `DecorationImage` or `Image.asset` background. Fetch it once, bundle it under `assets/images/` (or `assets/backgrounds/`), and let `optimize_flutter.py` produce the density buckets. The bundle-don't-hotlink rule applies exactly as it does to photos: the shipped file is the asset, a remote URL at runtime is a third-party request on every launch (trap 7).
 
 ## Photos — for the rare screen that wants one
 

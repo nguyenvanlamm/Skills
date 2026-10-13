@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.9.0 — 2026-09-27
+
+### Changed — asset selection logic
+- **Deliberate multi-source mixes are now allowed.** The old "one pack per category" rule is relaxed: a locked direction may combine sources on purpose (a domain icon set beside the general one, illustrations from one site beside a photo or texture background from another), as long as coherence holds per surface and the mix is recorded in `design-direction.md`. Updated in `sources-ui.md` (selection rule), `sources-game.md` (cross-category mixing is normal; within-element mixing still fails), `style-recipes.md` (recipe mixing needs a written exception) and the SKILL.md Consistency rule.
+- **Background is a first-class slot.** `design-direction.md` gains a `Background` field, every recipe in `style-recipes.md` gains a Background row, and `assets/backgrounds/` joins the output structure. Backgrounds may be pulled from any external source — Background/pattern table, Photos section, or a Direct-download pattern — fetched once and bundled (`fetch_asset.py` / `fetch_api.py`), never hotlinked at runtime. `fetch_asset.py --type` now lists `background`, and Step 6 maps flat `Container`/`Scaffold` backgrounds to the bundled image when the direction locks one.
+
 ## v1.8.0 — 2026-09-24
 
 For account-gated sources, the user logs in once, creates a key, and every later download is scripted through the site's **official** API.

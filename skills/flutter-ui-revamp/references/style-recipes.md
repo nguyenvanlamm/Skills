@@ -18,6 +18,7 @@ Licence column is a hint only — re-read on the source page before Step 4
 | Icons | **Lucide** (ISC) — 1.5px stroke, const `IconData` via `lucide_icons_flutter` |
 | Fonts | **Clash Display** 600 (headings) + **Satoshi** 400/500/700 (body) — Fontshare |
 | Illustration | unDraw, flat, recolour to seed, transparent |
+| Background | Flat `surface`/`surfaceContainer*`; optional bundled tile (Transparent Textures) or subtle fffuel noise at low opacity |
 | Animation | Rive loader + empty-state; skeletons for lists |
 | Spacing | 4 / 8 / 16 / 24 / 32 / 48 |
 | Radius | 8 / 12 / 18 / pill |
@@ -35,6 +36,7 @@ Best for: productivity, SaaS, finance, settings-heavy apps that currently look l
 | Icons | **Phosphor** (MIT) — regular + fill pair for tabs; use **const** `PhosphorIconsRegular.*` / `Fill.*` |
 | Fonts | **Nunito** or **Plus Jakarta Sans** (OFL, Google Fonts — **bundle** TTF) |
 | Illustration | Open Peeps or Humaaans (both CC0); soft, human, transparent |
+| Background | Soft pattern tile or fffuel blob behind headers and empty states, bundled |
 | Animation | Lottie empty/success bursts; playful press-scale 0.96 |
 | Spacing | 4 / 8 / 16 / 24 / 32 / 48 |
 | Radius | 12 / 16 / 24 / pill (softer than minimal) |
@@ -52,6 +54,7 @@ Best for: consumer social, kids-adjacent (non-Families policy), onboarding-heavy
 | Icons | **Tabler** or **Lucide** — geometric, never soft duotone |
 | Fonts | **Space Grotesk** (headings) + **Inter** (body) — OFL, bundled |
 | Illustration | Flat geometric / Haikei blobs with hard strokes; high contrast |
+| Background | Paper/noise texture or hard geometric pattern (fffuel, Pattern Monster); flat ink fields |
 | Animation | Minimal — hard cuts OK; short 100 ms colour flashes over floaty motion |
 | Spacing | 4 / 8 / 16 / 24 / 32 |
 | Radius | **0 / 4 / 8** only — no pills on primary cards |
@@ -69,6 +72,7 @@ Best for: marketing tools, indie brands, portfolios. Clashes with Material defau
 | Icons | **Game-icons.net** (CC BY → Credits screen) for abilities; pack glyphs for chrome |
 | Fonts | **Baloo 2** or **Fredoka** (OFL) for HUD; one family only |
 | UI pack | **Kenney UI Pack** (CC0) — panels/buttons with documented 9-slice insets |
+| Background | Layered parallax set matching the pack's art (Kenney Background Elements, Foozle Void); never a single flattened image |
 | Audio | Kenney Interface Sounds (CC0); SFX mono `.m4a` (OGG only if no iOS/macOS build — `sources-game.md § Audio`) |
 | Animation | Button press scale + SFX; win/lose stingers; no full-screen Lottie menus |
 | Spacing | Follow pack metrics; HUD padding 8 / 12 / 16 |
@@ -76,7 +80,7 @@ Best for: marketing tools, indie brands, portfolios. Clashes with Material defau
 | Surfaces | 9-slice panels only — never `BoxFit.fill` on decorative frames |
 | Dark mode | Optional; many packs are authored light — test readability |
 
-Best for: Flame / casual 2D. See `sources-game.md`. Stay inside one pack family.
+Best for: Flame / casual 2D. See `sources-game.md`. Stay inside one pack family per element — the UI pack, tileset and background may come from different sources when their art styles agree; record the combination in `design-direction.md`.
 
 ### `dark-premium`
 
@@ -86,6 +90,7 @@ Best for: Flame / casual 2D. See `sources-game.md`. Stay inside one pack family.
 | Icons | **Lucide** or **Phosphor thin/light** — airy strokes on dark |
 | Fonts | **Syne** or **Clash Display** (headings) + **Satoshi** / **General Sans** (body) |
 | Illustration | unDraw recolored to accent on transparent; avoid baked white |
+| Background | Near-black gradient (uiGradients/WebGradients stops in `LinearGradient`) or low-opacity noise; no baked-light imagery |
 | Animation | Rive subtle idle; slow fade-through; restrained haptics |
 | Spacing | 4 / 8 / 16 / 24 / 32 / 48 |
 | Radius | 12 / 16 / 20 / pill |
@@ -103,7 +108,7 @@ Best for: fintech, creator tools, pro media. Pair with high contrast checks (bod
 2. If not, propose **two or three** recipes (not all five) that fit the audit (game → `casual-game`; already-dark UI → `dark-premium`; generic Material demo → `minimal-modern` vs `playful-rounded`).
 3. Each proposal is the recipe table filled with the seed (user's or default) — user picks a **look**, not a form.
 4. Write `.revamp/design-direction.md` from the chosen recipe fields only.
-5. Do **not** mix recipes (Lucide + Phosphor tabs, Kenney panel + CraftPix button, three fonts).
+5. Do **not** mix recipes by accident (Lucide + Phosphor tabs, Kenney panel + CraftPix button, three fonts). A deliberate exception — a domain icon set beside the recipe's general one, a photo background beside flat illustration — is fine when it is written into `design-direction.md` with the reason; an unrecorded mix is a bug.
 
 ## `keep` overrides
 

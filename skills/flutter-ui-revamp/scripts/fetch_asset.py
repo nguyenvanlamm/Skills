@@ -309,7 +309,7 @@ def main(argv: List[str] | None = None, auth: dict | None = None) -> int:
     ap.add_argument("--license", required=True, help="CC0 / CC-BY-4.0 / OFL-1.1 / MIT / ...")
     ap.add_argument("--source", help="Landing page URL (defaults to --url; required with --local)")
     ap.add_argument("--type", default="asset",
-                    help="icon | illustration | font | sprite | audio | animation | texture")
+                    help="icon | illustration | font | sprite | audio | animation | texture | background")
     ap.add_argument("--only", help="Regex; extract only archive members matching it")
     ap.add_argument("--flatten", action="store_true",
                     help="Drop archive directory structure and dump files into --dest")

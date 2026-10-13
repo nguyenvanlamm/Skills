@@ -4,6 +4,8 @@ Read at Step 3 when `audit.json → derived.app_type` is `flame_game`, or when t
 
 **Pack coherence matters more here than anywhere else.** An app can survive a mismatched icon. A game cannot survive a Kenney button next to a CraftPix panel next to a hand-drawn HUD — the eye reads three different games on one screen. The `Complete pack` column below is the column that decides the download.
 
+Mixing *across* categories is normal — Kenney UI, a Foozle parallax background and Game-icons ability glyphs in one game work when each source is internally coherent and the art direction agrees. Mixing *within* one element is what fails. Record the combination in `design-direction.md` so it reads as a decision, not drift.
+
 ## 2D sprites and UI packs
 
 | Source | URL | Licence | Complete pack | Notes |

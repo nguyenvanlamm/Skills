@@ -4,7 +4,7 @@ description: Revamp the UI of an existing Flutter app or game with free assets �
 capabilities: [ui-revamp]
 license: MIT
 metadata:
-  version: 1.8.0
+  version: 1.9.0
 ---
 
 # Flutter UI Revamp
@@ -88,6 +88,7 @@ Seed         #4F46E5
 Icons        Lucide (ISC) — const IconData, stroke 1.5
 Fonts        Clash Display 600 (headings) + Satoshi 400/500/700 (body) — Fontshare
 Illustration unDraw, flat, recoloured to seed, transparent
+Background   Transparent Textures tile bundled in assets/images/, or "none — flat surfaces"
 Animation    Rive (loader, empty-state)
 Spacing      4 / 8 / 16 / 24 / 32 / 48
 Radius       8 / 12 / 18 / pill
@@ -103,7 +104,7 @@ Get explicit agreement. This file is what Step 6 is checked against — a change
 
 Read `references/sources-ui.md` (app) or `references/sources-game.md` (game), and `references/licensing.md`.
 
-Pick from the locked direction, then present the list **before downloading**. For each asset, also note how it will be fetched. Each sources file has a **Direct download URLs** section, which gives verified file-URL patterns (Kenney, Game-icons, Google Fonts, Fontshare, GitHub font releases, Fluent/Noto emoji, Mixkit, ambientCG, Poly Haven, …). It also lists the sources that must be downloaded by hand and imported with `--local`, and `sources-ui.md` has a **Checked and rejected** list. Do not guess URLs: a landing page returns HTML, and the script refuses it. For an icon set, check the package's API shape too. `apply_icons.py` swaps only to const `IconData`, so `font_awesome_flutter` (`FaIconData`), `iconoir_flutter` (widgets) and `hugeicons` (path data) need a widget-level refactor.
+Pick from the locked direction, then present the list **before downloading**. The direction may deliberately span several sources — a domain icon set beside the general one, illustrations from one site beside a bundled background texture from another. What it may not do is accumulate sources by accident; every pick still needs its own licence read and CREDITS row. For each asset, also note how it will be fetched. Each sources file has a **Direct download URLs** section, which gives verified file-URL patterns (Kenney, Game-icons, Google Fonts, Fontshare, GitHub font releases, Fluent/Noto emoji, Mixkit, ambientCG, Poly Haven, …). It also lists the sources that must be downloaded by hand and imported with `--local`, and `sources-ui.md` has a **Checked and rejected** list. Do not guess URLs: a landing page returns HTML, and the script refuses it. For an icon set, check the package's API shape too. `apply_icons.py` swaps only to const `IconData`, so `font_awesome_flutter` (`FaIconData`), `iconoir_flutter` (widgets) and `hugeicons` (path data) need a widget-level refactor.
 
 | Asset | Source | Licence | Credit | Size | Why this one |
 |---|---|---|---|---|---|
@@ -226,6 +227,7 @@ Then, **one screen at a time**:
 - Repeated `Container` + `BoxDecoration` → `AppCard` / `AppButton`
 - Magic padding/radius → `AppSpacing` / `AppRadius`
 - Empty, error and onboarding states → `EmptyState` with the new illustrations
+- Flat `Container`/`Scaffold` colour backgrounds → the bundled pattern, texture or photo when the direction locks one (`DecorationImage`, dark-mode checked)
 - `CircularProgressIndicator` → `LoadingView`, or a skeleton where the content shape is known
 - Ripple, haptics, press-scale, `PageRouteBuilder` transitions, `Hero` on shared images
 - Flame games: old UI sprites → the new pack, panels → 9-slice, SFX hooked to press / win / lose
@@ -309,7 +311,7 @@ git commit -m "refactor(home): theme tokens, empty state, Rive loader"
 
 **Licensing** — state every licence before proposing the asset, read from the source page. "Free" never implies commercially usable; prefer CC0 / MIT / OFL. Attribution-required assets need a place on screen, decided before download. No third-party logos, IP or copyrighted characters, whatever the stated licence. `fetch_asset.py` refuses GPL / CC-BY-NC / ARR unless `--force` (user must approve).
 
-**Consistency** — one icon set, one illustration style, at most two font families. Pick a full recipe from `style-recipes.md`; do not mix recipes. Vector over raster, WebP over PNG, a cohesive pack over assembled loose files. Rive for interactive animation, Lottie for linear.
+**Consistency** — one icon vocabulary per surface, one illustration style, at most two font families. A recipe from `style-recipes.md` is the starting point; mixing sources is allowed when `design-direction.md` names the mix on purpose (a domain set beside the general one, a photo or texture background beside flat illustration), and a mix nobody wrote down is a bug. Vector over raster, WebP over PNG, a cohesive pack over assembled loose files. Rive for interactive animation, Lottie for linear.
 
 **Theming** — every colour and text style flows through `ThemeData` or `CupertinoThemeData`; a new widget with a hardcoded colour is a bug in the revamp itself. Check dark mode explicitly: an illustration with a baked white background shows a slab, so find a transparent version or recolour it.
 
@@ -322,6 +324,7 @@ git commit -m "refactor(home): theme tokens, empty state, Rive loader"
 ```
 assets/
   images/          2.0x/  3.0x/
+  backgrounds/     bundled patterns, textures, photos
   icons/
   illustrations/
   sprites/
