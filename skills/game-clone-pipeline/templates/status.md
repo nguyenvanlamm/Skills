@@ -14,8 +14,7 @@ Original: {{STORE_URL}} · Repo: {{REPO_URL}} · Landing: {{SITE_REPO_URL}}
 - [ ] S6 codebase-modernizer → plan-to-issues → issues fixed; analyze + test exit 0
 - [ ] S7 Landing repo with privacy + support pages live on Pages
 - [ ] S8 iOS: flutter-ios-release → Mac build + upload → TestFlight → store assets/ASO → review-checker + asc validate → **G4** → ship + submit
-- [ ] S9 Android (optional): flutter-signing → flutter-build → flutter-store-metadata → flutter-store-compliance → flutter-publish
-- [ ] S10 Landing polish: search-optimizer, design-optimizer; post-launch checks
+- [ ] S9 Landing polish: search-optimizer, design-optimizer; post-launch checks
 
 ## Gate log
 

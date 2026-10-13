@@ -2,7 +2,7 @@
 name: game-clone-pipeline
 description: >-
   Clone a successful mobile casual/puzzle game into a differentiated, English-only Flutter game
-  and take it to the App Store (optionally Google Play) with a landing page, in 11 gated
+  and take it to the App Store with a landing page, in 10 gated
   stages: pick the target → APK facts with REA + human gameplay recording → evidence-backed
   SPEC → differentiation and economy design → Flutter core with tests, bot and simulator →
   3 UI directions (huashu-design) → flutter-ui-revamp + icon → IAP and playtest →
@@ -23,7 +23,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -57,7 +57,9 @@ version for people; this file is the operating manual.
    answer recorded in `.clone/status.md`. Never on a claim.
 7. **Commit after every stage** with the `commit` skill (English conventional commit, secret
    scan, push, never `--no-verify` or force). Tags and releases are `/ship`'s job.
-8. **Human-only decisions stay human:** gates G0, G0b, G1, G2 (UI direction), G3 (prices), G4
+8. **App Store only.** No Google Play release in this pipeline; Android files in the Flutter
+   project are left as generated.
+9. **Human-only decisions stay human:** gates G0, G0b, G1, G2 (UI direction), G3 (prices), G4
    (submit), every App Store submission, every secret value, every paid action.
 
 ## Roles
@@ -195,12 +197,7 @@ Follow `references/ios-release-runbook.md`. In short:
    release build from the Mac → `asc release stage …` → submit (web "Add for Review" with the
    first IAP, or `asc publish appstore --ipa … --submit --confirm`). Record in status.md, commit.
 
-### S9 — Google Play (optional)
-
-`flutter-signing` → `flutter-build` → `flutter-store-metadata` → `flutter-store-compliance` →
-`flutter-publish`, each as its own skill; same English-only listing. Commit after each.
-
-### S10 — Landing polish and follow-up
+### S9 — Landing polish and follow-up
 
 - In the site repo: `search-optimizer`, then `design-optimizer`; store badges and links once
   the app is live. Commit; Pages redeploys on push.

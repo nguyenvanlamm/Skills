@@ -1,8 +1,13 @@
 # Changelog
 
+## 1.1.0 — 2026-10-13
+
+- Drop the Google Play stage: the pipeline releases to the App Store only.
+- Stages renumbered S0–S9 (landing polish is now S9).
+
 ## 1.0.0 — 2026-10-13
 
-- First version. Eleven stages (S0–S10) with human gates G0, G0b, G1, G2, G3, G4 and a
+- First version. Eleven stages at 1.0.0 (S0–S10) with human gates G0, G0b, G1, G2, G3, G4 and a
   resumable `.clone/status.md`.
 - S1 combines APK facts from REA with a human gameplay recording; `scripts/contact-sheet.sh`
   turns recordings into timestamped contact sheets for the evidence-backed SPEC.

@@ -1,6 +1,6 @@
 # Quy trình clone game (bản 1.0)
 
-Biến một game casual/puzzle đang thành công thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, tuỳ chọn cả Google Play, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
+Biến một game casual/puzzle đang thành công thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
 
 ## Nguyên tắc
 
@@ -10,7 +10,8 @@ Biến một game casual/puzzle đang thành công thành một game Flutter **k
 4. **Game chỉ làm tiếng Anh**: chữ trong game, store listing (en-US), gói IAP, landing page, privacy, support. Tài liệu nội bộ được viết tiếng Việt.
 5. **Chỉ dùng main + tag `vX.Y.Z`.** Không mở nhánh `ios` sống lâu.
 6. **Cổng chỉ qua khi có bằng chứng**: lệnh thật chạy xong và exit 0, hoặc câu trả lời của người được ghi vào `.clone/status.md`.
-7. **Commit ngay sau mỗi bước** bằng skill `commit`: message tiếng Anh, kèm push. Tag và release để `/ship` làm.
+7. **Chỉ phát hành App Store.** Không có bước Google Play.
+8. **Commit ngay sau mỗi bước** bằng skill `commit`: message tiếng Anh, kèm push. Tag và release để `/ship` làm.
 
 ## Các bước
 
@@ -25,8 +26,7 @@ Biến một game casual/puzzle đang thành công thành một game Flutter **k
 | S6 | Agent | Soát codebase → issue → sửa | `codebase-modernizer`, `plan-to-issues`, `issue-work-loop` | test xanh |
 | S7 | Agent | Repo landing tối thiểu có privacy + support, deploy GitHub Pages | `landing-page-generator`, `templates/pages.yml` | 2 URL sống |
 | S8 | Agent + Người | iOS: chuẩn bị trên Ubuntu, **build và upload trên Mac**, TestFlight, ảnh store, ASO, soát, ship, nộp | `flutter-ios-release`, `appstore-assets`, `aso-marketing`, `appstore-review-checker`, `asc`, `/ship` | **G4** duyệt nộp |
-| S9 | Agent | Google Play (tuỳ chọn) | `flutter-signing` → `flutter-build` → `flutter-store-metadata` → `flutter-store-compliance` → `flutter-publish` | |
-| S10 | Agent | Hoàn thiện landing, theo dõi review và số liệu | `search-optimizer`, `design-optimizer`, `asc reviews` | |
+| S9 | Agent | Hoàn thiện landing, theo dõi review và số liệu | `search-optimizer`, `design-optimizer`, `asc reviews` | |
 
 ## Bước S1: ai làm gì
 
@@ -77,10 +77,10 @@ Chi tiết lệnh ở `references/ios-release-runbook.md`.
 | asccli | S8: `asc` (tên lệnh đúng) |
 | `/appstore-assets` | S8 |
 | Tạo repo landing page mới | S7, làm **trước** khi nộp vì cần URL privacy/support |
-| `/search-optimiser`, `/design-optimiser` | S10: `search-optimizer`, `design-optimizer` (tên đúng) |
+| `/search-optimiser`, `/design-optimiser` | S9: `search-optimizer`, `design-optimizer` (tên đúng) |
 | Push lên GitHub Actions | S7: `templates/pages.yml` deploy lên GitHub Pages mỗi lần push main |
 
-Bước mới thêm vào: `idea-validator`, `brand-name-checker`, `aso-marketing`, `appstore-review-checker`, `asc validate`, người thật chơi thử, `commit` sau mỗi bước, và tuỳ chọn Google Play.
+Bước mới thêm vào: `idea-validator`, `brand-name-checker`, `aso-marketing`, `appstore-review-checker`, `asc validate`, người thật chơi thử, `commit` sau mỗi bước.
 
 ## Checklist khác biệt (cổng G1, soát lại ở S4 và trước khi nộp)
 
