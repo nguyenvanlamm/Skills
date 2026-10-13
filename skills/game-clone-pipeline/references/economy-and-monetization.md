@@ -1,0 +1,73 @@
+# Economy and monetization (designed at S2, built at S5, prices approved at G3)
+
+Design the economy together with the core loop. Boosters and IAP only sell when the player can
+get stuck or fail; an unloseable game has nothing to sell (Coin Cubby: one long run that a
+careless bot wins 40/40, so Undo/Hammer were worthless, and new games could farm them).
+
+## 1. Tension first
+
+Write in `DESIGN.md`:
+
+- **Fail state**: what ends a level or run (no moves, out of space, timer, move limit).
+- **Cost of failing**: retry the level, back to the last checkpoint, lose a life. Keep it cheap
+  (seconds to minutes of play lost), so failing invites a booster instead of quitting.
+- **Session unit**: levels or checkpoints of 2–5 minutes. A single 30-minute run has no natural
+  break, no "level complete" moment and no place to offer anything.
+- **Target difficulty** measured with `tool/simulate.dart`: per level band, a careless simulated
+  player should win roughly 60–85 %, the greedy bot close to 100 %. Record the measured numbers.
+
+## 2. Boosters and soft currency
+
+- Each booster solves one kind of stuck (undo a mistake, remove a blocker, add space).
+- Sources: level rewards, milestones, daily gift, rewarded ad (if ads ship), IAP packs.
+- **Anti-farm rules** (check them in tests):
+  - gifts tied to progress that cannot be repeated by restarting (level first-clear, all-time
+    best), never to events a new game reproduces in seconds;
+  - stock caps (e.g. 9 per booster) and no gift for undo-then-redo;
+  - restarting a level does not refund a used booster.
+- Booster stock and purchases persist across games and app restarts.
+
+## 3. In-app purchases
+
+Pick from these shapes; record product IDs in `DESIGN.md` and keep them stable forever.
+
+| Type (App Store) | Typical use | Notes |
+|---|---|---|
+| Non-consumable | full game unlock, remove ads, booster starter pack | needs **Restore purchases** (Guideline 3.1.1) |
+| Consumable | coin packs, booster packs | price points like $0.99 / $1.99 / $4.99 / $9.99 |
+| Auto-renewable subscription | avoid for small puzzle games | extra review requirements |
+
+Implementation checklist (Flutter `in_app_purchase` + `in_app_purchase_storekit`):
+
+- [ ] Restore purchases button in Settings; restore runs on reinstall.
+- [ ] Purchase, cancel, pending, failed and refunded paths tested (brick-volley's unlock fixes are
+      a good reference: acknowledge, restore, cancel reliably; take back a refunded unlock).
+- [ ] When the store is unavailable, say "store unavailable" without naming another platform
+      (Guideline 2.3.1 lesson from Bus-Loop-Rush).
+- [ ] No debug "unlock all" path reachable in release builds.
+- [ ] Prices shown come from the store (`ProductDetails.price`), never hard-coded.
+- [ ] First IAP is submitted together with the first app version (select it on the version page).
+- [ ] Sandbox purchase + restore tested on a TestFlight build; review screenshot of the purchase
+      sheet captured.
+
+## 4. Ads (optional, decide at S2)
+
+The original likely earns mostly from ads. If the game ships ads:
+
+- Prefer rewarded ads (player-chosen: continue, double reward, free booster).
+- iOS: App Tracking Transparency prompt only if tracking; `PrivacyInfo.xcprivacy` and the
+  App Privacy answers must list the SDK's data; EU consent (UMP) before ad requests.
+- The privacy policy (templates/privacy.html) must describe the ad network.
+If the game ships no ads, say so in the privacy policy (template default).
+
+## 5. Analytics and crash reporting (decide at S2)
+
+Without numbers there is no way to know why players leave. Minimum event set:
+`level_start`, `level_complete` (moves, time, boosters used), `level_fail` (reason),
+`booster_use`, `iap_view`, `iap_purchase`, `iap_restore`. If no SDK ships, record that decision
+and keep the privacy policy's "no analytics" line.
+
+## 6. English only
+
+Product names, IAP display names and descriptions, prices screen and all in-game text are
+English (en-US). No localization.

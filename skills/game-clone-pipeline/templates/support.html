@@ -1,0 +1,44 @@
+<!doctype html>
+<!-- Template: replace every {{…}}. Keep it in English. Serve it at {{SITE_URL}}/support.html;
+     this is the App Store "Support URL". The Restore line is required when the game sells
+     non-consumables (App Review Guideline 3.1.1). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{GAME_NAME}} Support</title>
+<meta name="description" content="Help with {{GAME_NAME}}: contact, how to play, purchases and restoring, progress.">
+<link rel="canonical" href="{{SITE_URL}}/support.html">
+<style>
+  :root { --bg: #F6F2EA; --ink: #211D19; --muted: #5C5248; --accent: #24505B; --line: #DDD3C3; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1E1B18; --ink: #F2ECE2; --muted: #B7AC9D; --accent: #E6B45C; --line: #3A342D; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 system-ui, -apple-system, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 48px 20px 64px; }
+  h1 { font-size: 32px; line-height: 1.2; margin: 0 0 8px; }
+  h2 { font-size: 21px; line-height: 1.3; margin: 32px 0 8px; }
+  .muted { color: var(--muted); } a { color: var(--accent); }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>{{GAME_NAME}} Support</h1>
+  <p class="muted">{{TAGLINE}}</p>
+
+  <h2>Contact</h2>
+  <p>Write to <a href="mailto:{{CONTACT_EMAIL}}">{{CONTACT_EMAIL}}</a>. Please say which device you play on and, if it is about a level, its number.</p>
+
+  <h2>How to play</h2>
+  <p>{{HOW_TO_PLAY}}</p>
+
+  <h2>Purchases</h2>
+  <p>{{PURCHASES_SUMMARY}} Bought something before, or on another device with the same store account? Open <em>Settings → Restore purchases</em>.</p>
+
+  <h2>Progress</h2>
+  <p>Progress is saved on the device only. It is not synced between devices, and it is removed if you delete the app.</p>
+
+  <hr>
+  <p class="muted"><a href="privacy.html">Privacy Policy</a></p>
+</main>
+</body>
+</html>
