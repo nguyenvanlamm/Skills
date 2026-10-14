@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.6.0
+  version: 1.7.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -109,12 +109,18 @@ docs/IOS-BUILD-ON-MAC.md
 Add `.clone/reference/`, `.clone/apk/` and `.clone/data/` to `.gitignore` at S0, before
 anything is copied in.
 
+**Names.** The game repo (folder and GitHub repo) carries the game's name in kebab-case,
+`<game>` (Nightwall → `nightwall`); the landing repo is `<game>-site`. Never a `-clone` suffix,
+in either. Until G1 fixes the name, the repo uses a working slug of the idea or target (also
+without `-clone`) and is renamed right after G1 (see S2).
+
 ## Start or resume
 
 1. If `.clone/status.md` exists, read it and continue at the first unchecked stage. Re-run the
    last stage's verification before trusting a checked box from an older session.
 2. Otherwise ask for the target (a store URL or name, or a description of the game idea), what
-   the human already has about it (S1's sources), and the repo location; copy
+   the human already has about it (S1's sources), and the parent folder; create the repo there
+   under a working slug (see Names), private on GitHub; copy
    `templates/status.md` to `.clone/status.md`, fill the header, start at S0.
 3. **Steps pane**: `python3 <skill-dir>/scripts/steps_pane.py open <repo>` splits the agent's
    herdr pane and shows S0–S9 on the right with the current stage marked, reusing one already
@@ -186,6 +192,10 @@ the start, ask once for anything else they may have, and never wait for a source
   analytics yes/no), difficulty targets for the simulator, English name.
 - `brand-name-checker` on the name; act on Proceed/Modify/Abandon.
 - **G1**: human approves DESIGN.md. Commit.
+- Rename the repo to the approved name (see Names), unless it already has it:
+  `gh repo rename <game>`, move the folder to `<parent>/<game>`, then
+  `git remote set-url origin git@github.com:<owner>/<game>.git` and update the repo URL in the
+  status.md header. Reopen the steps pane on the new path.
 
 ### S3 — Core in Flutter (placeholder art)
 
@@ -193,8 +203,8 @@ the start, ask once for anything else they may have, and never wait for a source
   `com.nguyenvanlam`). The folder already holds `.git`, `.gitignore`, `.clone/`, `SPEC.md` and
   `DESIGN.md` from S0–S2, so:
   - when it asks about the existing directory, answer **use in place**: run its create command
-    with `--project-name <snake_case> .` (a `<game>-clone` folder name is not a valid Dart
-    package name, and `flutter create .` exits 1 on it);
+    with `--project-name <snake_case> .` (a kebab-case folder name such as `<game>` with a
+    hyphen is not a valid Dart package name, and `flutter create .` exits 1 on it);
   - `flutter create` keeps an existing `.gitignore`, so move ours aside first and append it back
     afterwards; otherwise `build/` and `.dart_tool/` are not ignored:
     `mv .gitignore .gitignore.clone` → create → `cat .gitignore.clone >> .gitignore && rm .gitignore.clone`;

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.0 — 2026-10-14
+
+- Names: the game repo (folder and GitHub) is the game's name in kebab-case (`nightwall`), the
+  landing repo is `<game>-site`, and neither ever ends in `-clone`. Before G1 the repo uses a
+  working slug of the idea; right after G1 it is renamed (`gh repo rename`, folder move, remote
+  URL, status.md header, steps pane reopened). The S3 note no longer assumes a `<game>-clone`
+  folder. PROCESS.md title now tracks the skill version (it showed 1.3.0).
+
 ## 1.6.0 — 2026-10-14
 
 - Hard rule 13: the Apple-account steps of S8 (App Store Connect web setup, Mac build and upload,
