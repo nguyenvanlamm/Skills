@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.0 — 2026-10-14
+
+- Hard rule 11: no GitHub Actions anywhere. No `.github/workflows/` in the game or site repo, no
+  CI job; checks run on the dev machine (analyze, test, simulator, pre-commit hooks).
+- S6 passes the rule to `codebase-modernizer`, so a missing CI is no longer a finding and the plan
+  never schedules a workflow task (this run had added `ci.yml`, which the account could not run).
+- S7 enables GitHub Pages from the `main` branch with `gh api` instead of a workflow;
+  `templates/pages.yml` is removed. The site repo is public so Pages stays free.
+
 ## 1.3.0 — 2026-10-13
 
 - S1 takes whatever the human has, one source being enough: APK (REA), game data files in the

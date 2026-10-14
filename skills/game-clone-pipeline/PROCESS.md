@@ -24,7 +24,7 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 | S4 | Agent → Người | 3 hướng UI → chọn 1 → áp vào Flutter → làm icon | `huashu-design` (hoặc `lam-design`), `flutter-ui-revamp`, `logo-designer` | **G2** chọn hướng |
 | S5 | Agent + Người | IAP + Restore, booster chống farm, analytics (nếu chọn), người thật chơi thử, chỉnh lại độ khó | | **G3** duyệt gói và giá |
 | S6 | Agent | Soát codebase → issue → sửa | `codebase-modernizer`, `plan-to-issues`, `issue-work-loop` | test xanh |
-| S7 | Agent | Repo landing tối thiểu có privacy + support, deploy GitHub Pages | `landing-page-generator`, `templates/pages.yml` | 2 URL sống |
+| S7 | Agent | Repo landing tối thiểu có privacy + support, GitHub Pages deploy thẳng từ nhánh `main` (không dùng Actions) | `landing-page-generator` | 2 URL sống |
 | S8 | Agent + Người | iOS: chuẩn bị trên Ubuntu, **build và upload trên Mac**, TestFlight, ảnh store, ASO, soát, ship, nộp | `flutter-ios-release`, `appstore-assets`, `aso-marketing`, `appstore-review-checker`, `asc`, `/ship` | **G4** duyệt nộp |
 | S9 | Agent | Hoàn thiện landing, theo dõi review và số liệu | `search-optimizer`, `design-optimizer`, `asc reviews` | |
 
@@ -61,7 +61,7 @@ Nếu chỉ có ý tưởng mà không có game gốc: ở S0 agent tìm 1–3 g
 
 ## Bước S8: build iOS
 
-Không build trên GitHub Actions. Agent chuẩn bị file trên Ubuntu, bạn build trên Mac:
+Không dùng GitHub Actions (luật 11). Agent chuẩn bị file trên Ubuntu, bạn build trên Mac:
 
 1. Agent:
    - chạy `flutter-ios-release`;
@@ -100,7 +100,7 @@ Chi tiết lệnh ở `references/ios-release-runbook.md`.
 | `/appstore-assets` | S8 |
 | Tạo repo landing page mới | S7, làm **trước** khi nộp vì cần URL privacy/support |
 | `/search-optimiser`, `/design-optimiser` | S9: `search-optimizer`, `design-optimizer` (tên đúng) |
-| Push lên GitHub Actions | S7: `templates/pages.yml` deploy lên GitHub Pages mỗi lần push main |
+| Push lên GitHub Actions | **Bỏ.** Không dùng GitHub Actions ở đâu cả (luật 11): kiểm tra chạy trên máy (analyze, test, pre-commit); landing deploy Pages từ nhánh `main` |
 
 Bước mới thêm vào: `idea-validator`, `brand-name-checker`, `aso-marketing`, `appstore-review-checker`, `asc validate`, người thật chơi thử, `commit` sau mỗi bước.
 

@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -68,6 +68,11 @@ version for people; this file is the operating manual.
     `Waiting on:` line with the human's next action whenever the run stops for them
     (`Waiting on: G0b: trả lời ❓ trong SPEC.md`), back to `—` once they answered. The pane
     redraws by itself.
+11. **No GitHub Actions.** No file under `.github/workflows/` in the game repo or the site repo,
+    no CI job, no build on Actions. Checks run on the dev machine: `flutter analyze`,
+    `flutter test`, the simulator, and pre-commit hooks once installed. Every delegate inherits
+    this: a "no CI" finding is not a finding, and no task may add a workflow. GitHub Pages
+    deploys from a branch, not from a workflow.
 
 ## Roles
 
@@ -217,6 +222,9 @@ the start, ask once for anything else they may have, and never wait for a source
 ### S6 — Codebase hardening
 
 - `codebase-modernizer` (the "codebase optimiser" step): read-only audit → `MODERNIZATION_PLAN.md`.
+  Pass it hard rule 11 in its arguments: the `CI` dimension covers local pre-commit hooks only,
+  "no CI" is out of scope, and the plan must not contain a workflow task (`devops-pipeline`
+  runs pre-commit only).
 - `plan-to-issues`: plan → labelled GitHub issues under one epic.
 - Fix them: `issue-work-loop` per issue when herdr + gh are available, else fix directly on
   short branches merged to main. `code-review` optional for risky changes.
@@ -226,7 +234,10 @@ the start, ask once for anything else they may have, and never wait for a source
 
 - New repo `<game>-site`: `landing-page-generator` for copy, a simple English page,
   `privacy.html` and `support.html` from `templates/` filled from DESIGN.md (must match what the
-  app really collects), `.github/workflows/pages.yml` from `templates/pages.yml`, Pages enabled.
+  app really collects). The site repo is public (free Pages). Enable Pages from the branch, no
+  workflow (hard rule 11):
+  `gh api -X POST repos/<owner>/<game>-site/pages -f 'source[branch]=main' -f 'source[path]=/'`.
+  Every push to `main` republishes the site.
 - Verify: both URLs return 200 (`curl -sI`). Commit with `commit` in that repo.
 
 ### S8 — iOS: prepare on Ubuntu, build and upload on a Mac → gate G4
@@ -273,4 +284,3 @@ leave the pane open.
 | `templates/status.md` | `.clone/status.md` starter |
 | `templates/build-ios.sh`, `templates/ExportOptions.plist` | Mac archive/export/upload kit (S8) |
 | `templates/privacy.html`, `templates/support.html` | App Store privacy and support pages (S7) |
-| `templates/pages.yml` | GitHub Pages deploy for the landing repo (S7) |
