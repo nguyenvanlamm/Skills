@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.5.0
+  version: 1.6.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -79,6 +79,11 @@ version for people; this file is the operating manual.
     ids, prices, review notes, URLs, a checklist) plus `store/` (screenshots, en-US texts), and
     the human enters it in the App Store Connect web UI. Status changes there advance on the
     human's answer, recorded in status.md.
+13. **Apple account steps are deferred.** The human's App Store Connect web setup, the Mac
+    build and upload, and the TestFlight test (S8 steps 2–3) are postponed by default: list them
+    under `## Deferred (human)` in status.md, do not stop for them, and continue with the steps
+    that need no Apple account (S8 steps 4–5, then S9's site work). Only `/ship`, the release
+    upload and the submission (S8 step 6) wait until the human resumes the deferred steps.
 
 ## Roles
 
@@ -253,16 +258,18 @@ Follow `references/ios-release-runbook.md`, skipping every `asc` step (hard rule
    `scripts/build-ios.sh`, `templates/ExportOptions.plist` → `ios/ExportOptions.plist`; write
    `docs/IOS-BUILD-ON-MAC.md` and `docs/APP-STORE-CONNECT.md` (bundle id, IAP product ids and
    prices from DESIGN.md, Support/Privacy URLs from S7, review notes, web-UI checklist). Commit.
-2. Human in the App Store Connect web UI: register the bundle id, create the app record and the
-   IAPs from `docs/APP-STORE-CONNECT.md`. On a Mac: `TEAM_ID=… scripts/build-ios.sh upload`.
-   Human reports when the build shows VALID in TestFlight.
-3. TestFlight with a Sandbox account: buy, cancel, reinstall, restore; IAP review screenshot.
+2. *(Deferred, hard rule 13.)* Human in the App Store Connect web UI: register the bundle id,
+   create the app record and the IAPs from `docs/APP-STORE-CONNECT.md`. On a Mac:
+   `TEAM_ID=… scripts/build-ios.sh upload`. Human reports when the build shows VALID in TestFlight.
+3. *(Deferred, hard rule 13.)* TestFlight with a Sandbox account: buy, cancel, reinstall,
+   restore; IAP review screenshot.
 4. `appstore-assets` (en-US; iPad set only if iPad is targeted) and `aso-marketing` (en-US)
    write `store/` (screenshots, name, subtitle, keywords, description); the human pastes them
    into the web UI, plus age rating and category from the checklist.
-5. `appstore-review-checker` on the build and `store/`. **G4**: human reads the report and the
-   filled checklist and approves.
-6. `/ship --no-auto` (version bump, changelog, tag, push; asks per step) → human uploads the
+5. `appstore-review-checker` on the source, the iOS project and `store/` (the build too, once
+   steps 2–3 are done). **G4**: human reads the report and approves the package; with steps 2–3
+   still deferred, G4 approves everything except the build and is noted as partial.
+6. Waits for the deferred steps 2–3. `/ship --no-auto` (version bump, changelog, tag, push; asks per step) → human uploads the
    release build from the Mac and submits in the web UI ("Add for Review" with the first IAP).
    Record in status.md, commit.
 

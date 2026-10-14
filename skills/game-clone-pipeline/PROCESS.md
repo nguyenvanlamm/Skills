@@ -75,6 +75,8 @@ Không dùng GitHub Actions (luật 11). Agent chuẩn bị file trên Ubuntu, b
    - soát bằng `appstore-review-checker` → **G4**. Bạn dán nội dung `store/` lên web.
 5. Agent chạy `/ship --no-auto` (version, tag). Bạn build bản chính thức trên Mac và bấm nộp trên web.
 
+**Hoãn việc cần tài khoản Apple (luật 13):** bước 2–3 (làm trên web App Store Connect, build/upload trên Mac, thử TestFlight) mặc định để sau, ghi vào `## Deferred (human)` trong status.md. Agent không dừng chờ mà làm tiếp bước 4 (ảnh store, ASO) và soát; chỉ bước 5 (ship, nộp) chờ bạn làm xong phần hoãn.
+
 **Hoãn `asc` (luật 12):** agent không chạy lệnh `asc` nào; mọi việc trên App Store Connect bạn làm trên web từ file agent chuẩn bị.
 
 Chi tiết lệnh ở `references/ios-release-runbook.md`.

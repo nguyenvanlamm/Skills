@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0 — 2026-10-14
+
+- Hard rule 13: the Apple-account steps of S8 (App Store Connect web setup, Mac build and upload,
+  TestFlight test) are deferred by default and listed under `## Deferred (human)` in status.md;
+  the run continues with store assets, ASO, the review check and S9 site work, and only ship,
+  release upload and submission wait for them. G4 can pass as partial without a build.
+
 ## 1.5.0 — 2026-10-14
 
 - Hard rule 12: `asc` is deferred. The agent runs no `asc` command; S8 writes
