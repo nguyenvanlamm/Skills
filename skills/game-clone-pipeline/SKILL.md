@@ -22,12 +22,12 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.4.0
+  version: 1.5.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
   shell: { enabled: true }
-  network: { enabled: true }   # store pages, gh, asc, pub get
+  network: { enabled: true }   # store pages, gh, pub get
   secrets: { required: false } # Apple keys stay with the human; never written to the repo
 ---
 
@@ -73,13 +73,19 @@ version for people; this file is the operating manual.
     `flutter test`, the simulator, and pre-commit hooks once installed. Every delegate inherits
     this: a "no CI" finding is not a finding, and no task may add a workflow. GitHub Pages
     deploys from a branch, not from a workflow.
+12. **`asc` is deferred.** The agent runs no `asc` command (no auth, bundle ids, IAP, metadata,
+    screenshots, validate, release or reviews) until the human lifts this rule. Everything
+    `asc` would push is written as files instead: `docs/APP-STORE-CONNECT.md` (bundle id, product
+    ids, prices, review notes, URLs, a checklist) plus `store/` (screenshots, en-US texts), and
+    the human enters it in the App Store Connect web UI. Status changes there advance on the
+    human's answer, recorded in status.md.
 
 ## Roles
 
 | Who | Does |
 |---|---|
 | Human | Brings what they have (APK, data files, a gameplay clip, a description), answers ❓, approves gates, provides Apple account access, builds and uploads on a Mac |
-| Agent | Runs every other step: REA analysis, contact sheets, SPEC, DESIGN, code, tests, sibling skills, `asc` from Ubuntu, commits |
+| Agent | Runs every other step: REA analysis, contact sheets, SPEC, DESIGN, code, tests, sibling skills, commits; prepares App Store Connect inputs as files (hard rule 12) |
 
 ## Workspace (inside the game repo)
 
@@ -242,26 +248,30 @@ the start, ask once for anything else they may have, and never wait for a source
 
 ### S8 — iOS: prepare on Ubuntu, build and upload on a Mac → gate G4
 
-Follow `references/ios-release-runbook.md`. In short:
+Follow `references/ios-release-runbook.md`, skipping every `asc` step (hard rule 12). In short:
 1. `flutter-ios-release` (prep-report exit 0); copy `templates/build-ios.sh` →
    `scripts/build-ios.sh`, `templates/ExportOptions.plist` → `ios/ExportOptions.plist`; write
-   `docs/IOS-BUILD-ON-MAC.md`; `asc bundle-ids create`; app record created by the human in the
-   web UI; `asc iap setup/create` for DESIGN.md's products. Commit.
-2. Human on a Mac: `TEAM_ID=… scripts/build-ios.sh upload`. Agent: `asc builds wait`.
+   `docs/IOS-BUILD-ON-MAC.md` and `docs/APP-STORE-CONNECT.md` (bundle id, IAP product ids and
+   prices from DESIGN.md, Support/Privacy URLs from S7, review notes, web-UI checklist). Commit.
+2. Human in the App Store Connect web UI: register the bundle id, create the app record and the
+   IAPs from `docs/APP-STORE-CONNECT.md`. On a Mac: `TEAM_ID=… scripts/build-ios.sh upload`.
+   Human reports when the build shows VALID in TestFlight.
 3. TestFlight with a Sandbox account: buy, cancel, reinstall, restore; IAP review screenshot.
-4. `appstore-assets` (en-US; iPad set only if iPad is targeted), `aso-marketing` (en-US), then
-   `asc metadata` / `screenshots` / `age-rating` / `categories` / `review` to push them.
-5. `appstore-review-checker`, then `asc validate --app APP_ID --version X.Y.Z --check-urls`.
-   **G4**: human reads both reports and approves.
+4. `appstore-assets` (en-US; iPad set only if iPad is targeted) and `aso-marketing` (en-US)
+   write `store/` (screenshots, name, subtitle, keywords, description); the human pastes them
+   into the web UI, plus age rating and category from the checklist.
+5. `appstore-review-checker` on the build and `store/`. **G4**: human reads the report and the
+   filled checklist and approves.
 6. `/ship --no-auto` (version bump, changelog, tag, push; asks per step) → human uploads the
-   release build from the Mac → `asc release stage …` → submit (web "Add for Review" with the
-   first IAP, or `asc publish appstore --ipa … --submit --confirm`). Record in status.md, commit.
+   release build from the Mac and submits in the web UI ("Add for Review" with the first IAP).
+   Record in status.md, commit.
 
 ### S9 — Landing polish and follow-up
 
 - In the site repo: `search-optimizer`, then `design-optimizer`; store badges and links once
   the app is live. Commit; Pages redeploys on push.
-- After launch: `asc reviews`, `asc analytics` / `insights`; feed findings back as issues.
+- After launch: the human reads reviews and analytics in App Store Connect (no `asc`, hard rule
+  12) and passes findings back; file them as issues.
 
 ## Final report (end of each session)
 
@@ -278,7 +288,7 @@ leave the pane open.
 | `references/spec-template.md` | SPEC skeleton and evidence rules (S1) |
 | `references/differentiation-gate.md` | similarity checklist, hard "no" list (S2, S4, S8) |
 | `references/economy-and-monetization.md` | fail state, boosters, IAP, ads, analytics (S2, S5) |
-| `references/ios-release-runbook.md` | Ubuntu prep + Mac build/upload + `asc` commands (S8) |
+| `references/ios-release-runbook.md` | Ubuntu prep + Mac build/upload (S8); its `asc` commands are deferred by hard rule 12 |
 | `scripts/contact-sheet.sh` | recording → timestamped contact sheets and strips (S1) |
 | `scripts/steps_pane.py` | steps pane in herdr, redrawn from status.md: `open`, `close`, `once` (all stages) |
 | `templates/status.md` | `.clone/status.md` starter |

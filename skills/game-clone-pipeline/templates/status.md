@@ -19,7 +19,7 @@ Waiting on: —
 - [ ] S5 IAP + Restore, booster rules, analytics decision, human playtest, re-tune → **G3**
 - [ ] S6 codebase-modernizer → plan-to-issues → issues fixed; analyze + test exit 0
 - [ ] S7 Landing repo with privacy + support pages live on Pages
-- [ ] S8 iOS: flutter-ios-release → Mac build + upload → TestFlight → store assets/ASO → review-checker + asc validate → **G4** → ship + submit
+- [ ] S8 iOS: flutter-ios-release + docs/APP-STORE-CONNECT.md → human web setup + Mac build/upload → TestFlight → store assets/ASO → review-checker → **G4** → ship + submit (no `asc`, rule 12)
 - [ ] S9 Landing polish: search-optimizer, design-optimizer; post-launch checks
 
 ## Gate log

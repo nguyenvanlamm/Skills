@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0 — 2026-10-14
+
+- Hard rule 12: `asc` is deferred. The agent runs no `asc` command; S8 writes
+  `docs/APP-STORE-CONNECT.md` (bundle id, IAP ids and prices, URLs, review notes, checklist) and
+  `store/` for the human to enter in the App Store Connect web UI. S9 review/analytics follow-up
+  is read by the human. The runbook keeps its `asc` commands behind a deferral banner.
+
 ## 1.4.0 — 2026-10-14
 
 - Hard rule 11: no GitHub Actions anywhere. No `.github/workflows/` in the game or site repo, no

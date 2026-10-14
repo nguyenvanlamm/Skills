@@ -1,5 +1,9 @@
 # iOS release runbook (stage S8): prepare on Ubuntu, build and upload on a Mac
 
+> **`asc` is deferred (SKILL.md hard rule 12).** Skip every `asc` command below. Write what it
+> would send into `docs/APP-STORE-CONNECT.md` and `store/`; the human does those steps in the App
+> Store Connect web UI. The `asc` commands stay here for when the rule is lifted.
+
 No CI build. The agent prepares every file on the Linux machine; a human builds and uploads on
 a Mac. App Store Connect work that needs no Xcode is done from Ubuntu with `asc`
 (`~/.local/bin/asc`, Rork's App Store Connect CLI; `asc <cmd> --help` for flags). Everything

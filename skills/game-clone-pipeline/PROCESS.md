@@ -25,8 +25,8 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 | S5 | Agent + Người | IAP + Restore, booster chống farm, analytics (nếu chọn), người thật chơi thử, chỉnh lại độ khó | | **G3** duyệt gói và giá |
 | S6 | Agent | Soát codebase → issue → sửa | `codebase-modernizer`, `plan-to-issues`, `issue-work-loop` | test xanh |
 | S7 | Agent | Repo landing tối thiểu có privacy + support, GitHub Pages deploy thẳng từ nhánh `main` (không dùng Actions) | `landing-page-generator` | 2 URL sống |
-| S8 | Agent + Người | iOS: chuẩn bị trên Ubuntu, **build và upload trên Mac**, TestFlight, ảnh store, ASO, soát, ship, nộp | `flutter-ios-release`, `appstore-assets`, `aso-marketing`, `appstore-review-checker`, `asc`, `/ship` | **G4** duyệt nộp |
-| S9 | Agent | Hoàn thiện landing, theo dõi review và số liệu | `search-optimizer`, `design-optimizer`, `asc reviews` | |
+| S8 | Agent + Người | iOS: chuẩn bị trên Ubuntu, **build và upload trên Mac**, TestFlight, ảnh store, ASO, soát, ship, nộp | `flutter-ios-release`, `appstore-assets`, `aso-marketing`, `appstore-review-checker`, `/ship` (không `asc`, luật 12) | **G4** duyệt nộp |
+| S9 | Agent | Hoàn thiện landing; bạn đọc review và số liệu trên App Store Connect rồi chuyển lại | `search-optimizer`, `design-optimizer` | |
 
 ## Ô các bước
 
@@ -66,16 +66,16 @@ Không dùng GitHub Actions (luật 11). Agent chuẩn bị file trên Ubuntu, b
 1. Agent:
    - chạy `flutter-ios-release`;
    - chép `scripts/build-ios.sh` và `ios/ExportOptions.plist` vào repo;
-   - viết `docs/IOS-BUILD-ON-MAC.md`;
-   - tạo bundle id và gói IAP bằng `asc`;
+   - viết `docs/IOS-BUILD-ON-MAC.md` và `docs/APP-STORE-CONNECT.md` (bundle id, gói IAP, giá, URL, ghi chú review, checklist);
    - commit.
-2. Bạn tạo app trên App Store Connect (web). Trên Mac: `TEAM_ID=… scripts/build-ios.sh upload`.
-3. Agent chạy `asc builds wait`. Bạn thử trên TestFlight bằng tài khoản Sandbox: mua, huỷ, cài lại, Restore.
+2. Bạn làm trên web App Store Connect theo `docs/APP-STORE-CONNECT.md`: bundle id, app, gói IAP. Trên Mac: `TEAM_ID=… scripts/build-ios.sh upload`. Bạn báo khi build VALID trên TestFlight.
+3. Bạn thử trên TestFlight bằng tài khoản Sandbox: mua, huỷ, cài lại, Restore.
 4. Agent:
-   - làm ảnh store bằng `appstore-assets`, viết tên và từ khoá bằng `aso-marketing` (chỉ en-US);
-   - đẩy lên bằng `asc metadata` và `asc screenshots`;
-   - soát bằng `appstore-review-checker` và `asc validate` → **G4**.
-5. Agent chạy `/ship --no-auto` (version, tag). Bạn build bản chính thức trên Mac. Agent chạy `asc release stage` rồi nộp.
+   - làm ảnh store bằng `appstore-assets`, viết tên và từ khoá bằng `aso-marketing` (chỉ en-US), lưu vào `store/`;
+   - soát bằng `appstore-review-checker` → **G4**. Bạn dán nội dung `store/` lên web.
+5. Agent chạy `/ship --no-auto` (version, tag). Bạn build bản chính thức trên Mac và bấm nộp trên web.
+
+**Hoãn `asc` (luật 12):** agent không chạy lệnh `asc` nào; mọi việc trên App Store Connect bạn làm trên web từ file agent chuẩn bị.
 
 Chi tiết lệnh ở `references/ios-release-runbook.md`.
 
@@ -96,13 +96,13 @@ Chi tiết lệnh ở `references/ios-release-runbook.md`.
 | `/codebase-optimiser` | S6: `codebase-modernizer` (tên đúng) |
 | `/plan-to-` | S6: `plan-to-issues` |
 | `/ship` | S8: `/ship --no-auto` |
-| asccli | S8: `asc` (tên lệnh đúng) |
+| asccli | **Hoãn** (luật 12): không chạy `asc`; agent chuẩn bị file, bạn làm trên web App Store Connect |
 | `/appstore-assets` | S8 |
 | Tạo repo landing page mới | S7, làm **trước** khi nộp vì cần URL privacy/support |
 | `/search-optimiser`, `/design-optimiser` | S9: `search-optimizer`, `design-optimizer` (tên đúng) |
 | Push lên GitHub Actions | **Bỏ.** Không dùng GitHub Actions ở đâu cả (luật 11): kiểm tra chạy trên máy (analyze, test, pre-commit); landing deploy Pages từ nhánh `main` |
 
-Bước mới thêm vào: `idea-validator`, `brand-name-checker`, `aso-marketing`, `appstore-review-checker`, `asc validate`, người thật chơi thử, `commit` sau mỗi bước.
+Bước mới thêm vào: `idea-validator`, `brand-name-checker`, `aso-marketing`, `appstore-review-checker`, người thật chơi thử, `commit` sau mỗi bước.
 
 ## Checklist khác biệt (cổng G1, soát lại ở S4 và trước khi nộp)
 
@@ -125,11 +125,11 @@ Ngoài ra phải có **ít nhất một cơ chế riêng**. Lý do: Apple 4.1 (C
 - [ ] Gói IAP đã tạo; Restore chạy được; đã thử Sandbox; có ảnh chụp để nộp review
 - [ ] Ảnh iPhone 6.9" (thêm iPad 13" nếu app hỗ trợ iPad), tất cả bằng tiếng Anh
 - [ ] Tên, subtitle, từ khoá, mô tả không nhắc tới game gốc hay nhà phát hành của nó
-- [ ] `appstore-review-checker` không còn lỗi chặn; `asc validate` sạch
+- [ ] `appstore-review-checker` không còn lỗi chặn; checklist `docs/APP-STORE-CONNECT.md` đã điền đủ trên web
 - [ ] Build mới nhất đã VALID trên TestFlight; tag `vX.Y.Z` đã push
 
 ## Ghi chú công cụ
 
 - **REA**: đọc APK bằng JADX và Apktool, có chụp/quay màn hình qua adb. Không nói tới Unity IL2CPP. Bản thân REA giới hạn phạm vi ở "nghiên cứu hợp pháp, phân tích phần mềm được phép".
-- **asc** (của Rork, `~/.local/bin/asc`): quản lý app, bundle id, IAP, metadata, ảnh, build, validate, submit. Không tạo được app mới (phải làm trên web). Không build được IPA (cần Mac).
+- **asc** (của Rork, `~/.local/bin/asc`): **đang hoãn** (luật 12), agent không dùng. Khi bỏ hoãn: quản lý bundle id, IAP, metadata, ảnh, build, validate, submit; không tạo được app mới, không build được IPA.
 - **Tên skill đúng**: `codebase-modernizer`, `plan-to-issues`, `search-optimizer`, `design-optimizer`.
