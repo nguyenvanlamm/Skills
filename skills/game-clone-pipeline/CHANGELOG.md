@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.10.0 — 2026-10-15
+
+- Temporary branches no longer outlive their stage (rule 5). `test-coverage` (S3),
+  `flutter-ui-revamp` (S4) and `issue-work-loop` (S6, one branch and PR per issue, which stops
+  at CLEAN without merging) each leave a branch; the stage now ends by merging it into `main`
+  and deleting it locally and on GitHub, with one "Closing a branch" recipe (`gh pr merge
+  --squash --delete-branch`, or `merge --no-ff` + `branch -d` + remote delete) and analyze + test
+  on `main` afterwards. Unmerged work is deleted only on the human's answer.
+- S8 starts with a branch check: only `main`, no open PR. The status template tracks it.
+
 ## 1.9.0 — 2026-10-15
 
 - The Telegram bot no longer lives inside a Claude session: `telegram_bridge.py serve` serves

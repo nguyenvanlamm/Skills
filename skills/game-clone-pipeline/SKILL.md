@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.9.0
+  version: 1.10.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -54,7 +54,11 @@ version for people; this file is the operating manual.
    landing page, privacy and support pages. Internal docs (SPEC, DESIGN, status) may be
    Vietnamese.
 5. **main + tags.** Work on `main`; releases are tags `vX.Y.Z`. No long-lived `ios` branch.
-   Short feature branches merged back are fine.
+   Temporary branches come only from sibling skills (`test-coverage` at S3, `flutter-ui-revamp`
+   at S4, one per issue at S6). A stage that creates a branch ends with it merged into `main`
+   and deleted locally and on GitHub ("Closing a branch"); the stage is not done while one of
+   its branches or PRs is open. Before S8, `git branch -a` lists only `main` and `origin/main`
+   and `gh pr list --state open` is empty.
 6. **Gates advance on evidence.** A command that ran in this session and exited 0, or a human
    answer recorded in `.clone/status.md`. Never on a claim.
 7. **Commit after every stage** with the `commit` skill (English conventional commit, secret
@@ -122,6 +126,13 @@ at S0, before anything is copied in.
 `<game>` (Nightwall → `nightwall`); the landing repo is `<game>-site`. Never a `-clone` suffix,
 in either. Until G1 fixes the name, the repo uses a working slug of the idea or target (also
 without `-clone`) and is renamed right after G1 (see S2).
+
+**Closing a branch** (rule 5), once analyze + test exit 0 on it:
+- with a PR: `gh pr merge <n> --squash --delete-branch`, then `git switch main && git pull`;
+- without: `git switch main && git merge --no-ff <branch> && git push && git branch -d <branch>`,
+  plus `git push origin --delete <branch>` if it exists on GitHub.
+Then re-run `flutter analyze` and `flutter test` on `main`. Never force-push; delete unmerged
+work (`git branch -D`, closing a PR unmerged) only on the human's answer, logged in status.md.
 
 ## Start or resume
 
@@ -279,8 +290,10 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
   platform-identical RNG (xorshift-style) for deals/levels; UI replays rule "steps".
 - Tests for every rule in SPEC §4 that we keep; a heuristic bot; `tool/simulate.dart` printing
   win rates of bot and careless player per difficulty band against DESIGN.md targets.
-  `test-coverage` if branches are thin.
-- Verify: `flutter analyze` and `flutter test` exit 0; simulator numbers recorded in DESIGN.md.
+  `test-coverage` if branches are thin; it writes the tests on its own `feat/…` branch, so close
+  that branch afterwards ("Closing a branch").
+- Verify: `flutter analyze` and `flutter test` exit 0 on `main`, no branch but `main`; simulator
+  numbers recorded in DESIGN.md.
   Commit after each green milestone.
 
 ### S4 — UI direction and look → gate G2
@@ -290,9 +303,12 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
    the choice: **G2**. Run the differentiation check (fresh-eyes comparison) on the chosen one.
 2. `flutter-ui-revamp`: give it the chosen direction so Step 2 only records it in
    `.revamp/design-direction.md`; it sources licence-verified assets, builds the design system,
-   applies it to the real screens and verifies.
+   applies it to the real screens and verifies. It works on `ui-revamp/<date>`: close that branch
+   once it verifies ("Closing a branch"). A revamp the human rejects is deleted only on their
+   answer (its own rollback).
 3. `logo-designer` for the app icon; generate platform icons (no alpha for iOS).
-- Verify: analyze + test exit 0, screenshots of home and game captured. Commit.
+- Verify: analyze + test exit 0 on `main`, no branch but `main`, screenshots of home and game
+  captured. Commit.
 
 ### S5 — IAP, boosters, telemetry, playtest → gate G3
 
@@ -311,8 +327,11 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
   runs pre-commit only).
 - `plan-to-issues`: plan → labelled GitHub issues under one epic.
 - Fix them: `issue-work-loop` per issue when herdr + gh are available, else fix directly on
-  short branches merged to main. `code-review` optional for risky changes.
-- Verify: analyze + test exit 0 on main. Commit/merge.
+  short branches. `code-review` optional for risky changes. `issue-work-loop` stops at CLEAN and
+  does not merge: close each CLEAN PR right away ("Closing a branch") and let it sweep its
+  worktree. A PR that does not reach CLEAN stays open, is logged under Fallbacks, and is merged
+  after a fix or closed on the human's answer before S8.
+- Verify: analyze + test exit 0 on `main`, `gh pr list --state open` empty, no branch but `main`.
 
 ### S7 — Landing repo, minimal (before any submission)
 
@@ -327,6 +346,7 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
 ### S8 — iOS: prepare on Ubuntu, build and upload on a Mac → gate G4
 
 Follow `references/ios-release-runbook.md`, skipping every `asc` step (hard rule 12). In short:
+0. Branch check (rule 5): only `main` / `origin/main`, no open PR; otherwise finish S6 first.
 1. `flutter-ios-release` (prep-report exit 0); copy `templates/build-ios.sh` →
    `scripts/build-ios.sh`, `templates/ExportOptions.plist` → `ios/ExportOptions.plist`; write
    `docs/IOS-BUILD-ON-MAC.md` and `docs/APP-STORE-CONNECT.md` (bundle id, IAP product ids and

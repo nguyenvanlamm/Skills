@@ -1,4 +1,4 @@
-# Quy trình clone game (bản 1.9.0)
+# Quy trình clone game (bản 1.10.0)
 
 Biến một game casual/puzzle đang thành công, hoặc một ý tưởng game (đặt cạnh các game thành công gần nhất), thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
 
@@ -8,7 +8,7 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 2. **Tạo khác biệt trước khi vẽ.** Chủ đề, bảng màu, tên gọi và một cơ chế riêng được chốt ở bước S2. Core làm bằng hình tạm; giao diện thật áp vào ở S4.
 3. **Thiết kế kinh tế game cùng vòng chơi.** Phải có điều kiện thua thì booster và IAP mới có giá trị.
 4. **Game chỉ làm tiếng Anh**: chữ trong game, store listing (en-US), gói IAP, landing page, privacy, support. Tài liệu nội bộ được viết tiếng Việt.
-5. **Chỉ dùng main + tag `vX.Y.Z`.** Không mở nhánh `ios` sống lâu.
+5. **Chỉ dùng main + tag `vX.Y.Z`.** Không mở nhánh `ios` sống lâu. Nhánh tạm chỉ do skill con tạo (nhánh test ở S3, nhánh giao diện ở S4, mỗi issue một nhánh ở S6) và phải được merge vào `main` rồi xóa (cả trên máy lẫn GitHub) ngay cuối bước tạo ra nó. Trước S8 chỉ còn `main` và không còn PR nào mở.
 6. **Cổng chỉ qua khi có bằng chứng**: lệnh thật chạy xong và exit 0, hoặc câu trả lời của người được ghi vào `.clone/status.md`.
 7. **Chỉ phát hành App Store.** Không có bước Google Play.
 8. **Commit ngay sau mỗi bước** bằng skill `commit`: message tiếng Anh, kèm push. Tag và release để `/ship` làm.
@@ -25,7 +25,7 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 | S3 | Agent | Tạo project ngay trong repo game đã có (use in place, không `git init` lại, gộp `.gitignore`); core Flutter với hình tạm: luật bằng Dart thuần, test, bot, `tool/simulate.dart` | `flutter-init`, `test-coverage` | analyze + test exit 0 |
 | S4 | Agent → Người | 3 hướng UI → chọn 1 → áp vào Flutter → làm icon | `huashu-design` (hoặc `lam-design`), `flutter-ui-revamp`, `logo-designer` | **G2** chọn hướng |
 | S5 | Agent + Người | IAP + Restore, booster chống farm, analytics (nếu chọn), người thật chơi thử, chỉnh lại độ khó | | **G3** duyệt gói và giá |
-| S6 | Agent | Soát codebase → issue → sửa | `codebase-modernizer`, `plan-to-issues`, `issue-work-loop` | test xanh |
+| S6 | Agent | Soát codebase → issue → sửa, merge từng PR rồi xóa nhánh | `codebase-modernizer`, `plan-to-issues`, `issue-work-loop` | test xanh, chỉ còn `main` |
 | S7 | Agent | Repo landing tối thiểu có privacy + support, GitHub Pages deploy thẳng từ nhánh `main` (không dùng Actions) | `landing-page-generator` | 2 URL sống |
 | S8 | Agent + Người | iOS: chuẩn bị trên Ubuntu, **build và upload trên Mac**, TestFlight, ảnh store, ASO, soát, ship, nộp | `flutter-ios-release`, `appstore-assets`, `aso-marketing`, `appstore-review-checker`, `/ship` (không `asc`, luật 12) | **G4** duyệt nộp |
 | S9 | Agent | Hoàn thiện landing; bạn đọc review và số liệu trên App Store Connect rồi chuyển lại | `search-optimizer`, `design-optimizer` | |

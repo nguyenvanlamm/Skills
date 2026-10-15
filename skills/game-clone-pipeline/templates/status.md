@@ -18,9 +18,9 @@ Waiting on: —
 - [ ] S3 Core in Flutter: pure-Dart rules, tests, bot, `tool/simulate.dart`; analyze + test exit 0
 - [ ] S4 UI: 3 directions (huashu-design) → chosen → flutter-ui-revamp → icon (logo-designer) → **G2**
 - [ ] S5 IAP + Restore, booster rules, analytics decision, human playtest, re-tune → **G3**
-- [ ] S6 codebase-modernizer → plan-to-issues → issues fixed; analyze + test exit 0
+- [ ] S6 codebase-modernizer → plan-to-issues → issues fixed, PRs merged, branches deleted; analyze + test exit 0
 - [ ] S7 Landing repo with privacy + support pages live on Pages
-- [ ] S8 iOS: flutter-ios-release + docs/APP-STORE-CONNECT.md → human web setup + Mac build/upload → TestFlight → store assets/ASO → review-checker → **G4** → ship + submit (no `asc`, rule 12)
+- [ ] S8 iOS: only `main` left → flutter-ios-release + docs/APP-STORE-CONNECT.md → human web setup + Mac build/upload → TestFlight → store assets/ASO → review-checker → **G4** → ship + submit (no `asc`, rule 12)
 - [ ] S9 Landing polish: search-optimizer, design-optimizer; post-launch checks
 
 ## Gate log
