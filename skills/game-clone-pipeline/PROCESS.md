@@ -1,4 +1,4 @@
-# Quy trình clone game (bản 1.7.0)
+# Quy trình clone game (bản 1.9.0)
 
 Biến một game casual/puzzle đang thành công, hoặc một ý tưởng game (đặt cạnh các game thành công gần nhất), thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
 
@@ -13,6 +13,7 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 7. **Chỉ phát hành App Store.** Không có bước Google Play.
 8. **Commit ngay sau mỗi bước** bằng skill `commit`: message tiếng Anh, kèm push. Tag và release để `/ship` làm.
 9. **Đặt tên repo theo tên game.** Repo game (thư mục và GitHub) mang đúng tên game viết thường, nối bằng gạch ngang (Nightwall → `nightwall`); repo landing là `<tên-game>-site`. Không bao giờ có đuôi `-clone`. Trước G1 dùng tên tạm theo ý tưởng (cũng không có `-clone`); duyệt tên ở G1 xong thì đổi tên repo và thư mục.
+10. **Telegram chỉ là cổng thêm.** Ngồi ở máy thì vẫn quyết trong chat; chỉ khi bạn bật chế độ vắng mặt (`/away`) agent mới hỏi qua Telegram. Từ điện thoại bạn cũng mở được phiên Claude (`/open`, `/new`). Không gửi mật khẩu hay tài khoản Apple qua Telegram.
 
 ## Các bước
 
@@ -38,6 +39,47 @@ Khi chạy trong herdr, agent tách pane của mình và mở một ô bên ph�
 - dòng cuối ghi "Đang làm" (dòng `Now:` trong status.md) và "Chờ bạn" (dòng `Waiting on:`).
 
 Nếu lỡ đóng ô, mở lại bằng `python3 ~/.claude/skills/game-clone-pipeline/scripts/steps_pane.py open .` trong repo game. Khi không có herdr, agent in khối này vào chat mỗi lần đổi bước.
+
+## Điều khiển qua Telegram khi ở xa
+
+Không bắt buộc. Ngồi ở máy thì mọi thứ như cũ, bạn quyết trong chat. Khi ra ngoài, bạn quyết, ra lệnh và mở phiên Claude bằng điện thoại.
+
+**Cài một lần:**
+1. Trên Telegram, nhắn @BotFather lệnh `/newbot` để tạo **một bot riêng cho pipeline**. Đừng dùng lại bot mà chương trình khác (ví dụ Hermes) đang đọc: mỗi bot chỉ có một chương trình nhận tin được.
+2. Trong terminal của bạn (không gõ token vào chat với agent), chạy `python3 ~/.claude/skills/game-clone-pipeline/scripts/telegram_bridge.py setup`, dán token khi được hỏi (token không hiện ra màn hình), rồi bấm Start trong bot trên điện thoại.
+3. Chạy tiếp `python3 ~/.claude/skills/game-clone-pipeline/scripts/telegram_bridge.py install-service`. Bot chạy thành dịch vụ nền (systemd), nên điện thoại vẫn điều khiển được kể cả khi không mở Claude nào. Gỡ bằng `uninstall-service`.
+4. Token, chat id và thư mục chứa game (`GAMES_DIR`, mặc định `~/Documents/projects`) được lưu ở `~/.config/game-clone-pipeline/telegram.env` (chỉ bạn đọc được), không bao giờ nằm trong repo. Bot chỉ nghe đúng chat của bạn.
+
+**Quyết định và ra lệnh:**
+
+| Bạn làm | Kết quả |
+|---|---|
+| Gõ `/away` trên điện thoại, hoặc nói "tôi ra ngoài" trong chat | Bật chế độ vắng mặt: câu hỏi đang chờ (nếu có) được gửi ngay lên Telegram kèm nút Duyệt / Làm lại / Từ chối; mỗi lần đổi bước bạn nhận tin; máy được giữ thức (màn hình vẫn tắt và khoá bình thường) |
+| Bấm nút hoặc nhắn câu trả lời | Agent nhận quyết định và chạy tiếp; nhật ký cổng ghi `via Telegram`. Nếu lúc đó không còn phiên Claude nào chạy cho game ấy, bot tự mở phiên mới để làm tiếp |
+| Gõ `/back`, hoặc trả lời một câu ngay trên máy | Telegram im lặng trở lại, máy được phép ngủ như thường; tin đang chờ trên Telegram được đánh dấu "đã quyết trên máy tính" |
+| `/status [game]` | Xem game đang ở bước nào (giống ô các bước) |
+| `/pause`, `/resume` | Dừng sau bước hiện tại, chạy tiếp |
+| `/skip <bước>`, `/redo <S…>`, `/note <chữ>` hay nhắn chữ tự do | Ghi vào hộp thư của game đang chọn; agent đọc ở ranh giới bước tới. Quyết định chỉ người được làm (cổng, giá, nộp app) vẫn phải qua cổng |
+| Gửi video, APK, file data | Lưu thẳng vào `.clone/reference/`, `.clone/apk/` hoặc `.clone/data/` của game đang chọn (không đưa vào git). Tối đa 20 MB một file; lớn hơn thì gửi link hoặc cắt ngắn |
+
+**Mở Claude từ điện thoại:**
+
+| Lệnh | Kết quả |
+|---|---|
+| `/games` | Danh sách game: đang ở bước nào, có phiên Claude đang chạy không, đang hỏi gì |
+| `/use <game>` | Chọn game để nói chuyện (gõ một phần tên là đủ) |
+| `/open [game]` | Mở một phiên Claude chạy nền trong repo game đó và chạy tiếp từ `.clone/status.md`. Nếu game đã có phiên đang chạy thì bot báo, không mở thêm |
+| `/new <ý tưởng hoặc link store>` | Mở phiên Claude bắt đầu game mới trong `GAMES_DIR`; agent tạo repo rồi hỏi tiếp bạn qua Telegram |
+| `/log [game]` | Xem phiên Claude vừa nói gì và vừa chạy lệnh gì (12 mục gần nhất) |
+| `/stop [game]` | Dừng phiên chạy nền do điện thoại mở (phiên đang mở trên máy tính thì không dừng từ xa được) |
+| Về máy: `claude attach <game>` (hoặc mã phiên bot gửi) | Mở phiên đó trong terminal và làm tiếp như bình thường |
+
+Phiên mở từ điện thoại chạy với chế độ quyền `auto`: Claude Code tự cho phép thao tác an toàn và chặn thao tác rủi ro. Nếu phiên vẫn phải dừng chờ cấp quyền, bot nhắn bạn; từ điện thoại không bấm cho phép được, về máy `claude attach <game>` để xử lý.
+
+**Lưu ý:**
+- Máy đang ngủ hay ngủ đông thì không chạy gì cả, Telegram cũng không đánh thức được máy. Lúc bật `/away`, máy được chặn ngủ tự động. Nếu máy vẫn ngủ (bạn tự cho ngủ, mất điện), bot cố nhắn trước "máy sắp ngủ". Khi máy thức dậy, bot báo và chạy các lệnh đã gửi trong vòng 24 giờ.
+- Phiên Claude chạy nền mà đứng chờ quá khoảng 1 giờ thì Claude Code tự dừng nó (cuộc trò chuyện vẫn được giữ). Không sao: khi bạn trả lời, bot mở phiên mới và phiên này đọc câu trả lời từ `.clone/telegram/`.
+- Không gửi mật khẩu, token hay tài khoản Apple qua Telegram.
 
 ## Bước S1: dùng những gì bạn có
 

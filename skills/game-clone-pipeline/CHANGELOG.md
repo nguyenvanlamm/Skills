@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.9.0 — 2026-10-15
+
+- The Telegram bot no longer lives inside a Claude session: `telegram_bridge.py serve` serves
+  every game (`GAMES_DIR/*/.clone/status.md` plus `register`ed repos) and `install-service` runs it
+  as a systemd user service (`KillMode=process`, carries `CLAUDE_CONFIG_DIR`), so the phone works
+  with no Claude open. `watch REPO` now registers the repo and serves only when no service does.
+- The phone opens Claude sessions: `/open <game>` and `/new <idea>` start `claude --bg -n <game>
+  --permission-mode auto` with a resume or start prompt; an answer for a game with no live session
+  starts one, which reads it with the new `answers` subcommand. `/games`, `/use`, `/log`, `/stop`
+  (background sessions only). Phone-started sessions get a Notification hook (`hook` subcommand)
+  that reports a waiting permission prompt; `claude attach <game>` takes over at the computer.
+- Away mode and the current game are global (`~/.local/state/game-clone-pipeline/telegram/`);
+  `mode` takes no repo. Questions are prefixed with the game name and route by question id.
+- The setup and serve errors name a 409 Conflict as another program polling the same bot.
+- Checked against a real `claude --bg` session (v2.1.300, auto mode allowed by the org policy):
+  the bot reads the short id from `backgrounded · <id> · <name>` and uses it for `attach`,
+  `logs` and `stop`; `/games` shows `status · state`; `/log` shows the session's last prompts,
+  replies and tool calls from its transcript, because `claude logs` returns a raw screen stream.
+
+## 1.8.0 — 2026-10-15
+
+- Telegram remote (optional, hard rule 14): `scripts/telegram_bridge.py` (stdlib) with `setup`,
+  `watch`, `ask`, `close`, `mode`, `send`, `inbox`. At the computer nothing changes; in away
+  mode (`/away` on the phone or `mode away`) every human stop is also asked on Telegram
+  with buttons, the first answer wins (`close --answered-here` from the chat, or the phone), and
+  the gate log notes where it was decided. `/back` or an answer at the computer silences it.
+- Away mode keeps the machine awake with a `systemd-inhibit` sleep lock (`caffeinate` on macOS),
+  warns the phone before a sleep it cannot block, and reports on wake; queued Telegram messages
+  are processed then (24 h).
+- Commands `/status`, `/pause`, `/resume`, `/skip`, `/redo`, `/note` and free text land in
+  `.clone/telegram/inbox.jsonl`, read at every step boundary; videos, APKs and data files sent
+  to the bot are saved into the git-ignored `.clone/` folders (20 MB Bot API limit). Only the
+  allowlisted chat counts; the token lives in `~/.config/game-clone-pipeline/telegram.env`.
+- `templates/status.md` gains a `Remote:` line; `.clone/telegram/` is git-ignored at S0.
+
 ## 1.7.0 — 2026-10-14
 
 - Names: the game repo (folder and GitHub) is the game's name in kebab-case (`nightwall`), the

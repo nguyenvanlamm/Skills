@@ -22,12 +22,12 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.7.0
+  version: 1.9.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
   shell: { enabled: true }
-  network: { enabled: true }   # store pages, gh, pub get
+  network: { enabled: true }   # store pages, gh, pub get, Telegram Bot API (optional)
   secrets: { required: false } # Apple keys stay with the human; never written to the repo
 ---
 
@@ -84,12 +84,20 @@ version for people; this file is the operating manual.
     under `## Deferred (human)` in status.md, do not stop for them, and continue with the steps
     that need no Apple account (S8 steps 4–5, then S9's site work). Only `/ship`, the release
     upload and the submission (S8 step 6) wait until the human resumes the deferred steps.
+14. **Telegram is an optional remote gate.** At the computer the human decides in the chat as
+    always; Telegram only speaks up in away mode (see "Telegram remote"). Only the allowlisted
+    chat counts as the human, and the gate log Notes say `via Telegram` or `tại máy`. Never ask
+    for or accept a secret, password or Apple credential over Telegram (rule 9); files received
+    land only in the git-ignored `.clone/` folders (rule 1); the bot token never enters a repo.
+    Sessions the phone starts (`/open`, `/new`, or an answer with no session running) run as
+    `claude --bg` with `--permission-mode auto`; the phone can stop only those, never a session
+    at the computer. Without the config file the run behaves exactly as without this rule.
 
 ## Roles
 
 | Who | Does |
 |---|---|
-| Human | Brings what they have (APK, data files, a gameplay clip, a description), answers ❓, approves gates, provides Apple account access, builds and uploads on a Mac |
+| Human | Brings what they have (APK, data files, a gameplay clip, a description), answers ❓, approves gates (in the chat, or on Telegram while away), provides Apple account access, builds and uploads on a Mac |
 | Agent | Runs every other step: REA analysis, contact sheets, SPEC, DESIGN, code, tests, sibling skills, commits; prepares App Store Connect inputs as files (hard rule 12) |
 
 ## Workspace (inside the game repo)
@@ -101,13 +109,14 @@ DESIGN.md               # S2: differentiation table, economy, difficulty targets
 .clone/reference/       # recordings, store screenshots, contact sheets  (git-ignored)
 .clone/apk/             # the original's APK and REA notes                 (git-ignored)
 .clone/data/            # game data the human gave: config, levels, saves  (git-ignored)
+.clone/telegram/        # Telegram remote state: mode, inbox, pending question (git-ignored)
 tool/simulate.dart      # S3: plays many seeded games with a bot and a careless player
 scripts/build-ios.sh    # S8: from templates/, archive/export/upload on a Mac
 docs/IOS-BUILD-ON-MAC.md
 ```
 
-Add `.clone/reference/`, `.clone/apk/` and `.clone/data/` to `.gitignore` at S0, before
-anything is copied in.
+Add `.clone/reference/`, `.clone/apk/`, `.clone/data/` and `.clone/telegram/` to `.gitignore`
+at S0, before anything is copied in.
 
 **Names.** The game repo (folder and GitHub repo) carries the game's name in kebab-case,
 `<game>` (Nightwall → `nightwall`); the landing repo is `<game>-site`. Never a `-clone` suffix,
@@ -129,6 +138,59 @@ without `-clone`) and is renamed right after G1 (see S2).
 4. **Sibling skills**: invoke them by name with the Skill tool. If one is missing, do its step
    inline with the same output, and log it under "Fallbacks" in status.md. A missing skill
    lowers quality; it never stops the run.
+5. **Telegram remote** (only when `~/.config/game-clone-pipeline/telegram.env` exists): run
+   `python3 <skill-dir>/scripts/telegram_bridge.py watch <repo>` in the background once per
+   session. It registers the repo; when the service already serves the bot it prints
+   "already running" and exits 0, otherwise it serves until the session ends. Exit 69 = not set
+   up: skip Telegram and say so once. Set the status.md `Remote:` line to `Telegram on`, then run
+   `<tb> answers <repo>` and `<tb> inbox <repo>` and act on what they print. After G1's rename,
+   `<tb> register <new path>`.
+
+## Telegram remote
+
+The human decides at the computer while they sit there and on the phone while they are away.
+`scripts/telegram_bridge.py serve` is the only reader of the bot and serves every game
+(`GAMES_DIR/*/.clone/status.md` plus registered repos). Installed once with `install-service`
+it runs as a systemd user service, so the phone works even with no Claude session open; without
+it, `watch` serves from inside the session. The agent talks to it through these subcommands
+(`<tb>` = `python3 <skill-dir>/scripts/telegram_bridge.py`):
+
+- **Sessions from the phone.** `/open <game>` starts `claude --bg -n <game> --permission-mode
+  auto` in that repo with a resume prompt; `/new <idea or store URL>` starts one in `GAMES_DIR`;
+  a Telegram answer for a game with no live session starts a resume session too. Such sessions
+  carry a Notification hook that tells the phone when a permission prompt is waiting. At the
+  computer, `claude attach <game>` takes the session over.
+- **A session started from Telegram** (its prompt says so): the human is away, so run
+  `answers` and `inbox` first, ask every human stop with `ask` in the foreground (no chat-only
+  question), and send the evidence with `send`. For `/new`, create the repo under `GAMES_DIR`
+  with a working slug without asking for the parent folder, run `<tb> register <repo>`, then ask
+  the remaining start questions (sources, reference games) through `ask`.
+- **Modes.** `here` (default): Telegram stays silent. `away`: the human typed `/away` on the
+  phone, or said in the chat that they are leaving (then run `<tb> mode away`). In away
+  mode the bot asks the pending question, pushes `Now:` / `Waiting on:` changes and keeps the
+  machine awake (a `systemd-inhibit` sleep lock; the screen may still lock). `/back`, or any
+  answer typed at the computer, returns to `here`. A machine that sleeps anyway runs nothing:
+  messages wait on Telegram (24 h) and the bot reports them when it wakes.
+- **Every human stop** in a session at the computer (G0, G0b, G1, G2, G3, G4, a ❓ round, any `Waiting on:`):
+  1. start `<tb> ask <repo> <GATE> "<question>" --option Approve --option Revise --option Reject`
+     in the background (`run_in_background`, no timeout; free-text stops use no `--option`);
+  2. ask the same question in the chat and end the turn, as before;
+  3. answered in the chat → `<tb> close <repo> --answered-here "<answer>"`, then continue;
+  4. the background `ask` finished → read its JSON line: `"event": "answer"` with `"by":
+     "telegram"` is the human's decision (post "Bạn đã quyết qua Telegram: …" in the chat,
+     record it, continue); `"event": "inbox"` → handle the inbox (below) and start the same
+     `ask` again (it reuses the question, it does not resend it).
+  An answer that arrives while no session is waiting is kept; `<tb> answers <repo>` prints it.
+- **Evidence for a gate** while away: `<tb> send <repo> "<summary>" --file <path>` with what the
+  human would look at (SPEC excerpt, S4 direction screenshots, simulator numbers, the review
+  report). Up to 50 MB per file.
+- **Inbox.** `<tb> inbox <repo>` prints unread JSON lines; run it at every stage and numbered
+  step boundary and before each human stop. `/pause` → stop after the current step with
+  `Waiting on: resume` (ask for it as a human stop); `/resume` → continue; `/skip <step>`,
+  `/redo <stage>` → do it when it is not a human-only decision (rule 9) and log it under
+  Fallbacks and deviations; `/note` and free text → act on them like a chat message; `file` →
+  a new S1 source, already saved under `.clone/`; `file_too_big` → ask for a link or a shorter
+  clip.
 
 ## Stages
 
@@ -148,6 +210,7 @@ without `-clone`) and is renamed right after G1 (see S2).
 
 One source is enough to start; each extra one turns ❓ into facts. Use what the human named at
 the start, ask once for anything else they may have, and never wait for a source they lack.
+Files sent to the Telegram bot (up to 20 MB) are saved by type into the same folders.
 
 | Source | Put in | Read with | Best for |
 |---|---|---|---|
@@ -294,7 +357,8 @@ Follow `references/ios-release-runbook.md`, skipping every `asc` step (hard rule
 
 Stage reached, gates passed with dates, commands run and their exit codes, fallbacks, open
 assumptions, what the human must do next (record, approve, build on the Mac). Tick boxes in
-`.clone/status.md` and commit it. Once S9 is done, `steps_pane.py close <repo>`; before that
+`.clone/status.md` and commit it. Once S9 is done, `steps_pane.py close <repo>` and stop the
+Telegram `watch` process if this session started one; before that
 leave the pane open.
 
 ## Files in this skill
@@ -308,6 +372,7 @@ leave the pane open.
 | `references/ios-release-runbook.md` | Ubuntu prep + Mac build/upload (S8); its `asc` commands are deferred by hard rule 12 |
 | `scripts/contact-sheet.sh` | recording → timestamped contact sheets and strips (S1) |
 | `scripts/steps_pane.py` | steps pane in herdr, redrawn from status.md: `open`, `close`, `once` (all stages) |
+| `scripts/telegram_bridge.py` | optional Telegram remote (rule 14): `setup`, `install-service`, `serve`/`watch`, `register`, `ask`, `close`, `answers`, `inbox`, `mode`, `send`, `hook` |
 | `templates/status.md` | `.clone/status.md` starter |
 | `templates/build-ios.sh`, `templates/ExportOptions.plist` | Mac archive/export/upload kit (S8) |
 | `templates/privacy.html`, `templates/support.html` | App Store privacy and support pages (S7) |
