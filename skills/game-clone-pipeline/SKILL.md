@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.10.0
+  version: 1.11.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -58,7 +58,10 @@ version for people; this file is the operating manual.
    at S4, one per issue at S6). A stage that creates a branch ends with it merged into `main`
    and deleted locally and on GitHub ("Closing a branch"); the stage is not done while one of
    its branches or PRs is open. Before S8, `git branch -a` lists only `main` and `origin/main`
-   and `gh pr list --state open` is empty.
+   and `gh pr list --state open` is empty. A background session (`claude --bg`) must isolate its
+   changes, so it works each stage in one worktree: from the game repo's root (check `pwd`),
+   `EnterWorktree` with `name: s<N>-<stage>` (never `path:`); at the stage end `ExitWorktree`,
+   then close its `worktree-s<N>-…` branch like any other.
 6. **Gates advance on evidence.** A command that ran in this session and exited 0, or a human
    answer recorded in `.clone/status.md`. Never on a claim.
 7. **Commit after every stage** with the `commit` skill (English conventional commit, secret
@@ -96,6 +99,11 @@ version for people; this file is the operating manual.
     Sessions the phone starts (`/open`, `/new`, or an answer with no session running) run as
     `claude --bg` with `--permission-mode auto`; the phone can stop only those, never a session
     at the computer. Without the config file the run behaves exactly as without this rule.
+15. **Stay in the game repo.** Read another repo (a previous game's store code at S5, any
+    reference project) by absolute path or `git -C <path>`; never `cd` into it. A session's
+    working directory follows `cd`, so the next `EnterWorktree`, `git` or `flutter` command lands
+    in the wrong repo. A background session once sat two days at the start of S5 this way,
+    holding a call only the computer could release.
 
 ## Roles
 
@@ -170,7 +178,17 @@ it, `watch` serves from inside the session. The agent talks to it through these 
   auto` in that repo with a resume prompt; `/new <idea or store URL>` starts one in `GAMES_DIR`;
   a Telegram answer for a game with no live session starts a resume session too. Such sessions
   carry a Notification hook that tells the phone when a permission prompt is waiting. At the
-  computer, `claude attach <game>` takes the session over.
+  computer, `claude attach <game>` takes the session over. The bot counts a session as a game's
+  when it runs in the repo or one of its worktrees, or is named after the game. `claude --bg`
+  refuses a folder Claude was never opened in ("Workspace not trusted"), which is every repo the
+  pipeline created from the phone: the bot then starts the session from the repo's parent with the
+  repo path in the prompt and tells the phone; running `claude` once in the repo at the computer
+  fixes it for good.
+- **Stalls and status.** In away mode the bot warns the phone once when a busy session has
+  written nothing for 30 minutes while no question is pending (most likely a prompt only the
+  computer can answer), naming the last tool call and how to `/log`, `/stop` + `/open`, or
+  attach. Free text with no pending question is answered with the game's `Now:`, `Waiting on:`
+  and session state; `help` without the slash returns the command list.
 - **A session started from Telegram** (its prompt says so): the human is away, so run
   `answers` and `inbox` first, ask every human stop with `ask` in the foreground (no chat-only
   question), and send the evidence with `send`. For `/new`, create the repo under `GAMES_DIR`
@@ -316,7 +334,9 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
   purchase path, store-unavailable message without naming platforms, anti-farm tests, no debug
   unlock in release. Analytics/crash SDK only if DESIGN.md says so (then update privacy page).
 - Human playtest (3–5 people or the user): note where they get stuck or bored; re-tune with
-  the simulator.
+  the simulator. It does not block G3: with none done yet (the human is away or has no testers),
+  list it under `## Deferred (human)` in status.md, say so in the G3 question, and re-tune once
+  notes arrive. A previous game's store code may be reused, read in place (rule 15).
 - **G3**: human approves the product list and price tiers. Commit.
 
 ### S6 — Codebase hardening

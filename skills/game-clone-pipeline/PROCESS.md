@@ -1,4 +1,4 @@
-# Quy trình clone game (bản 1.10.0)
+# Quy trình clone game (bản 1.11.0)
 
 Biến một game casual/puzzle đang thành công, hoặc một ý tưởng game (đặt cạnh các game thành công gần nhất), thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
 
@@ -14,6 +14,7 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 8. **Commit ngay sau mỗi bước** bằng skill `commit`: message tiếng Anh, kèm push. Tag và release để `/ship` làm.
 9. **Đặt tên repo theo tên game.** Repo game (thư mục và GitHub) mang đúng tên game viết thường, nối bằng gạch ngang (Nightwall → `nightwall`); repo landing là `<tên-game>-site`. Không bao giờ có đuôi `-clone`. Trước G1 dùng tên tạm theo ý tưởng (cũng không có `-clone`); duyệt tên ở G1 xong thì đổi tên repo và thư mục.
 10. **Telegram chỉ là cổng thêm.** Ngồi ở máy thì vẫn quyết trong chat; chỉ khi bạn bật chế độ vắng mặt (`/away`) agent mới hỏi qua Telegram. Từ điện thoại bạn cũng mở được phiên Claude (`/open`, `/new`). Không gửi mật khẩu hay tài khoản Apple qua Telegram.
+11. **Agent ở yên trong repo game.** Muốn xem code của game khác (ví dụ phần shop của game trước), agent đọc bằng đường dẫn đầy đủ chứ không `cd` sang đó. Phiên chạy nền làm mỗi bước trong một worktree riêng rồi merge vào `main` khi xong bước.
 
 ## Các bước
 
@@ -24,7 +25,7 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 | S2 | Agent → Người | `DESIGN.md`: bảng khác biệt, kinh tế game, mục tiêu độ khó, tên game | `brand-name-checker` | **G1** duyệt thiết kế |
 | S3 | Agent | Tạo project ngay trong repo game đã có (use in place, không `git init` lại, gộp `.gitignore`); core Flutter với hình tạm: luật bằng Dart thuần, test, bot, `tool/simulate.dart` | `flutter-init`, `test-coverage` | analyze + test exit 0 |
 | S4 | Agent → Người | 3 hướng UI → chọn 1 → áp vào Flutter → làm icon | `huashu-design` (hoặc `lam-design`), `flutter-ui-revamp`, `logo-designer` | **G2** chọn hướng |
-| S5 | Agent + Người | IAP + Restore, booster chống farm, analytics (nếu chọn), người thật chơi thử, chỉnh lại độ khó | | **G3** duyệt gói và giá |
+| S5 | Agent + Người | IAP + Restore, booster chống farm, analytics (nếu chọn), người thật chơi thử, chỉnh lại độ khó. Chưa chơi thử thì ghi vào mục hoãn, không chặn G3 | | **G3** duyệt gói và giá |
 | S6 | Agent | Soát codebase → issue → sửa, merge từng PR rồi xóa nhánh | `codebase-modernizer`, `plan-to-issues`, `issue-work-loop` | test xanh, chỉ còn `main` |
 | S7 | Agent | Repo landing tối thiểu có privacy + support, GitHub Pages deploy thẳng từ nhánh `main` (không dùng Actions) | `landing-page-generator` | 2 URL sống |
 | S8 | Agent + Người | iOS: chuẩn bị trên Ubuntu, **build và upload trên Mac**, TestFlight, ảnh store, ASO, soát, ship, nộp | `flutter-ios-release`, `appstore-assets`, `aso-marketing`, `appstore-review-checker`, `/ship` (không `asc`, luật 12) | **G4** duyệt nộp |
@@ -59,7 +60,8 @@ Không bắt buộc. Ngồi ở máy thì mọi thứ như cũ, bạn quyết tr
 | Gõ `/back`, hoặc trả lời một câu ngay trên máy | Telegram im lặng trở lại, máy được phép ngủ như thường; tin đang chờ trên Telegram được đánh dấu "đã quyết trên máy tính" |
 | `/status [game]` | Xem game đang ở bước nào (giống ô các bước) |
 | `/pause`, `/resume` | Dừng sau bước hiện tại, chạy tiếp |
-| `/skip <bước>`, `/redo <S…>`, `/note <chữ>` hay nhắn chữ tự do | Ghi vào hộp thư của game đang chọn; agent đọc ở ranh giới bước tới. Quyết định chỉ người được làm (cổng, giá, nộp app) vẫn phải qua cổng |
+| `/skip <bước>`, `/redo <S…>`, `/note <chữ>` hay nhắn chữ tự do | Ghi vào hộp thư của game đang chọn; agent đọc ở ranh giới bước tới. Với chữ tự do, bot trả lời ngay game đang làm gì, chờ gì và phiên Claude ghi lần cuối bao lâu trước. Quyết định chỉ người được làm (cổng, giá, nộp app) vẫn phải qua cổng |
+| Nhắn `help` (không cần dấu `/`) | Bot gửi danh sách lệnh |
 | Gửi video, APK, file data | Lưu thẳng vào `.clone/reference/`, `.clone/apk/` hoặc `.clone/data/` của game đang chọn (không đưa vào git). Tối đa 20 MB một file; lớn hơn thì gửi link hoặc cắt ngắn |
 
 **Mở Claude từ điện thoại:**
@@ -75,6 +77,10 @@ Không bắt buộc. Ngồi ở máy thì mọi thứ như cũ, bạn quyết tr
 | Về máy: `claude attach <game>` (hoặc mã phiên bot gửi) | Mở phiên đó trong terminal và làm tiếp như bình thường |
 
 Phiên mở từ điện thoại chạy với chế độ quyền `auto`: Claude Code tự cho phép thao tác an toàn và chặn thao tác rủi ro. Nếu phiên vẫn phải dừng chờ cấp quyền, bot nhắn bạn; từ điện thoại không bấm cho phép được, về máy `claude attach <game>` để xử lý.
+
+Khi đang ở chế độ vắng mặt, nếu một phiên Claude đang chạy mà 30 phút không ghi gì và không có câu hỏi nào chờ bạn, bot nhắn **một lần** kèm lệnh cuối cùng phiên đó chạy. Thường là phiên đang chờ một xác nhận chỉ bấm được trên máy. Xem bằng `/log`; mở lại bằng `/stop` rồi `/open`, hoặc về máy `claude attach`.
+
+Bot nhận ra cả những phiên đang làm trong worktree của game (`.claude/worktrees/…`). Repo do pipeline tạo từ điện thoại chưa được Claude trust, nên `/open` sẽ mở phiên từ thư mục cha (`GAMES_DIR`) và báo cho bạn. Muốn sửa hẳn, ở máy chạy `claude` một lần trong repo đó và chấp nhận.
 
 **Lưu ý:**
 - Máy đang ngủ hay ngủ đông thì không chạy gì cả, Telegram cũng không đánh thức được máy. Lúc bật `/away`, máy được chặn ngủ tự động. Nếu máy vẫn ngủ (bạn tự cho ngủ, mất điện), bot cố nhắn trước "máy sắp ngủ". Khi máy thức dậy, bot báo và chạy các lệnh đã gửi trong vòng 24 giờ.

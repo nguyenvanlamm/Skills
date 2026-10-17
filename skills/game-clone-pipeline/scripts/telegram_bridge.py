@@ -26,7 +26,10 @@ and the update offset in ~/.local/state/game-clone-pipeline/telegram/.
 
 From the phone, `/open <game>` and `/new <idea>` start `claude --bg` sessions (permission mode auto);
 `claude attach <game>` takes one over at the computer. A Telegram answer for a game with no live
-session opens one, which reads it with `answers`.
+session opens one, which reads it with `answers`. A session belongs to a game when it runs in the repo
+or one of its worktrees, or carries the game's name. In away mode `serve` warns the phone once when a
+busy session has written nothing for STALL_MINUTES and no question is pending: it is most likely
+waiting on a prompt only the computer can answer.
 
 `ask` prints one JSON line and exits 0: {"event": "answer", "answer", "by": "telegram"|"computer", ...}
 or {"event": "inbox", "unread": n} when a command arrived first (read `inbox`, then ask again: the
@@ -71,6 +74,8 @@ DEFAULT_GAMES_DIR = '~/Documents/projects'
 WHO = 'game-clone-pipeline'
 POLL_SECONDS = 10
 SLEEP_GAP = 60
+STALL_MINUTES = 30
+STALL_CHECK_SECONDS = 300
 DOWNLOAD_LIMIT = 20 * 1024 * 1024
 UPLOAD_LIMIT = 50 * 1024 * 1024
 PHOTO_LIMIT = 10 * 1024 * 1024
@@ -82,8 +87,9 @@ NEEDS_ARGS = {'skip', 'redo', 'note', 'new', 'use'}
 MODE_LABEL = {'here': 'ở máy', 'away': 'vắng mặt'}
 ANSI = re.compile(r'\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07|\x1b[()][0-9A-Za-z]')
 BACKGROUNDED = re.compile(r'backgrounded\s*·\s*(\S+)')
-RESUME_PROMPT = ('/game-clone-pipeline Resume this game. Started from Telegram: the human is away. Follow the '
-                 '"Telegram remote" section: run `answers` and `inbox` first, ask every decision with `ask`.')
+RESUME_PROMPT = ('/game-clone-pipeline Resume the game in {repo} (work in that folder). Started from Telegram: '
+                 'the human is away. Follow the "Telegram remote" section: run `answers` and `inbox` first, ask '
+                 'every decision with `ask`.')
 NEW_PROMPT = ('/game-clone-pipeline Start a new game: {idea}\n\nStarted from Telegram: the human is away. Create '
               'the repo under {games_dir} with a working slug, run `register` on it, and ask everything else '
               'with `ask` as the "Telegram remote" section says.')
@@ -105,6 +111,7 @@ HELP = '\n'.join([
     'Gửi video, APK hay file data: lưu vào .clone/ của game đang chọn (tối đa 20 MB).',
     'Khi có câu hỏi: bấm nút hoặc nhắn câu trả lời.',
 ])
+HELP_WORDS = {'help', 'trợ giúp', 'tro giup', 'lệnh', 'menu'}
 
 
 class BotError(Exception):
@@ -385,11 +392,21 @@ def claude(*args, cwd=None, timeout=60):
     return done.stdout
 
 
-def sessions_for(repo, include_done=False):
-    """Claude Code sessions whose cwd is REPO, newest first."""
-    listing = json.loads(claude('agents', '--json', *(['--all'] if include_done else [])) or '[]')
-    real = os.path.realpath(repo)
-    mine = [s for s in listing if s.get('cwd') and os.path.realpath(s['cwd']) == real]
+def agents(include_done=False):
+    return json.loads(claude('agents', '--json', *(['--all'] if include_done else [])) or '[]')
+
+
+def belongs(session, repo):
+    """A session is REPO's when it runs in REPO or one of its worktrees, or carries the game's name."""
+    real, cwd = os.path.realpath(repo), session.get('cwd')
+    if cwd and (os.path.realpath(cwd) + os.sep).startswith(real + os.sep):
+        return True
+    return session.get('name') == game_name(repo)
+
+
+def sessions_for(repo, include_done=False, listing=None):
+    """REPO's Claude Code sessions, newest first; LISTING is a fetched `agents` list to reuse."""
+    mine = [s for s in (agents(include_done) if listing is None else listing) if belongs(s, repo)]
     return sorted(mine, key=lambda s: s.get('startedAt') or 0, reverse=True)
 
 
@@ -401,33 +418,59 @@ def session_state(session):
     return ' · '.join(str(session[key]) for key in ('status', 'state') if session.get(key)) or '?'
 
 
-def recent_activity(session, limit=12):
-    """The last prompts, replies and tool calls of a session, from its transcript; None if not found."""
+def transcript(session):
+    """Path of a session's transcript (the newest, when a worktree move left several), or None."""
     config_dir = os.environ.get('CLAUDE_CONFIG_DIR') or os.path.expanduser('~/.claude')
     sid = session.get('sessionId')
     matches = glob.glob(os.path.join(glob.escape(config_dir), 'projects', '*', f'{sid}.jsonl')) if sid else []
-    if not matches:
-        return None
+    return max(matches, key=os.path.getmtime) if matches else None
+
+
+def transcript_items(lines):
+    """Prompts, replies and tool calls of transcript lines, as short phone-readable strings."""
     items = []
-    with open(matches[0], encoding='utf-8') as f:
-        for line in f:
-            try:
-                entry = json.loads(line)
-            except ValueError:
-                continue
-            content = (entry.get('message') or {}).get('content')
-            if entry.get('type') == 'user' and isinstance(content, str):
-                items.append('👤 ' + content.strip())
-            elif entry.get('type') == 'assistant' and isinstance(content, list):
-                for block in content:
-                    if block.get('type') == 'text' and block.get('text', '').strip():
-                        items.append('🤖 ' + block['text'].strip())
-                    elif block.get('type') == 'tool_use':
-                        args = block.get('input') or {}
-                        detail = next((str(args[key]) for key in ('description', 'command', 'file_path', 'skill', 'pattern')
-                                       if args.get(key)), '')
-                        items.append(f"🔧 {block.get('name')}" + (f': {detail}' if detail else ''))
+    for line in lines:
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        content = (entry.get('message') or {}).get('content')
+        if entry.get('type') == 'user' and isinstance(content, str):
+            items.append('👤 ' + content.strip())
+        elif entry.get('type') == 'assistant' and isinstance(content, list):
+            for block in content:
+                if block.get('type') == 'text' and block.get('text', '').strip():
+                    items.append('🤖 ' + block['text'].strip())
+                elif block.get('type') == 'tool_use':
+                    args = block.get('input') or {}
+                    detail = next((str(args[key]) for key in ('description', 'command', 'file_path', 'skill', 'pattern', 'path', 'name')
+                                   if args.get(key)), '')
+                    items.append(f"🔧 {block.get('name')}" + (f': {detail}' if detail else ''))
+    return items
+
+
+def recent_activity(session, limit=12):
+    """The last prompts, replies and tool calls of a session, from its transcript; None if not found."""
+    path = transcript(session)
+    if not path:
+        return None
+    with open(path, encoding='utf-8') as f:
+        items = transcript_items(f)
     return '\n\n'.join(item if len(item) <= 500 else item[:500] + '…' for item in items[-limit:]) or '(chưa có gì)'
+
+
+def last_tool(path, tail=512 * 1024):
+    """The last tool call in a transcript, read from its end (transcripts grow to tens of MB)."""
+    start = max(0, os.path.getsize(path) - tail)
+    with open(path, 'rb') as f:
+        f.seek(start)
+        lines = f.read().decode('utf-8', 'replace').splitlines()[1 if start else 0:]
+    calls = [item for item in transcript_items(lines) if item.startswith('🔧')]
+    return calls[-1][2:].strip()[:300] if calls else None
+
+
+def minutes_since(path):
+    return int((time.time() - os.path.getmtime(path)) // 60)
 
 
 def hook_settings():
@@ -444,12 +487,29 @@ def launch(cfg, cwd, name, prompt):
     return found.group(1) if found else name
 
 
+def resume(cfg, repo):
+    """Open a session that resumes REPO. Claude may never have been opened in a repo the pipeline created,
+    and `--bg` refuses an untrusted folder: then start from its parent (GAMES_DIR, where `/new` runs)."""
+    prompt = RESUME_PROMPT.format(repo=repo)
+    try:
+        return launch(cfg, repo, game_name(repo), prompt)
+    except BotError as error:
+        if 'not trusted' not in str(error):
+            raise
+    parent = os.path.dirname(repo)
+    ref = launch(cfg, parent, game_name(repo), prompt)
+    with contextlib.suppress(BotError):
+        send_text(cfg, f'ℹ️ {game_name(repo)}: Claude chưa được trust trong thư mục game nên phiên chạy từ {parent}. '
+                       f'Sửa hẳn: ở máy chạy `claude` một lần trong {repo} và chấp nhận.', disable_notification=True)
+    return ref
+
+
 def ensure_session(cfg, repo):
     """After a phone answer: open a session to act on it when none is running for REPO."""
     try:
         if sessions_for(repo):
             return
-        ref = launch(cfg, repo, game_name(repo), RESUME_PROMPT)
+        ref = resume(cfg, repo)
         send_text(cfg, f'▶ {game_name(repo)}: không có phiên Claude nào đang chạy, đã mở phiên mới để chạy tiếp. '
                        f'Về máy: claude attach {ref}')
     except (BotError, subprocess.TimeoutExpired, ValueError) as error:
@@ -529,6 +589,23 @@ def status_snapshot(repo):
     except FileNotFoundError:
         return None, None
     return state['now'], state['waiting']
+
+
+def brief(repo):
+    """REPO's step, what it waits on, and its Claude session with the minutes since it last wrote."""
+    now, waiting = status_snapshot(repo)
+    lines = [f"Đang làm: {now or 'chưa có status.md'}"] + ([f'Chờ bạn: {waiting}'] if waiting else [])
+    try:
+        live = sessions_for(repo)
+    except (BotError, subprocess.TimeoutExpired, ValueError):
+        return '\n'.join(lines)
+    if not live:
+        lines.append(f'Claude: không chạy. Gõ /open {game_name(repo)} để chạy tiếp.')
+    else:
+        path = transcript(live[0])
+        lines.append(f'Claude: {session_state(live[0])}'
+                     + (f', ghi lần cuối {minutes_since(path)} phút trước' if path else ''))
+    return '\n'.join(lines)
 
 
 # Sleep: a sleeping machine runs nothing and Telegram cannot wake it
@@ -691,15 +768,15 @@ def games_text(cfg):
     if not found:
         return f"Chưa có game nào trong {cfg['games_dir']}. Dùng /new <ý tưởng> để bắt đầu."
     try:
-        live = {os.path.realpath(s['cwd']): session_state(s)
-                for s in json.loads(claude('agents', '--json') or '[]') if s.get('cwd')}
+        listing = agents()
     except (BotError, subprocess.TimeoutExpired, ValueError):
-        live = {}
+        listing = []
     lines = []
     for name, repo in found.items():
         now, waiting = status_snapshot(repo)
         pending = read_json(state_file(repo, 'pending.json'))
-        session = live.get(os.path.realpath(repo))
+        live = sessions_for(repo, listing=listing)
+        session = session_state(live[0]) if live else None
         lines.append(f"{'▶' if repo == current else '·'} {name}")
         lines.append(f"   {now or 'chưa có status.md'}")
         lines.append(f"   Claude: {session or 'không chạy'}" + (f" · hỏi {pending['gate']}" if pending else '')
@@ -737,7 +814,7 @@ def on_session_command(cfg, command, rest):
             send_text(cfg, f'{name}: đã có phiên Claude đang chạy ({session_state(live[0])}). '
                            f'Xem bằng /log {name}.')
             return
-        ref = launch(cfg, repo, name, RESUME_PROMPT)
+        ref = resume(cfg, repo)
         send_text(cfg, f'▶ {name}: đã mở phiên Claude (phiên {ref}). Về máy: claude attach {ref}')
     elif command == 'log':
         found = sessions_for(repo) or sessions_for(repo, include_done=True)
@@ -799,12 +876,17 @@ def on_text(cfg, text):
         send_text(cfg, '✓ Đã nhận câu trả lời.', disable_notification=True)
         ensure_session(cfg, target)
         return
+    if text.lower().strip(' ?!.') in HELP_WORDS:
+        send_text(cfg, HELP)
+        return
     repo = resolve_game(cfg, None)
     if not repo:
         send_text(cfg, 'Chưa chọn game: xem /games, chọn bằng /use <game>.')
         return
     to_inbox(repo, {'kind': 'text', 'text': text})
-    send_text(cfg, f'📥 {game_name(repo)}: đã ghi cho agent. Agent đọc ở ranh giới bước tới.', disable_notification=True)
+    # A session stuck inside one step never reaches the boundary where it reads this: show the human where it is.
+    send_text(cfg, f'📥 {game_name(repo)}: đã ghi cho agent. Agent đọc ở ranh giới bước tới.\n\n{brief(repo)}',
+              disable_notification=True)
 
 
 def handle(cfg, update):
@@ -830,6 +912,34 @@ def handle(cfg, update):
         on_text(cfg, text)
 
 
+def check_stalls(cfg, warned):
+    """Warn the phone once per stall: a busy session that wrote nothing for STALL_MINUTES while no question is
+    pending is most likely held by a prompt only the computer can answer. WARNED: sessionId → reported mtime."""
+    try:
+        listing = agents()
+    except (BotError, subprocess.TimeoutExpired, ValueError) as error:
+        warn(str(error))
+        return
+    for repo in games(cfg).values():
+        if read_json(state_file(repo, 'pending.json')):
+            continue
+        for session in sessions_for(repo, listing=listing):
+            path = transcript(session) if session.get('status') == 'busy' else None
+            if not path:
+                continue
+            mtime, sid = os.path.getmtime(path), session.get('sessionId')
+            if time.time() - mtime < STALL_MINUTES * 60 or warned.get(sid) == mtime:
+                continue
+            warned[sid] = mtime
+            name, tool = game_name(repo), last_tool(path)
+            with contextlib.suppress(BotError):
+                send_text(cfg, f'⚠️ {name}: phiên Claude ({session_state(session)}) không ghi gì '
+                               f'{minutes_since(path)} phút' + (f', lệnh cuối: {tool}' if tool else '') + '.\n'
+                               'Có thể đang chờ một xác nhận chỉ bấm được trên máy. '
+                               f'Xem: /log {name}. Mở lại: /stop {name} rồi /open {name}. '
+                               f'Ở máy: claude attach {session_ref(session)}')
+
+
 def cmd_serve():
     cfg = require_config()
     if pid := serve_pid():
@@ -847,6 +957,7 @@ def cmd_serve():
     seen = {repo: status_snapshot(repo) for repo in games(cfg).values()}
     wall, mono = time.time(), time.monotonic()
     woke, failures = 0.0, 0
+    stall_checked, stalled = mono, {}
     print(f'serving Telegram for the games in {cfg["games_dir"]} and registered repos (pid {os.getpid()})', flush=True)
     try:
         while True:
@@ -857,6 +968,10 @@ def cmd_serve():
             wall, mono = now_wall, now_mono
             if gap >= SLEEP_GAP:
                 woke = gap
+                stall_checked = now_mono  # sessions were frozen too: give them time to write again
+            if away and now_mono - stall_checked >= STALL_CHECK_SECONDS:
+                stall_checked = now_mono
+                check_stalls(cfg, stalled)
             for repo in games(cfg).values():
                 snapshot = status_snapshot(repo)
                 if snapshot != seen.get(repo):

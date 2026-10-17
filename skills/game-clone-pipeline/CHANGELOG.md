@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.11.0 — 2026-10-17
+
+Fixes a Telegram run (Lowtide Locks) that sat two days at the start of S5: the session `cd`'d into
+a previous game's repo to read its store code, then called `EnterWorktree` from there, and the
+call held until the human was back at the computer. The phone could not see or restart it.
+
+- Hard rule 15: stay in the game repo; read other repos by absolute path or `git -C`.
+- Rule 5: a background session works each stage in one worktree, entered by name from the repo
+  root and closed at the stage end like any other branch.
+- S5: a missing human playtest no longer stalls G3; it is listed under `## Deferred (human)`.
+- `telegram_bridge.py`: a session belongs to a game when it runs in the repo or one of its
+  worktrees, or carries the game's name, so `/games`, `/log`, `/stop`, `/open` and the resume
+  after a phone answer see sessions working in `.claude/worktrees/`. Resume sessions refused as
+  "Workspace not trusted" start from the repo's parent with the repo path in the prompt, and the
+  phone is told how to fix it for good.
+- `serve` warns the phone once per stall in away mode when a busy session has written nothing for
+  30 minutes with no question pending, naming its last tool call. Free text with no pending
+  question is answered with the game's step and session state; `help` without a slash returns
+  the command list.
+
 ## 1.10.0 — 2026-10-15
 
 - Temporary branches no longer outlive their stage (rule 5). `test-coverage` (S3),
