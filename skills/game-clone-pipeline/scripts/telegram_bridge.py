@@ -86,7 +86,7 @@ VIDEO_EXT = {'.mp4', '.mov', '.m4v', '.webm', '.mkv', '.avi', '.3gp'}
 PHOTO_EXT = {'.png', '.jpg', '.jpeg', '.webp'}
 APK_EXT = {'.apk', '.xapk', '.apks', '.aab'}
 INBOX_COMMANDS = {'pause', 'resume', 'skip', 'redo', 'note'}
-NEEDS_ARGS = {'skip', 'redo', 'note', 'new', 'use'}
+NEEDS_ARGS = {'skip', 'redo', 'note', 'new', 'use', 'hide', 'unhide'}
 MODE_LABEL = {'here': 'ở máy', 'away': 'vắng mặt'}
 SESSION_LABEL = {'idle': 'đang mở, không làm gì', 'waiting': 'chờ xác nhận trên máy'}
 ANSI = re.compile(r'\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07|\x1b[()][0-9A-Za-z]')
@@ -102,6 +102,7 @@ HELP = '\n'.join([
     '/away: ra ngoài, hỏi quyết định ở đây và giữ máy thức',
     '/back: về máy, Telegram im lặng',
     '/games: danh sách game, bước, phiên Claude',
+    '/hide <game>, /unhide <game>: ẩn hoặc hiện game trong /games',
     '/use <game>: chọn game để nói chuyện',
     '/open [game]: mở phiên Claude chạy tiếp game',
     '/new <ý tưởng hoặc link store>: mở phiên Claude làm game mới',
@@ -363,6 +364,16 @@ def get_current(cfg):
 
 def set_current(repo):
     write_text(global_file('current'), repo)
+
+
+def hidden():
+    """Repos `/hide` took off the /games list; everything else still sees them."""
+    return read_json(global_file('hidden.json')) or []
+
+
+def set_hidden(repo, on):
+    real, rest = os.path.realpath(repo), [path for path in hidden() if path != os.path.realpath(repo)]
+    write_json(global_file('hidden.json'), rest + [real] if on else rest)
 
 
 def resolve_game(cfg, name):
@@ -834,14 +845,18 @@ def game_card(name, repo, current, live):
 
 
 def games_text(cfg):
-    found, current = games(cfg), get_current(cfg)
+    found, current, skip = games(cfg), get_current(cfg), hidden()
     if not found:
         return html.escape(f"Chưa có game nào trong {cfg['games_dir']}. Dùng /new <ý tưởng> để bắt đầu.")
+    shown = {name: repo for name, repo in found.items() if os.path.realpath(repo) not in skip}
     try:
-        listing = agents()
+        listing = agents() if shown else []
     except (BotError, subprocess.TimeoutExpired, ValueError):
         listing = []
-    cards = [game_card(name, repo, current, sessions_for(repo, listing=listing)) for name, repo in found.items()]
+    cards = [game_card(name, repo, current, sessions_for(repo, listing=listing)) for name, repo in shown.items()]
+    if len(shown) < len(found):
+        cards.append(f"Đang ẩn: {html.escape(', '.join(name for name in found if name not in shown))}"
+                     ' · /unhide &lt;game&gt; để hiện lại')
     return '\n\n'.join(cards + ['Chi tiết: /status &lt;game&gt; · Chọn game: /use &lt;game&gt;'])
 
 
@@ -869,8 +884,15 @@ def on_session_command(cfg, command, rest):
         send_text(cfg, f'✓ Đang nói chuyện với {name}.')
     elif command == 'status':
         send_pre(cfg, status_text(repo))
+    elif command == 'hide':
+        set_hidden(repo, True)
+        send_text(cfg, f'🙈 Đã ẩn {name} khỏi /games. Hiện lại: /unhide {name}')
+    elif command == 'unhide':
+        set_hidden(repo, False)
+        send_text(cfg, f'✓ {name} hiện lại trong /games.')
     elif command == 'open':
         set_current(repo)
+        set_hidden(repo, False)
         if live := sessions_for(repo):
             send_text(cfg, f'{name}: đã có phiên Claude đang chạy ({session_state(live[0])}). '
                            f'Xem bằng /log {name}.')
@@ -906,7 +928,7 @@ def on_command(cfg, text):
         set_mode(cfg, 'away')
     elif command == 'back':
         set_mode(cfg, 'here')
-    elif command in ('games', 'use', 'status', 'open', 'new', 'log', 'stop'):
+    elif command in ('games', 'use', 'status', 'open', 'new', 'log', 'stop', 'hide', 'unhide'):
         try:
             on_session_command(cfg, command, rest)
         except (BotError, subprocess.TimeoutExpired, ValueError) as error:

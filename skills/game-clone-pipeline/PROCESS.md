@@ -69,6 +69,7 @@ Không bắt buộc. Ngồi ở máy thì mọi thứ như cũ, bạn quyết tr
 | Lệnh | Kết quả |
 |---|---|
 | `/games` | Danh sách game: đang ở bước nào, có phiên Claude đang chạy không, đang hỏi gì |
+| `/hide <game>`, `/unhide <game>` | Ẩn game khỏi `/games` (ví dụ game chỉ còn chờ bạn làm App Store) hoặc hiện lại. Game ẩn vẫn hỏi, vẫn nhận trả lời và vẫn dùng được `/use`, `/status`, `/log`; `/open` tự hiện lại |
 | `/use <game>` | Chọn game để nói chuyện (gõ một phần tên là đủ) |
 | `/open [game]` | Mở một phiên Claude chạy nền trong repo game đó và chạy tiếp từ `.clone/status.md`. Nếu game đã có phiên đang chạy thì bot báo, không mở thêm |
 | `/new <ý tưởng hoặc link store>` | Mở phiên Claude bắt đầu game mới trong `GAMES_DIR`; agent tạo repo rồi hỏi tiếp bạn qua Telegram |

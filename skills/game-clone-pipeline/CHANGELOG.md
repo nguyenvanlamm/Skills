@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.13.0 — 2026-10-19
+
+A game that only waits on the human (Nightwall, at S8's App Store steps) stayed in `/games` with
+no way to take it off: the list is every registered repo plus every `GAMES_DIR/*/.clone/status.md`.
+
+- `/hide <game>` takes a game off the `/games` list and `/unhide <game>` brings it back; the list
+  ends with `Đang ẩn: …` while any are hidden. A partial name works, as with `/use`.
+- Hiding touches only the list: questions, answers, stall and stop warnings, `/use`, `/status`
+  and `/log` still see the game. `/open <game>` unhides it. The hidden repos live in
+  `~/.local/state/game-clone-pipeline/telegram/hidden.json`.
+
 ## 1.12.1 — 2026-10-19
 
 `/games` on Telegram was a monospace block of raw `Now:` / `Waiting on:` lines and session
