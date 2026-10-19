@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.12.1 — 2026-10-19
+
+`/games` on Telegram was a monospace block of raw `Now:` / `Waiting on:` lines and session
+states (`busy · working`), hard to read on a phone.
+
+- Each game is now a short card in plain HTML: bold name with one state badge (❓ asking you,
+  🟢 running, ⏸ waiting on you, 🟡 Claude idle, 💤 stopped with `/open <game>`, ✅ done,
+  ⚪ not started), the stage's short label (`S8 · iOS + nộp`), and the first clause of
+  `Waiting on:` cut to 80 characters. `/status <game>` still shows everything.
+
 ## 1.12.0 — 2026-10-19
 
 Fixes a Telegram run (Haboob Run) that stopped overnight at the start of S7: the session ran

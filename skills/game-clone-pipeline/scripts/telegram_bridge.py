@@ -88,6 +88,7 @@ APK_EXT = {'.apk', '.xapk', '.apks', '.aab'}
 INBOX_COMMANDS = {'pause', 'resume', 'skip', 'redo', 'note'}
 NEEDS_ARGS = {'skip', 'redo', 'note', 'new', 'use'}
 MODE_LABEL = {'here': 'ở máy', 'away': 'vắng mặt'}
+SESSION_LABEL = {'idle': 'đang mở, không làm gì', 'waiting': 'chờ xác nhận trên máy'}
 ANSI = re.compile(r'\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07|\x1b[()][0-9A-Za-z]')
 BACKGROUNDED = re.compile(r'backgrounded\s*·\s*(\S+)')
 RESUME_PROMPT = ('/game-clone-pipeline Resume the game in {repo} (work in that folder). Started from Telegram: '
@@ -611,13 +612,18 @@ def status_text(repo):
     return '\n'.join(lines)
 
 
-def status_snapshot(repo):
+def read_state(repo):
+    """REPO's parsed `.clone/status.md`, or None before it exists."""
     try:
         with open(steps_pane.status_path(repo), encoding='utf-8') as f:
-            state = steps_pane.parse(f.read())
+            return steps_pane.parse(f.read())
     except FileNotFoundError:
-        return None, None
-    return state['now'], state['waiting']
+        return None
+
+
+def status_snapshot(repo):
+    state = read_state(repo)
+    return (state['now'], state['waiting']) if state else (None, None)
 
 
 def brief(repo):
@@ -792,30 +798,56 @@ def on_button(cfg, query):
                                                 'reply_markup': {'inline_keyboard': []}})
 
 
+def short(text, limit=80):
+    """The first clause of a status.md line, without markdown or a leading `human —`, cut to LIMIT."""
+    text = re.sub(r'^human\s*[—:-]\s*', '', text.replace('`', ''), flags=re.IGNORECASE)
+    text = re.split(r' → |; |, xem ', text)[0].strip()
+    return text if len(text) <= limit else text[:limit - 1].rstrip() + '…'
+
+
+def game_card(name, repo, current, live):
+    """One game for /games, as Telegram HTML: name and one state, then its stage and what it waits on."""
+    state, pending = read_state(repo), read_json(state_file(repo, 'pending.json'))
+    stage = steps_pane.current_stage(state) if state else None
+    status = live[0].get('status') if live else None
+    if pending:
+        badge = f"❓ đang hỏi bạn ({pending['gate']})"
+    elif status == 'busy':
+        badge = '🟢 đang chạy'
+    elif state and state['waiting']:
+        badge = '⏸ chờ bạn'
+    elif live:
+        badge = f"🟡 Claude {SESSION_LABEL.get(status, status or '?')}"
+    elif not state:
+        badge = '⚪ chưa bắt đầu'
+    elif not stage:
+        badge = '✅ xong'
+    else:
+        badge = f'💤 đã dừng · /open {name}'
+    lines = [f"{'▶ ' if repo == current else ''}<b>{html.escape(name)}</b>  {html.escape(badge)}"]
+    if stage:
+        label = next(s['label'] for s in state['stages'] if s['id'] == stage)
+        lines.append(f'{stage} · {html.escape(label)}')
+    if state and state['waiting'] and not pending:
+        lines.append(f"Chờ: {html.escape(short(state['waiting']))}")
+    return '\n'.join(lines)
+
+
 def games_text(cfg):
     found, current = games(cfg), get_current(cfg)
     if not found:
-        return f"Chưa có game nào trong {cfg['games_dir']}. Dùng /new <ý tưởng> để bắt đầu."
+        return html.escape(f"Chưa có game nào trong {cfg['games_dir']}. Dùng /new <ý tưởng> để bắt đầu.")
     try:
         listing = agents()
     except (BotError, subprocess.TimeoutExpired, ValueError):
         listing = []
-    lines = []
-    for name, repo in found.items():
-        now, waiting = status_snapshot(repo)
-        pending = read_json(state_file(repo, 'pending.json'))
-        live = sessions_for(repo, listing=listing)
-        session = session_state(live[0]) if live else None
-        lines.append(f"{'▶' if repo == current else '·'} {name}")
-        lines.append(f"   {now or 'chưa có status.md'}")
-        lines.append(f"   Claude: {session or 'không chạy'}" + (f" · hỏi {pending['gate']}" if pending else '')
-                     + (f' · chờ: {waiting}' if waiting and not pending else ''))
-    return '\n'.join(lines)
+    cards = [game_card(name, repo, current, sessions_for(repo, listing=listing)) for name, repo in found.items()]
+    return '\n\n'.join(cards + ['Chi tiết: /status &lt;game&gt; · Chọn game: /use &lt;game&gt;'])
 
 
 def on_session_command(cfg, command, rest):
     if command == 'games':
-        send_pre(cfg, games_text(cfg))
+        send_text(cfg, games_text(cfg), parse_mode='HTML')
         return
     if command == 'new':
         if not os.path.isdir(cfg['games_dir']):
@@ -953,12 +985,8 @@ def check_ended(cfg, warned, repo, session):
     mtime, key = os.path.getmtime(path), ('ended', session.get('sessionId'))
     if not ENDED_MINUTES * 60 <= time.time() - mtime <= ENDED_HOURS * 3600 or warned.get(key) == mtime:
         return
-    try:
-        with open(steps_pane.status_path(repo), encoding='utf-8') as f:
-            state = steps_pane.parse(f.read())
-    except FileNotFoundError:
-        return
-    if state['waiting'] or all(stage['done'] for stage in state['stages']):
+    state = read_state(repo)
+    if not state or state['waiting'] or all(stage['done'] for stage in state['stages']):
         return
     warned[key] = mtime
     name, reply = game_name(repo), last_reply(path)
