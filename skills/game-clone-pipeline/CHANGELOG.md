@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.12.0 — 2026-10-19
+
+Fixes a Telegram run (Haboob Run) that stopped overnight at the start of S7: the session ran
+`landing-page-generator`, printed its copy with the skill's own `Result: COMPLETE … Decision: No
+approval needed.` block, and ended its turn before the site repo existed. A background session
+that ends its turn is never prompted again, and the bot said nothing: its stall check only looked
+at busy sessions, and the session, started by `/new` from `GAMES_DIR` under the idea's name, did
+not count as the game's. The resume the phone started the next morning died on an expired login,
+also unseen.
+
+- Hard rule 16: only a human stop (or the Final report after S9) ends the turn; a sibling
+  skill's final report closes its step, not the stage. Setup step 4 and S7 say so where it bit.
+- `telegram_bridge.py`: in away mode `serve` also warns once when a game's sessions have all
+  stopped 10 minutes to 24 hours ago with stages left, nothing in `Waiting on:` and no question
+  pending, quoting the session's last reply (so "Login expired" reaches the phone) and
+  `/open <game>`. A session `/stop`ped from the phone is left alone.
+- Every subcommand run on a repo from inside a Claude session records `CLAUDE_CODE_SESSION_ID`
+  in `.clone/telegram/sessions.json`, and such a session belongs to the game, so `/games`,
+  `/log`, `/stop` and both warnings see `/new` sessions too.
+
 ## 1.11.0 — 2026-10-17
 
 Fixes a Telegram run (Lowtide Locks) that sat two days at the start of S5: the session `cd`'d into

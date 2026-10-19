@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.11.0
+  version: 1.12.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -104,6 +104,14 @@ version for people; this file is the operating manual.
     working directory follows `cd`, so the next `EnterWorktree`, `git` or `flutter` command lands
     in the wrong repo. A background session once sat two days at the start of S5 this way,
     holding a call only the computer could release.
+16. **Only a human stop ends the turn.** End the turn at a human stop (a gate, a ❓ round, a
+    `Waiting on:` asked with `ask` or in the chat) or at the Final report after S9, never
+    elsewhere. A sibling skill's closing block (`Result / Evidence / Uncertainty / Decision`)
+    is input to the pipeline, not the end of the run: read it, act on it, and start the next
+    step in the same turn. A background session that ends its turn stops for good, because
+    nothing prompts it again. One stopped at the start of S7 this way: it printed the
+    landing-page-generator copy with `Decision: No approval needed.` and ended, before the
+    site repo existed.
 
 ## Roles
 
@@ -156,7 +164,8 @@ work (`git branch -D`, closing a PR unmerged) only on the human's answer, logged
    at every stage change and gate stop instead.
 4. **Sibling skills**: invoke them by name with the Skill tool. If one is missing, do its step
    inline with the same output, and log it under "Fallbacks" in status.md. A missing skill
-   lowers quality; it never stops the run.
+   lowers quality; it never stops the run. When a sibling skill returns, its final report
+   closes that skill's step, not the stage: carry on with the next step (hard rule 16).
 5. **Telegram remote** (only when `~/.config/game-clone-pipeline/telegram.env` exists): run
    `python3 <skill-dir>/scripts/telegram_bridge.py watch <repo>` in the background once per
    session. It registers the repo; when the service already serves the bot it prints
@@ -187,7 +196,12 @@ it, `watch` serves from inside the session. The agent talks to it through these 
 - **Stalls and status.** In away mode the bot warns the phone once when a busy session has
   written nothing for 30 minutes while no question is pending (most likely a prompt only the
   computer can answer), naming the last tool call and how to `/log`, `/stop` + `/open`, or
-  attach. Free text with no pending question is answered with the game's `Now:`, `Waiting on:`
+  attach. It also warns once when a game's sessions have all stopped 10 minutes to 24 hours
+  ago with stages left, nothing in `Waiting on:` and no question pending (the session quit
+  without asking, or died on an expired login), quoting the session's last reply and
+  `/open <game>`. A session counts as the game's once it runs any subcommand on the repo
+  (`register`, `inbox`, `ask`, …), so a `/new` session working from `GAMES_DIR` under the
+  idea's name is seen too. Free text with no pending question is answered with the game's `Now:`, `Waiting on:`
   and session state; `help` without the slash returns the command list.
 - **A session started from Telegram** (its prompt says so): the human is away, so run
   `answers` and `inbox` first, ask every human stop with `ask` in the foreground (no chat-only
@@ -361,6 +375,9 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
   workflow (hard rule 11):
   `gh api -X POST repos/<owner>/<game>-site/pages -f 'source[branch]=main' -f 'source[path]=/'`.
   Every push to `main` republishes the site.
+- landing-page-generator's copy mode only prints the copy in the chat and ends with its own
+  `Result: COMPLETE` block. That ends its step, not S7 (hard rule 16): put the copy into the
+  site's `index.html` right away, then the privacy and support pages, Pages and the checks.
 - Verify: both URLs return 200 (`curl -sI`). Commit with `commit` in that repo.
 
 ### S8 — iOS: prepare on Ubuntu, build and upload on a Mac → gate G4

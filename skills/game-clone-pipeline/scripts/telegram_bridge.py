@@ -27,9 +27,10 @@ and the update offset in ~/.local/state/game-clone-pipeline/telegram/.
 From the phone, `/open <game>` and `/new <idea>` start `claude --bg` sessions (permission mode auto);
 `claude attach <game>` takes one over at the computer. A Telegram answer for a game with no live
 session opens one, which reads it with `answers`. A session belongs to a game when it runs in the repo
-or one of its worktrees, or carries the game's name. In away mode `serve` warns the phone once when a
-busy session has written nothing for STALL_MINUTES and no question is pending: it is most likely
-waiting on a prompt only the computer can answer.
+or one of its worktrees, carries the game's name, or ran a subcommand on the repo. In away mode `serve`
+warns the phone once when no question is pending and either a busy session has written nothing for
+STALL_MINUTES (most likely waiting on a prompt only the computer can answer) or the game's sessions
+have all stopped with stages left and nothing in `Waiting on:` (it quit without asking anything).
 
 `ask` prints one JSON line and exits 0: {"event": "answer", "answer", "by": "telegram"|"computer", ...}
 or {"event": "inbox", "unread": n} when a command arrived first (read `inbox`, then ask again: the
@@ -76,6 +77,8 @@ POLL_SECONDS = 10
 SLEEP_GAP = 60
 STALL_MINUTES = 30
 STALL_CHECK_SECONDS = 300
+ENDED_MINUTES = 10
+ENDED_HOURS = 24
 DOWNLOAD_LIMIT = 20 * 1024 * 1024
 UPLOAD_LIMIT = 50 * 1024 * 1024
 PHOTO_LIMIT = 10 * 1024 * 1024
@@ -396,12 +399,25 @@ def agents(include_done=False):
     return json.loads(claude('agents', '--json', *(['--all'] if include_done else [])) or '[]')
 
 
+def link_session(repo):
+    """Remember the Claude session running this subcommand as REPO's. A `/new` session runs from GAMES_DIR
+    under the idea's name, so neither its folder nor its name tells which game it builds."""
+    sid = os.environ.get('CLAUDE_CODE_SESSION_ID')
+    if not sid:
+        return
+    linked = read_json(state_file(repo, 'sessions.json')) or []
+    if sid not in linked:
+        write_json(state_file(repo, 'sessions.json'), (linked + [sid])[-20:])
+
+
 def belongs(session, repo):
-    """A session is REPO's when it runs in REPO or one of its worktrees, or carries the game's name."""
+    """A session is REPO's when it runs in REPO or one of its worktrees, carries the game's name, or ran a
+    subcommand on REPO (`link_session`)."""
     real, cwd = os.path.realpath(repo), session.get('cwd')
     if cwd and (os.path.realpath(cwd) + os.sep).startswith(real + os.sep):
         return True
-    return session.get('name') == game_name(repo)
+    return (session.get('name') == game_name(repo)
+            or session.get('sessionId') in (read_json(state_file(repo, 'sessions.json')) or []))
 
 
 def sessions_for(repo, include_done=False, listing=None):
@@ -459,14 +475,27 @@ def recent_activity(session, limit=12):
     return '\n\n'.join(item if len(item) <= 500 else item[:500] + '…' for item in items[-limit:]) or '(chưa có gì)'
 
 
-def last_tool(path, tail=512 * 1024):
-    """The last tool call in a transcript, read from its end (transcripts grow to tens of MB)."""
+def tail_items(path, tail=512 * 1024):
+    """Transcript items read from the end of PATH (transcripts grow to tens of MB)."""
     start = max(0, os.path.getsize(path) - tail)
     with open(path, 'rb') as f:
         f.seek(start)
         lines = f.read().decode('utf-8', 'replace').splitlines()[1 if start else 0:]
-    calls = [item for item in transcript_items(lines) if item.startswith('🔧')]
+    return transcript_items(lines)
+
+
+def last_tool(path):
+    """The last tool call in a transcript."""
+    calls = [item for item in tail_items(path) if item.startswith('🔧')]
     return calls[-1][2:].strip()[:300] if calls else None
+
+
+def last_reply(path):
+    """The end of the last reply in a transcript, where a run says how it ended."""
+    replies = [item[2:].strip() for item in tail_items(path) if item.startswith('🤖')]
+    if not replies:
+        return None
+    return replies[-1] if len(replies[-1]) <= 300 else '…' + replies[-1][-300:]
 
 
 def minutes_since(path):
@@ -832,6 +861,7 @@ def on_session_command(cfg, command, rest):
             send_text(cfg, f'{name}: không có phiên chạy nền nào để dừng (phiên trên máy tính thì dừng ở máy).')
             return
         claude('stop', session_ref(background[0]))
+        write_text(state_file(repo, 'stopped'), background[0].get('sessionId') or '')
         send_text(cfg, f'⏹ {name}: đã dừng phiên Claude. Mở lại bằng /open {name}.')
 
 
@@ -912,25 +942,57 @@ def handle(cfg, update):
         on_text(cfg, text)
 
 
-def check_stalls(cfg, warned):
-    """Warn the phone once per stall: a busy session that wrote nothing for STALL_MINUTES while no question is
-    pending is most likely held by a prompt only the computer can answer. WARNED: sessionId → reported mtime."""
+def check_ended(cfg, warned, repo, session):
+    """Warn once when REPO's newest session, not busy, last wrote ENDED_MINUTES to ENDED_HOURS ago with stages
+    left and nothing in `Waiting on:`: it stopped without asking anything (a sibling skill's final report taken
+    for the end of the run, an expired login) and nothing restarts it. A session `/stop`ped from the phone is
+    left alone."""
+    path = transcript(session)
+    if not path or read_text(state_file(repo, 'stopped')) == session.get('sessionId'):
+        return
+    mtime, key = os.path.getmtime(path), ('ended', session.get('sessionId'))
+    if not ENDED_MINUTES * 60 <= time.time() - mtime <= ENDED_HOURS * 3600 or warned.get(key) == mtime:
+        return
     try:
-        listing = agents()
+        with open(steps_pane.status_path(repo), encoding='utf-8') as f:
+            state = steps_pane.parse(f.read())
+    except FileNotFoundError:
+        return
+    if state['waiting'] or all(stage['done'] for stage in state['stages']):
+        return
+    warned[key] = mtime
+    name, reply = game_name(repo), last_reply(path)
+    with contextlib.suppress(BotError):
+        send_text(cfg, f'⚠️ {name}: phiên Claude ({session_state(session)}) đã dừng lúc '
+                       f'{time.strftime("%H:%M", time.localtime(mtime))} mà không hỏi gì.\n'
+                       f"Đang làm: {state['now'] or '?'}\n" + (f'Câu cuối: {reply}\n' if reply else '')
+                       + f'Chạy tiếp: /open {name}. Xem: /log {name}.')
+
+
+def check_stalls(cfg, warned):
+    """Warn the phone once per stall while no question is pending: a busy session that wrote nothing for
+    STALL_MINUTES is most likely held by a prompt only the computer can answer, and a game with no busy
+    session may have stopped without asking (`check_ended`). WARNED: (kind, sessionId) → reported mtime."""
+    try:
+        listing = agents(include_done=True)
     except (BotError, subprocess.TimeoutExpired, ValueError) as error:
         warn(str(error))
         return
     for repo in games(cfg).values():
         if read_json(state_file(repo, 'pending.json')):
             continue
-        for session in sessions_for(repo, listing=listing):
-            path = transcript(session) if session.get('status') == 'busy' else None
+        mine = sessions_for(repo, listing=listing)
+        busy = [session for session in mine if session.get('status') == 'busy']
+        if mine and not busy:
+            check_ended(cfg, warned, repo, mine[0])
+        for session in busy:
+            path = transcript(session)
             if not path:
                 continue
-            mtime, sid = os.path.getmtime(path), session.get('sessionId')
-            if time.time() - mtime < STALL_MINUTES * 60 or warned.get(sid) == mtime:
+            mtime, key = os.path.getmtime(path), ('stall', session.get('sessionId'))
+            if time.time() - mtime < STALL_MINUTES * 60 or warned.get(key) == mtime:
                 continue
-            warned[sid] = mtime
+            warned[key] = mtime
             name, tool = game_name(repo), last_tool(path)
             with contextlib.suppress(BotError):
                 send_text(cfg, f'⚠️ {name}: phiên Claude ({session_state(session)}) không ghi gì '
@@ -1256,6 +1318,8 @@ def main(argv):
     if not os.path.isdir(repo):
         warn(f'no such directory: {repo}')
         return 66
+    if args.command != 'watch':
+        link_session(repo)
     if args.command == 'watch':
         register(repo)
         return cmd_serve()

@@ -80,6 +80,8 @@ Phiên mở từ điện thoại chạy với chế độ quyền `auto`: Claude
 
 Khi đang ở chế độ vắng mặt, nếu một phiên Claude đang chạy mà 30 phút không ghi gì và không có câu hỏi nào chờ bạn, bot nhắn **một lần** kèm lệnh cuối cùng phiên đó chạy. Thường là phiên đang chờ một xác nhận chỉ bấm được trên máy. Xem bằng `/log`; mở lại bằng `/stop` rồi `/open`, hoặc về máy `claude attach`.
 
+Bot cũng nhắn **một lần** khi phiên của game đã dừng hẳn (từ 10 phút đến 24 giờ trước) mà game chưa xong, `Waiting on:` trống và không có câu hỏi nào chờ bạn. Tin nhắn kèm câu cuối của phiên, ví dụ "Login expired" khi Claude hết hạn đăng nhập. Chạy tiếp bằng `/open <game>`. Agent chỉ được dừng ở chỗ cần bạn quyết (luật 16), nên tin này nghĩa là phiên dừng ngoài ý muốn.
+
 Bot nhận ra cả những phiên đang làm trong worktree của game (`.claude/worktrees/…`). Repo do pipeline tạo từ điện thoại chưa được Claude trust, nên `/open` sẽ mở phiên từ thư mục cha (`GAMES_DIR`) và báo cho bạn. Muốn sửa hẳn, ở máy chạy `claude` một lần trong repo đó và chấp nhận.
 
 **Lưu ý:**
