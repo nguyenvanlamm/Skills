@@ -1,0 +1,141 @@
+{
+  "game": {
+    "name": "Tile Pop",
+    "icon": "../../assets/icon/icon.png",
+    "colors": {
+      "bg": "#1b1530",
+      "bg2": "#3a2a6b",
+      "fg": "#ffffff",
+      "accent": "#ffcc33"
+    }
+  },
+  "direction": "B · challenge",
+  "shots": [
+    {
+      "take": "takes/take-01.mp4",
+      "in": 0.4,
+      "out": 3.4,
+      "framing": "wide 1x",
+      "why": "establish the board",
+      "caption": {
+        "text": "Can you clear *all 35*?",
+        "pos": 0.035
+      },
+      "action": "first taps, combo climbs",
+      "check_at": [
+        1.0
+      ]
+    },
+    {
+      "take": "takes/take-03.mp4",
+      "in": 3.0,
+      "out": 5.6,
+      "framing": "close 1.5x",
+      "transition": "fade",
+      "transition_s": 0.3,
+      "zoom": {
+        "from": 1.0,
+        "to": 1.5,
+        "anchor": [
+          0.5,
+          0.45
+        ],
+        "anchor_label": "the clearing row",
+        "at": 0.1,
+        "dur": 0.6
+      },
+      "why": "push onto the combo",
+      "caption": {
+        "text": "Combo *x20*",
+        "pos": "bottom"
+      },
+      "action": "rows burst",
+      "check_at": [
+        1.5
+      ]
+    },
+    {
+      "take": "takes/take-02.mp4",
+      "in": 0.5,
+      "out": 5.5,
+      "framing": "wide 1x",
+      "transition": "slideup",
+      "transition_s": 0.3,
+      "why": "show the whole loop",
+      "action": "board refills",
+      "check_at": [
+        2.5
+      ]
+    },
+    {
+      "take": "takes/take-03.mp4",
+      "in": 0.4,
+      "out": 3.0,
+      "framing": "wide 1x",
+      "profiles": [
+        "app-preview"
+      ],
+      "why": "extra loop for the preview",
+      "action": "speed run"
+    },
+    {
+      "take": "takes/take-01.mp4",
+      "in": 3.5,
+      "out": 6.3,
+      "framing": "medium 1.2x",
+      "zoom": {
+        "from": 1.2,
+        "to": 1.2,
+        "anchor": [
+          0.5,
+          0.4
+        ]
+      },
+      "why": "payoff, score settles",
+      "caption": {
+        "text": "Score *2100*",
+        "pos": 0.035
+      },
+      "action": "score lands",
+      "check_at": [
+        2.0
+      ]
+    }
+  ],
+  "end_card": {
+    "seconds": 2.8,
+    "headline": "Tile Pop",
+    "subline": "One more board?",
+    "cta": "Play free",
+    "transition": "fade",
+    "transition_s": 0.3,
+    "check_at": [
+      1.5
+    ]
+  },
+  "audio": {
+    "bgm": "ad",
+    "bgm_volume": 0.45,
+    "game_volume": 1.0
+  },
+  "cues": [
+    {
+      "shot": 1,
+      "at": 0.1,
+      "sfx": "transition/whoosh-fast.mp3",
+      "db": -14
+    },
+    {
+      "shot": 1,
+      "at": 0.7,
+      "sfx": "feedback/achievement.mp3",
+      "db": -12
+    },
+    {
+      "end_card": true,
+      "at": 0.1,
+      "sfx": "impact/brand-stamp.mp3",
+      "db": -10
+    }
+  ]
+}

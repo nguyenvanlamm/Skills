@@ -1,0 +1,48 @@
+{
+  "lead_in_ms": 500,
+  "tail_ms": 1200,
+  "actions": [
+    {
+      "wait": 600
+    },
+    {
+      "tap": [
+        96,
+        271
+      ],
+      "after": 180
+    },
+    {
+      "tap": [
+        173,
+        271
+      ],
+      "after": 180
+    },
+    {
+      "mark": "combo"
+    },
+    {
+      "repeat": 5,
+      "actions": [
+        {
+          "swipe": [
+            100,
+            600,
+            330,
+            600
+          ],
+          "ms": 160,
+          "after": 250
+        }
+      ]
+    },
+    {
+      "key": "Space",
+      "after": 300
+    },
+    {
+      "shot": "end-state.png"
+    }
+  ]
+}
