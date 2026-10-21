@@ -23,6 +23,7 @@ monitor in parallel (it hears every app on the machine, so keep the machine quie
 Android: adb screencap / input / screenrecord; coordinates are device pixels.
 
 Each take writes <out>/takes/NAME.mp4 and NAME.marks.json ({"duration": s, "marks": [{t, label}]}).
+`serve` writes <out>/.gitignore so takes, shots, sheets and every video stay out of git.
 """
 import argparse
 import asyncio
@@ -38,6 +39,18 @@ from pathlib import Path
 
 DEFAULT_OUT = "marketing/video"
 FPS = 30
+# Footage never goes to GitHub: the output folder carries its own .gitignore for it.
+MEDIA_IGNORE = ["*.mp4", "*.mov", "*.m4v", "*.webm", "*.mkv", "takes/", "shots/", "sheets/", ".build-*/"]
+
+
+def ignore_media(folder):
+    gi = Path(folder) / ".gitignore"
+    text = gi.read_text() if gi.exists() else ""
+    missing = [p for p in MEDIA_IGNORE if p not in text.splitlines()]
+    if missing:
+        head = "" if text else "# game-ad-video: videos and raw footage stay on this machine, never in git\n"
+        sep = "\n" if text and not text.endswith("\n") else ""
+        gi.write_text(text + sep + head + "".join(p + "\n" for p in missing))
 
 
 def sock_path(out):
@@ -426,6 +439,7 @@ def main():
         if not a.android and not a.url:
             p.error("serve needs --url (web) or --android")
         Path(a.out).mkdir(parents=True, exist_ok=True)
+        ignore_media(a.out)
         asyncio.run(Server(a).serve())
         return
     req = {"cmd": a.cmd}

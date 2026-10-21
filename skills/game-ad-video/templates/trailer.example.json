@@ -1,0 +1,103 @@
+{
+  "game": {
+    "name": "Tile Pop",
+    "icon": "../../assets/icon/icon.png",
+    "logo": null,
+    "font": "../../assets/fonts/Display.ttf",
+    "colors": {"bg": "#1b1530", "bg2": "#3a2a6b", "fg": "#ffffff", "accent": "#ffcc33", "stroke": "#000000"}
+  },
+  "direction": "A · Cinematic mood",
+  "profiles": ["trailer", "trailer-9x16"],
+  "music": {"bpm": 126.0, "beat0": 1.684, "start": 55.019},
+  "music_trailer_9x16": {"bpm": 126.0, "beat0": 1.684, "start": 64.543},
+  "fade_in": 0.6,
+  "fade_in_trailer_9x16": 0,
+  "shots": [
+    {
+      "take": "takes/take-05.mp4", "in": 15.6, "beats": 8,
+      "profiles": ["trailer-9x16"],
+      "framing": "wide 1x → 1.2x",
+      "zoom": {"from": 1.0, "to": 1.2, "anchor": [0.4, 0.6], "anchor_label": "the chain reaction", "at": 1.6, "dur": 0.7},
+      "why": "cut-down hook, on the drop",
+      "caption": {"text": "Can you clear *all 35*?", "pos": 0.03, "size": 0.056},
+      "check_at": [0.5, 3.0]
+    },
+    {
+      "take": "takes/take-01.mp4", "in": 1.0, "beats": 8,
+      "profiles": ["trailer"],
+      "framing": "wide, slow push",
+      "zoom": {"from": 1.0, "to": 1.12, "anchor": [0.5, 0.55], "anchor_label": "the full board", "at": 0.0, "dur": 3.5},
+      "why": "cold open, music still low",
+      "check_at": [2.0]
+    },
+    {
+      "card": {"text": "One *board*.", "style": "title", "bg_take": "takes/take-01.mp4", "bg_at": 3.0},
+      "beats": 4, "profiles": ["trailer"], "transition": "fade", "transition_s": 0.3,
+      "check_at": [1.0]
+    },
+    {
+      "take": "takes/take-01.mp4", "in": 5.6, "beats": 8,
+      "profiles": ["trailer"], "transition": "fade", "transition_s": 0.3,
+      "zoom": {"from": 1.0, "to": 1.4, "anchor": [0.5, 0.45], "anchor_label": "the first clear", "at": 1.4, "dur": 0.8},
+      "why": "first payoff, right before the drop",
+      "check_at": [3.5]
+    },
+    {
+      "card": {"style": "logo"}, "beats": 4, "transition": "fadewhite", "transition_s": 0.1,
+      "why": "title on the drop", "check_at": [1.0]
+    },
+    {
+      "take": "takes/take-02.mp4", "in": 1.1, "beats": 8,
+      "layout": "panel", "side": "left",
+      "caption": {"text": "*Tap* a tile", "sub": "the game's own hint goes here"},
+      "why": "verb 1", "check_at": [2.0]
+    },
+    {
+      "take": "takes/take-03.mp4", "in": 1.0, "beats": 8,
+      "layout": "panel", "side": "right",
+      "caption": {"text": "*Chain* the pops"},
+      "why": "verb 2", "check_at": [3.0]
+    },
+    {
+      "take": "takes/take-04.mp4", "in": 2.0, "beats": 8,
+      "layout": "panel", "side": "left",
+      "caption": {"text": "*Clear* the board"},
+      "why": "verb 3", "check_at": [3.0]
+    },
+    {
+      "layout": "grid", "beats": 8,
+      "takes": [
+        {"take": "takes/take-05.mp4", "in": 11.0},
+        {"take": "takes/take-06.mp4", "in": 12.5},
+        {"take": "takes/take-07.mp4", "in": 2.5}
+      ],
+      "caption": {"text": "*Three* worlds", "pos": 0.02, "size": 0.06, "plate": false},
+      "why": "variety", "check_at": [2.0]
+    },
+    {"take": "takes/take-03.mp4", "in": 12.0, "beats": 4, "layout": "fill", "fill_y": 0.5, "check_at": [1.0]},
+    {"take": "takes/take-06.mp4", "in": 3.0, "beats": 4, "layout": "fill", "fill_y": 0.45, "check_at": [1.0]},
+    {"take": "takes/take-07.mp4", "in": 11.3, "beats": 2, "layout": "fill", "check_at": [0.5]},
+    {"take": "takes/take-04.mp4", "in": 8.0, "beats": 2, "layout": "fill", "check_at": [0.5]},
+    {
+      "card": {"text": "Clear *every* board.", "style": "feature", "bg_take": "takes/take-05.mp4", "bg_at": 16.0},
+      "beats": 4, "transition": "fadeblack", "transition_s": 0.3, "check_at": [1.2]
+    },
+    {
+      "take": "takes/take-05.mp4", "in": 22.5, "beats": 16,
+      "zoom": {"from": 1.0, "to": 1.25, "anchor": [0.5, 0.47], "anchor_label": "the win stars", "at": 4.6, "dur": 0.8},
+      "why": "payoff, held", "check_at": [3.0, 6.5]
+    }
+  ],
+  "end_card": {
+    "beats": 8, "headline": "Tile Pop", "subline": "One more board?",
+    "date": "Out now", "platforms": ["App Store", "Google Play"], "cta": "Play free",
+    "transition": "fade", "transition_s": 0.3, "check_at": [2.0]
+  },
+  "audio": {"bgm": "ad", "game_volume": 0.8},
+  "cues": [
+    {"shot": 4, "at": 0.0, "sfx": "impact/logo-reveal.mp3", "db": -9},
+    {"shot": 5, "at": 0.0, "sfx": "transition/whoosh.mp3", "db": -16},
+    {"shot": 14, "at": 5.5, "sfx": "feedback/achievement.mp3", "db": -12},
+    {"end_card": true, "at": 0.1, "sfx": "impact/brand-stamp.mp3", "db": -10}
+  ]
+}

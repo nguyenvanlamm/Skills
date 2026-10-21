@@ -1,5 +1,8 @@
 # Ad structure for casual / puzzle game videos
 
+For a 16:9 trailer and its 9:16 cut-down, read `trailer-structure.md`. The camera, caption and
+audio rules below still apply there.
+
 This file is a summary. The camera and audio rules are condensed from huashu-design
 (`references/storyboard-basics.md`, `camera-language.md`, `ui-demo-animation.md`,
 `audio-design-rules.md`); read those when a shot needs more than what is here.
@@ -48,7 +51,9 @@ use "Can you pass level 9?"). App Preview captions never sell: no price, "free",
   - `slideup` / `slideleft` for "next level / next board".
   - `fade` into the end card.
 
-  Any ffmpeg `xfade` transition name works, but keep to these.
+  Any ffmpeg `xfade` transition name works, but keep to these. Trailers add `fadeblack`
+  (between acts) and `fadewhite` (0.1 s, into the title on the drop); see
+  `trailer-structure.md`.
 - **Check frames**: 1–2 per shot, at the moment the shot must prove something (caption fully in,
   push-in landed, payoff visible).
 
