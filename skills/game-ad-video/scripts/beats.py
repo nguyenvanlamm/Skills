@@ -7,7 +7,9 @@ Prints bpm, beat0 (first downbeat, seconds into the track), the bar length, down
 (low / mid / high energy, on bar lines), the rises (bars where the energy jumps) and the drop:
 the biggest rise, or with --length the biggest one that leaves L seconds of track after
 music.start. With --drop-at S it suggests music.start so that the drop lands S seconds into the
-trailer (snapped to whole bars, so music.start is itself a downbeat).
+trailer (snapped to whole bars, so music.start is itself a downbeat). It also finds where the
+track's sound really ends and suggests `outro_at` (a downbeat a few bars before), so a trailer can
+end on the track's own ending: music: {"end": "outro", "outro_at": …}.
 
 Copy bpm, beat0 and start into trailer.json → music. The grid assumes one steady tempo, which
 holds for produced background music; it is checked against the onsets (confidence).
@@ -91,6 +93,24 @@ def tempo(env):
     return float(bpm), float(phase) / fps + LATENCY
 
 
+def last_sound(y):
+    """Seconds where the sound ends: the end of the last run of ≥ 200 ms above 2 % of the
+    loudest 50 ms (a lone click in an encoder's tail doesn't count)."""
+    win = int(0.05 * SR)
+    env_rms = np.sqrt(np.mean(y[:len(y) // win * win].reshape(-1, win) ** 2, axis=1))
+    above = env_rms > 0.02 * (env_rms.max() or 1)
+    end, run = len(y) / SR, 0
+    for i in range(len(above)):
+        run = run + 1 if above[i] else 0
+        if run >= 4:
+            end = float((i + 1) * win / SR)
+    return end
+
+
+def sound_end(path):
+    return last_sound(decode(path))
+
+
 def analyze(path, drop_at=None, length=None):
     y = decode(path)
     dur = len(y) / SR
@@ -149,11 +169,23 @@ def analyze(path, drop_at=None, length=None):
         else:
             merged.append(dict(s))
 
+    # The ending to splice in: the last section if it starts within 8 bars of where the sound
+    # ends, else the downbeat 4 bars before that.
+    sound_end = last_sound(y)
+    before = [t for t in downbeats if t <= sound_end - 0.5]
+    outro_at = None
+    if before:
+        last_sec = merged[-1]["start"] if merged else None
+        outro_at = (last_sec if last_sec is not None and sound_end - last_sec <= 8 * bar
+                    else float(before[max(len(before) - 4, 0)]))
+
     out = {"file": str(path), "duration": round(dur, 3), "bpm": round(bpm, 2),
            "beat0": round(float(downbeats[0]) if len(downbeats) else beat0, 3),
            "beat_s": round(spb, 4), "bar_s": round(bar, 4), "confidence": round(confidence, 2),
            "drop": round(drop, 3) if drop is not None else None,
            "rises": [{"t": round(float(downbeats[i]), 3), "jump": round(j, 2)} for i, j in rises],
+           "sound_end": round(sound_end, 3),
+           "outro_at": round(outro_at, 3) if outro_at is not None else None,
            "sections": merged,
            "downbeats": [round(float(t), 3) for t in downbeats]}
     if drop_at is not None and drop is not None:
@@ -172,6 +204,10 @@ def report(a):
              f"  drop at {a['drop']}s" if a["drop"] is not None else "  no drop that fits", "  sections:"]
     for s in a["sections"]:
         lines.append(f"    {s['start']:7.2f}–{s['end']:7.2f}s  {s['bars']:3d} bars  {s['level']}")
+    if a.get("outro_at") is not None:
+        lines.append(f"  ending: the sound ends at {a['sound_end']}s; outro_at {a['outro_at']} gives a "
+                     f"{a['sound_end'] - a['outro_at']:.1f}s ending → music: {{\"end\": \"outro\", "
+                     f"\"outro_at\": {a['outro_at']}}}")
     if "start_for_drop" in a:
         sd = a["start_for_drop"]
         lines.append(f"  music.start {sd['start']} puts the drop at {sd['drop_at']}s into the trailer"

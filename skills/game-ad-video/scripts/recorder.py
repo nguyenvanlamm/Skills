@@ -22,7 +22,10 @@ pixels, which is what `shot` images use. --audio also records the PulseAudio/Pip
 monitor in parallel (it hears every app on the machine, so keep the machine quiet).
 Android: adb screencap / input / screenrecord; coordinates are device pixels.
 
-Each take writes <out>/takes/NAME.mp4 and NAME.marks.json ({"duration": s, "marks": [{t, label}]}).
+Each take writes <out>/takes/NAME.mp4 and NAME.marks.json ({"duration": s, "marks": [{t, label}],
+"inputs": [{t, kind, at, to, ms}]}). Inputs are every tap and swipe, as fractions of the screen,
+so build_ad.py can draw touch indicators where and when the player touched (Apple allows "touch
+hotspots" in App Previews). On Android their times are estimates (adb input has latency).
 `serve` writes <out>/.gitignore so takes, shots, sheets and every video stay out of git.
 """
 import argparse
@@ -85,22 +88,38 @@ def encode_frames(frames, end_time, frames_dir, mp4, audio=None):
 
 
 class Take:
-    def __init__(self, out, name):
+    def __init__(self, out, name, space=None):
         self.name = name
         self.mp4 = Path(out) / "takes" / f"{name}.mp4"
         self.mp4.parent.mkdir(parents=True, exist_ok=True)
         self.t0 = time.monotonic()
         self.marks = []
+        self.space = space  # (w, h) of the input coordinates: CSS px on web, device px on Android
+        self.inputs = []
 
     def mark(self, label):
         t = round(time.monotonic() - self.t0, 2)
         self.marks.append({"t": t, "label": label})
         return t
 
+    def touch(self, kind, x, y, x2=None, y2=None, ms=0, t=None):
+        """Log a tap or swipe in fractions of the screen (a swipe that doesn't move is a hold)."""
+        if not self.space:
+            return {}
+        w, h = self.space
+        e = {"t": round(time.monotonic() - self.t0 if t is None else t, 3), "kind": kind,
+             "at": [round(x / w, 4), round(y / h, 4)]}
+        if kind == "swipe":
+            e.update(to=[round(x2 / w, 4), round(y2 / h, 4)], ms=int(ms))
+        self.inputs.append(e)
+        return e
+
     def write_marks(self, duration):
-        meta = {"take": str(self.mp4), "duration": round(duration, 2), "marks": self.marks}
+        meta = {"take": str(self.mp4), "duration": round(duration, 2), "marks": self.marks,
+                "inputs": self.inputs}
         self.mp4.with_suffix(".marks.json").write_text(json.dumps(meta, indent=2))
-        return meta
+        # The reply stays short: the agent reads it, the inputs live in the file.
+        return {**meta, "inputs": len(self.inputs)}
 
 
 class WebBackend:
@@ -141,16 +160,22 @@ class WebBackend:
         await self.page.screenshot(path=str(path), scale="css")
 
     async def tap(self, x, y):
+        if self.take:
+            self.take.touch("tap", x, y)
         await self.page.mouse.click(x, y)
 
     async def swipe(self, x1, y1, x2, y2, ms):
         steps = max(int(ms / 16), 2)
         await self.page.mouse.move(x1, y1)
+        e = self.take.touch("swipe", x1, y1, x2, y2, ms) if self.take else {}
+        t_down = time.monotonic()
         await self.page.mouse.down()
         for i in range(1, steps + 1):
             await self.page.mouse.move(x1 + (x2 - x1) * i / steps, y1 + (y2 - y1) * i / steps)
             await asyncio.sleep(ms / 1000 / steps)
         await self.page.mouse.up()
+        if e:  # each move costs a little, so the real drag runs longer than `ms`: log what happened
+            e["ms"] = int((time.monotonic() - t_down) * 1000)
 
     async def key(self, key):
         await self.page.keyboard.press(key)
@@ -160,7 +185,7 @@ class WebBackend:
         await self.page.wait_for_timeout(self.args.boot_ms)
 
     async def rec_start(self, name):
-        self.take = Take(self.args.out, name)
+        self.take = Take(self.args.out, name, (self.args.width, self.args.height))
         self.frames_dir = self.take.mp4.parent / f".{name}.frames"
         shutil.rmtree(self.frames_dir, ignore_errors=True)
         self.frames_dir.mkdir(parents=True)
@@ -214,6 +239,9 @@ class AndroidBackend:
 
     async def start(self):
         await asyncio.to_thread(self._run, "get-state", capture_output=True)
+        png = await asyncio.to_thread(self._run, "exec-out", "screencap", "-p", capture_output=True)
+        # PNG header: width and height are big-endian at bytes 16–24. Same orientation as the take.
+        self.space = (int.from_bytes(png.stdout[16:20], "big"), int.from_bytes(png.stdout[20:24], "big"))
 
     async def shot(self, path):
         png = await asyncio.to_thread(self._run, "exec-out", "screencap", "-p", capture_output=True)
@@ -221,10 +249,14 @@ class AndroidBackend:
 
     async def tap(self, x, y):
         await asyncio.to_thread(self._run, "shell", "input", "tap", str(int(x)), str(int(y)))
+        if self.take:  # `input` lands the tap just before it returns
+            self.take.touch("tap", x, y, t=time.monotonic() - self.take.t0 - 0.03)
 
     async def swipe(self, x1, y1, x2, y2, ms):
         await asyncio.to_thread(self._run, "shell", "input", "swipe",
                                 *[str(int(v)) for v in (x1, y1, x2, y2, ms)])
+        if self.take:  # the swipe ran for `ms` up to the moment adb returned
+            self.take.touch("swipe", x1, y1, x2, y2, ms, t=time.monotonic() - self.take.t0 - ms / 1000)
 
     async def key(self, key):
         await asyncio.to_thread(self._run, "shell", "input", "keyevent", key)
@@ -233,7 +265,7 @@ class AndroidBackend:
         raise RuntimeError("reload is web-only; restart the app with adb shell am start")
 
     async def rec_start(self, name):
-        self.take = Take(self.args.out, name)
+        self.take = Take(self.args.out, name, self.space)
         # screenrecord stops by itself after 180 s; takes are meant to be short.
         self.proc = subprocess.Popen(self.adb + ["shell", "screenrecord", "--bit-rate", "12000000",
                                                  "/sdcard/game-ad-take.mp4"])

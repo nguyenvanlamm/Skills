@@ -1,5 +1,110 @@
 # Changelog
 
+## v1.4.0 — 2026-10-21
+
+A second research round: trailer editors (Derek Lieu), Apple's and Google Play's video rules,
+TikTok, Google ABCD, the networks' published practices (via Replai), a hyper-casual creative
+review (Game Developer) and Voodoo. All of it is folded into `references/mobile-ad-playbook.md`.
+What the sources agreed on is now a feature.
+
+### Added
+- **Touch indicators.**
+  - `recorder.py` logs every tap and swipe of a take (`marks.json → inputs`, fractions of the
+    screen, real drag durations).
+  - `"touches": true` draws them where and when they happened: a ripple ring, a fingertip dot
+    that follows a drag or holds, or a drawn hand (`touch_style: "hand"`, UA only).
+  - They sit on the raw take, so a push-in zooms them with the screen.
+  - Older takes can list touches by hand.
+  - Apple allows "touch hotspots" in App Previews; gesture cues outperform in UA.
+  - Verified against a test page that marks every touch: the ring lands on the mark, the dot
+    on the drag's head.
+- **Animated text, drawn frame by frame by Chrome from CSS.**
+  - Captions: `anim` `pop` (default) / `slide` / `words` / `fade`, and `style: "sticker"`.
+  - Cards: `anim` `rise` (default) / `pop` / `words` / `settle`.
+  - End card: the icon pops, the lines rise one after another, then the CTA pulses
+    (`anim: "none"` for the still card).
+- **Level 1 vs N / noob vs pro.** A grid of 2 takes now works in portrait and square frames too,
+  with `labels` above the panels and a `vs` badge between them.
+- **Brand bug.** `brand_bug` puts the icon + name in a corner until the end card, so the game is
+  named early (Meta, Google ABCD) without a logo card in the hook.
+- **Music edits for trailers.**
+  - `music.stops` (`{"before": shot, "beats": 1}`) silences the music for the beat before a
+    title.
+  - `music.end` is `fade` (default), `stop` (the music cuts when the end card lands) or `outro`
+    (the track's own ending spliced in on a bar line, so its last hit and tail land as the video
+    ends).
+  - `beats.py` reports where the track's sound really ends and suggests `outro_at`.
+- **`play-promo` profile** for the Google Play preview video (1080×1920, 15–30 s). It refuses
+  CTA and ranking words ("best", "#1"), drops the end card's CTA, and uses `caption_play_promo`,
+  then `caption_app_preview`.
+- **Store text rules** in `render` and `check`: selling words for the App Store, CTA and ranking
+  words for Google Play. Dated words (years, seasons) and non-plain App Preview transitions get
+  warnings. `check` saves the poster frame at `poster_at`.
+- **Storyboard guidance:**
+  - a `pacing` line (cuts in the first 5 s; which networks the length suits: Meta, TikTok,
+    ironSource, Snapchat, Unity);
+  - captions too short to read (~15 characters a second);
+  - touches with no logged inputs;
+  - the brand bug crowding top captions.
+- `zoom.punch`: quick 8 % bumps that settle back, on hits and beats.
+- `look`: a light grade (saturation, contrast, brightness) for UA; store videos keep their true
+  colours.
+- `build_ad.py thumb`: a YouTube (1280×720) or vertical thumbnail from a take frame, big text and
+  the game's icon + name.
+- `transition_<profile>` overrides, so a store video can fade where the UA cut slides.
+  `PICK_FALLBACK` lets `caption_ua` cover every UA ratio.
+
+### Changed
+- UA profiles allow 6–60 s, the range across networks; `storyboard` says which networks fit.
+- Captions pop in by default and cards rise in. Set `anim: "fade"` / `"settle"` for the v1.3
+  look.
+- Docs: the brief template (core message, 2–3 pillars, don'ts, end slate), new directions (Fail
+  → solve, Noob vs pro, unresolved Challenge), touch, motion, brand bug and look sections, both
+  stores' rules, Derek Lieu's trailer principles, the music stop, and thumbnails.
+
+### Fixed
+- A looped still with no `-t` (the brand bug) kept `join` running for ever: overlay lasts as
+  long as either input. Every looped input is now bounded.
+
+## v1.3.0 — 2026-10-21
+
+What game-video studios and ad networks do, applied to the skill. Sources: Creatune, Sunstrike
+Studios, Quadral, Anna K, vinhle3230, the Fiverr/Upwork market, Meta's click-to-play creative
+guide and Unity's video specs.
+
+### Added
+- `references/mobile-ad-playbook.md` covers:
+  - the brief;
+  - one promise per video;
+  - hook angles (promise / number / conflict);
+  - the first 3 s;
+  - real gameplay only (no "fake gameplay" ads);
+  - sound-off design;
+  - ratios, lengths and file caps per placement;
+  - the variant matrix;
+  - QA and file naming.
+
+  Each rule names its source.
+- **UA ratios.** New profiles `ua-1x1` (1080×1080, Meta feed), `ua-4x5` (1080×1350) and `ua-16x9`
+  (1920×1080, Unity / AppLovin landscape, Meta desktop), all 15–30 s. Shots without `profiles`
+  go into every ratio, and `"ua"` in a `profiles` list means the whole `ua*` family.
+- **Variants.** `ad.json → variants.<name>` patches shots by index: a new hook take or caption,
+  `{"drop": true}` for a 15 s cut, translated captions. It also merges `end_card` / `audio` /
+  `music`. `storyboard` / `render` / `check --variant a,b` apply variants in order. Output and
+  check frames are named after the variant (`ad-ua-9x16-hook-number-short.mp4`).
+- **Hook rule.** For `ua*`, `check` fails a cut that opens on a card or shows any card before
+  3 s; logos go on the end card (Meta, Creatune). `storyboard` also flags it, and warns when no
+  caption shows in the first 3 s (most viewers watch muted).
+- **UA file cap.** 30 MB for `ua*` (Meta's click-to-play guidance; Unity recommends 10 MB, max
+  100 MB).
+- `ad.json → brief` (free text: store link, channels, promise, references). Steps 1, 4, 5, 6, 7
+  and 9 of SKILL.md now cover the brief, clean capture, hook angles, the variant matrix and
+  per-channel ratios.
+- `templates/ad.example.json` gains a brief and hook / language variants.
+
+### Changed
+- `panel` and `grid` now also fall back to `fit` in square profiles, not only in portrait ones.
+
 ## v1.2.0 — 2026-10-21
 
 ### Added

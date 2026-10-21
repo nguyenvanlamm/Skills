@@ -1,4 +1,5 @@
 {
+  "brief": "Tile Pop · Steam + YouTube + Shorts · core message: one tap can clear the whole board · pillars: chain, clear, worlds",
   "game": {
     "name": "Tile Pop",
     "icon": "../../assets/icon/icon.png",
@@ -8,8 +9,9 @@
   },
   "direction": "A · Cinematic mood",
   "profiles": ["trailer", "trailer-9x16"],
-  "music": {"bpm": 126.0, "beat0": 1.684, "start": 55.019},
-  "music_trailer_9x16": {"bpm": 126.0, "beat0": 1.684, "start": 64.543},
+  "music": {"bpm": 126.0, "beat0": 1.684, "start": 55.019,
+            "stops": [{"before": 4, "beats": 1}], "end": "outro", "outro_at": 199.785},
+  "music_trailer_9x16": {"bpm": 126.0, "beat0": 1.684, "start": 64.543, "end": "stop"},
   "fade_in": 0.6,
   "fade_in_trailer_9x16": 0,
   "shots": [

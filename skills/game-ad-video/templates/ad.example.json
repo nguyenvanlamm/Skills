@@ -1,4 +1,5 @@
 {
+  "brief": "Tile Pop · iOS + Android · Meta + TikTok · promise: clear the whole board in one chain",
   "game": {
     "name": "Tile Pop",
     "icon": "../../assets/icon/icon.png",
@@ -10,6 +11,14 @@
     }
   },
   "direction": "B · challenge",
+  "brand_bug": {
+    "pos": "bottom-left"
+  },
+  "look": {
+    "saturation": 1.1,
+    "contrast": 1.05
+  },
+  "poster_at": 0.5,
   "shots": [
     {
       "take": "takes/take-01.mp4",
@@ -19,12 +28,14 @@
       "why": "establish the board",
       "caption": {
         "text": "Can you clear *all 35*?",
-        "pos": 0.035
+        "pos": 0.035,
+        "anim": "words"
       },
       "action": "first taps, combo climbs",
       "check_at": [
         1.0
-      ]
+      ],
+      "touches": true
     },
     {
       "take": "takes/take-03.mp4",
@@ -42,12 +53,16 @@
         ],
         "anchor_label": "the clearing row",
         "at": 0.1,
-        "dur": 0.6
+        "dur": 0.6,
+        "punch": [
+          1.5
+        ]
       },
       "why": "push onto the combo",
       "caption": {
         "text": "Combo *x20*",
-        "pos": "bottom"
+        "pos": "bottom",
+        "style": "sticker"
       },
       "action": "rows burst",
       "check_at": [
@@ -65,7 +80,8 @@
       "action": "board refills",
       "check_at": [
         2.5
-      ]
+      ],
+      "transition_app_preview": "fade"
     },
     {
       "take": "takes/take-03.mp4",
@@ -100,6 +116,38 @@
       "check_at": [
         2.0
       ]
+    },
+    {
+      "layout": "grid",
+      "seconds": 3.0,
+      "transition": "fade",
+      "transition_s": 0.3,
+      "takes": [
+        {
+          "take": "takes/take-01.mp4",
+          "in": 0.4
+        },
+        {
+          "take": "takes/take-04.mp4",
+          "in": 2.0
+        }
+      ],
+      "labels": [
+        "Level 1",
+        "Level *35*"
+      ],
+      "vs": true,
+      "caption": {
+        "text": "Level 1 vs *Level 35*",
+        "pos": 0.06,
+        "anim": "slide"
+      },
+      "framing": "grid of 2",
+      "why": "progression in one look",
+      "check_at": [
+        0.5,
+        2.0
+      ]
     }
   ],
   "end_card": {
@@ -111,7 +159,8 @@
     "transition_s": 0.3,
     "check_at": [
       1.5
-    ]
+    ],
+    "anim": "rise"
   },
   "audio": {
     "bgm": "ad",
@@ -137,5 +186,47 @@
       "sfx": "impact/brand-stamp.mp3",
       "db": -10
     }
-  ]
+  ],
+  "variants": {
+    "hook-number": {
+      "shots": {
+        "0": {
+          "caption": {
+            "text": "*35* tiles, one chain",
+            "pos": 0.035
+          }
+        }
+      }
+    },
+    "hook-promise": {
+      "shots": {
+        "0": {
+          "caption": {
+            "text": "Clear the *whole* board",
+            "pos": 0.035
+          }
+        }
+      }
+    },
+    "vi": {
+      "shots": {
+        "0": {
+          "caption": {
+            "text": "Xoá hết *35* ô?",
+            "pos": 0.035
+          }
+        },
+        "1": {
+          "caption": {
+            "text": "Combo *x20*",
+            "pos": "bottom"
+          }
+        }
+      },
+      "end_card": {
+        "subline": "Thêm một bàn nữa?",
+        "cta": "Chơi miễn phí"
+      }
+    }
+  }
 }

@@ -8,6 +8,23 @@ We borrow its **editing**: pacing, act structure, cards, logo beats. We do not b
 Every gameplay frame is still a take from `recorder.py` (SKILL.md rule 1). For a casual or puzzle
 game, 45–75 s is plenty: a trailer that outlasts the game's variety loses people.
 
+## How editors think about it (Derek Lieu)
+
+Derek Lieu's trailers include Firewatch, Shadow of Mordor and Subnautica.
+
+- **A trailer is a tutorial, in a way.** List the game's verbs first (aim, bank, split…). Show
+  the principal unique feature as soon as possible, then expand on it.
+- **Layers, not a list.** "Show the basic mechanic and then gradually add on layers of
+  complexity", giving each new mechanic "enough time to fully understand". The Sheepherds
+  makeover opens on 10 s of the core loop. Cosmetics and modes can wait for the end.
+- **Show challenge.** If every shot is a perfect run, the game "looks not at all challenging". A
+  near-miss teases the audience.
+- **Brief first.** Write a core message (one sentence), 2–3 pillars (no more), the player
+  fantasy, the mood, the don'ts and the end slate. Write it into `trailer.json → brief`.
+- **Title cards with personality,** tested on someone outside the team: "A fluffy cheeky co-op
+  game!" over "A Cozy Co-op Party Game!". Tie words to visuals as often as you can.
+- **Non-gameplay openings are risky,** especially on Steam. Get to gameplay within seconds.
+
 ## Acts (16:9, 45–90 s)
 
 | Act | Time | Job | Cut rate | Material |
@@ -24,6 +41,20 @@ Budget the music first. Run `build_ad.py beats MUSIC --drop-at 9.5 --length 60` 
 the trailer, the script picks another rise. Lay out the acts in beats, then fill each act with
 shots.
 
+**Edit the music, not just the picture.**
+
+- **The music stop.** Silence the music for a beat right before the title lands on the drop:
+  `"stops": [{"before": <index of the title card>, "beats": 1}]` in `music`. Trailer editors
+  call the music stop the most useful trick they know. Game sound and SFX keep playing; put
+  `impact/logo-reveal.mp3` on the title so the hit comes out of the silence.
+- **End on the track's own ending.** `beats` prints `outro_at`, a downbeat a few bars before the
+  track's sound ends. Then:
+  - `"end": "outro", "outro_at": …` jumps there on a bar line, so the track's last hit and tail
+    land as the video ends;
+  - `"end": "stop"` cuts the music dead when the end card lands, and the brand-stamp hit sits in
+    the silence;
+  - `"end": "fade"` (the default) fades the music out over 2 s.
+
 ## 9:16 cut-down (30–60 s)
 
 Same `trailer.json` and the same shot list, filtered by `profiles`.
@@ -32,10 +63,13 @@ Same `trailer.json` and the same shot list, filtered by `profiles`.
   (`"profiles": ["trailer-9x16"]`) and mark the cold-open shots `"profiles": ["trailer"]`.
 - **Start the music at the drop.** Set `music_trailer_9x16` with a later `start`, and
   `"fade_in_trailer_9x16": 0`. The feed punishes a slow open.
-- **Layouts fall back on their own.** `panel` and `grid` become `fit` in portrait, because a
-  portrait take already fills the frame. A panel's caption becomes an overlay caption. Use
-  `caption_trailer_9x16` / `layout_trailer_9x16` / `zoom_trailer_9x16` to tune one shot for the
-  vertical cut.
+- **Layouts fall back on their own.** `panel` and a grid of 3 become `fit` in portrait, because
+  a portrait take already fills the frame; a grid of 2 stays side by side. A panel's caption
+  becomes an overlay caption. Use `caption_trailer_9x16` / `layout_trailer_9x16` /
+  `zoom_trailer_9x16` to tune one shot for the vertical cut, and check fallback captions against
+  the game's HUD.
+- **End the cut-down cleanly.** `music_trailer_9x16` with `"end": "stop"` cuts the music when the
+  end card lands.
 
 ## Directions (three-direction gate, SKILL.md rule 2)
 
@@ -78,6 +112,13 @@ Render each board with `build_ad.py board --wide …` from a real frame.
 | `feature` | A verb or a promise, ≤ 4 words ("Light every *lamp*.") | 0.09 |
 | `logo` | `game.logo` (a wordmark PNG) if set, else icon + name in the game's font | — |
 
+- `anim`:
+  - `rise` (default): the line rises in, `sub` after it, the icon or logo pops;
+  - `pop`: for a title on a hit;
+  - `words`: word by word, for a three-word line on three beats;
+  - `settle`: the still card.
+
+  Every card also settles from 1.06× to 1×.
 - `sub` adds a smaller line under the card or panel text.
 - `bg_take` + `bg_at` put a blurred, darkened still from a take behind the card. Without them
   the card uses the game's gradient.
@@ -91,7 +132,7 @@ Render each board with `build_ad.py board --wide …` from a real frame.
 | `fit` | Scales the take into the frame over a blurred copy of itself | Landscape takes; cold open; payoff with a push |
 | `fill` | Cuts a frame-shaped band out of the take around `fill_y` (0 top … 1 bottom) and scales it up | Fast montage cuts. A 974-px-wide take goes up ~2× in 16:9: fine for 1–4 beats, soft if held. `storyboard` warns past 2× |
 | `panel` | Puts the take on a rounded card at ~88 % height on one `side`, with the caption as big text on the other half | The mechanics triad |
-| `grid` | Puts 2–3 takes side by side (`takes: [{take, in}, …]`); a caption overlays as usual | Variety, before/after |
+| `grid` | Puts 2–3 takes side by side (`takes: [{take, in}, …]`); a caption overlays as usual. `labels` go above the panels, and `vs: true` puts a badge between two | Variety, before/after, "Level 1 vs Level 20" |
 
 If the game lays out in landscape on the web, record native 16:9 takes instead:
 `recorder.py serve --url … --width 960 --height 540 --dpr 2` gives 1920×1080, and `fit` fills
@@ -108,6 +149,20 @@ the frame.
   - `feedback/achievement.mp3` on the payoff;
   - `impact/brand-stamp.mp3` on the end card.
 - **Loudness.** The mix is loudnormed to −14 LUFS, as YouTube expects.
+
+## Thumbnail
+
+YouTube shows the thumbnail before anyone presses play, so make one per trailer:
+
+```bash
+build_ad.py thumb --ad trailer.json --take takes/l20-a.mp4 --at 17.6 \
+  --text "One beam. *Every lamp.*" --sub "A light-splitting puzzle" --out thumb.png
+```
+
+- The default size is 1280×720: the frame blurred behind, the frame on a tilted card, big text
+  with the icon and name.
+- `--size 1080x1920` gives a vertical cover with the text above the card.
+- One promise, ≤ 5 words, true to the game. Test two thumbnails the way you test two hooks.
 
 ## Output specs
 

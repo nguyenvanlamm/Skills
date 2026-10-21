@@ -2,11 +2,14 @@
 name: game-ad-video
 description: >-
   Run a Flutter game, let the agent play it while recording real gameplay, and cut the takes into
-  a 9:16 UA ad (TikTok/Reels/Shorts, 15–30 s), an App Store App Preview (886x1920, 15–30 s), or a
-  16:9 gameplay trailer (45–120 s, cut on the music's beat, full-frame cards, logo and end card,
-  plus a 9:16 cut-down): facts from the repo → run on web (or Android via adb) → explore and
-  record scripted takes → 3 directions, human picks one → storyboard (ad.json / trailer.json) →
-  render with captions, push-ins, layouts for portrait footage in 16:9, BGM + SFX → hard checks.
+  a UA ad (9:16, 1:1, 4:5, 16:9; 6–60 s; hook × length × language variants from one storyboard),
+  store videos (App Store App Preview 886x1920, Google Play preview), or a 16:9 gameplay trailer
+  (45–120 s, cut on the music's beat, full-frame cards, music stops and endings, plus a 9:16
+  cut-down and a YouTube thumbnail): facts from the repo → run on web (or Android via adb) →
+  explore and record scripted takes (every tap and swipe logged) → 3 directions, human picks one
+  → storyboard (ad.json / trailer.json) → render with animated captions and end card, touch
+  indicators, push-ins and punches, vs-grids, BGM + SFX → hard checks (hook, store text rules,
+  beat sync).
   Borrows huashu-design's three-direction gate, storyboard card, camera rules, two-layer audio
   and verify-video.sh. Use when asked to "make an ad video for my game", "record gameplay for an
   ad", "app preview video", "make a game trailer", "làm video quảng cáo game", "quay gameplay
@@ -15,7 +18,7 @@ description: >-
   that are not playable on this machine.
 license: MIT
 metadata:
-  version: 1.2.0
+  version: 1.4.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -47,14 +50,14 @@ game doesn't keep, and the App Store rejects previews that aren't captured from 
 
 | Script | Does |
 |---|---|
-| `scripts/recorder.py` | Holds the game open (Playwright + Chrome, or adb) and records takes: `serve`, `shot`, `tap`, `swipe`, `key`, `wait`, `rec start/stop`, `mark`, `play`, `status`, `stop` |
-| `scripts/build_ad.py` | `storyboard` (shot table), `board` (direction board PNG; `--wide` for a trailer), `beats` (music beat grid), `render` (profile `ua` / `app-preview` / `trailer` / `trailer-9x16`), `check` (hard checks + check frames) |
-| `scripts/beats.py` | BPM, first downbeat, sections and drop of a music track (numpy only), so trailer cuts land on the beat. `build_ad.py beats` calls it |
+| `scripts/recorder.py` | Holds the game open (Playwright + Chrome, or adb) and records takes: `serve`, `shot`, `tap`, `swipe`, `key`, `wait`, `rec start/stop`, `mark`, `play`, `status`, `stop`. Logs every tap and swipe in the take's `marks.json` so the render can draw them |
+| `scripts/build_ad.py` | `storyboard` (shot table + warnings), `board` (direction board PNG; `--wide` for a trailer), `beats` (music beat grid), `render` (profiles `ua` `ua-1x1` `ua-4x5` `ua-16x9` `app-preview` `play-promo` `trailer` `trailer-9x16`), `check` (hard checks + check frames + poster frame), `thumb` (YouTube / cover thumbnail) |
+| `scripts/beats.py` | BPM, first downbeat, sections, rises, drop and the track's real ending (`outro_at`), numpy only, so trailer cuts land on the beat and the music ends on its own hit. `build_ad.py beats` calls it |
 | `../game-clone-pipeline/scripts/contact-sheet.sh` | Take or final video → timestamped contact sheets you can read |
 | `huashu-design` (sibling skill, optional) | `assets/bgm-ad.mp3`, `assets/sfx/**`, `scripts/verify-video.sh`. Found at `$HUASHU_DESIGN_DIR` or `~/.claude/skills/huashu-design`. Without it, pass `audio.bgm` yourself; the checks skip black-frame and loudness tests |
 
 Needs: ffmpeg, Python 3 with `playwright` (Chrome or Playwright's Chromium), Flutter for the
-game. Trailers also need `numpy` (beat detection). Android path: `adb`
+game. Trailers also need `numpy` (beat detection, `music.end: "outro"`). Android path: `adb`
 (`~/Android/Sdk/platform-tools/adb`) and a device or emulator.
 
 Output, all in the game repo under `marketing/video/`:
@@ -66,7 +69,7 @@ shots/        screenshots taken while exploring                 (git-ignored)
 sheets/       contact sheets and check frames                   (git-ignored)
 directions/   a.png b.png c.png — the three direction boards
 ad.json       the ad storyboard           trailer.json   the trailer storyboard
-ad-ua-9x16.mp4  app-preview-886x1920.mp4                        (git-ignored)
+ad-ua-9x16.mp4  app-preview-886x1920.mp4  play-promo-9x16.mp4  (git-ignored)
 trailer-16x9.mp4  trailer-9x16.mp4                              (git-ignored)
 ```
 
@@ -80,8 +83,16 @@ decides to rewrite it.
 
 ### 1. Facts
 
-Read `pubspec.yaml` (name), the app icon, `SPEC.md` / `DESIGN.md` / `README.md` if present. Write
-down:
+Read `pubspec.yaml` (name), the app icon, `SPEC.md` / `DESIGN.md` / `README.md` if present. Ask the
+human for the brief if it isn't written anywhere. It covers:
+
+- the store link and the channels (Meta, TikTok, Google, AppLovin, Unity, App Store, Google
+  Play, YouTube), which decide ratios, lengths and text rules;
+- the core message in one sentence, and 2–3 pillars at most;
+- the don'ts;
+- 2–3 reference or competitor ads, if the human has them.
+
+Put it in `ad.json → brief` (`references/mobile-ad-playbook.md` § 1). Write down:
 
 - **Selling points the code proves**: the core loop, combos, levels, modes.
 - **Design tokens**: font file, background, foreground and accent colours. These go in
@@ -126,7 +137,7 @@ recorder.py shot after-tap
 
 Find the core loop, the most satisfying moment (combo, clear, chain), a near-miss or fail state,
 and a win. Note coordinates. If the game has onboarding, play through it once so takes start in
-real gameplay.
+real gameplay. Tutorial pop-ups in a take cost a caption plate to hide, so record past them.
 
 ### 4. Record takes
 
@@ -152,7 +163,9 @@ For moments you can't script, record manually: `rec start take-07`, then play wi
 `shot`/`tap` while you look, marking moments with `mark combo`, then `rec stop`. Thinking time
 becomes dead footage; cut around the marks.
 
-Every take returns its `duration` and `marks`. Review each with a contact sheet:
+Every take returns its `duration`, `marks` and the number of `inputs`. `NAME.marks.json` holds
+every tap and swipe, as fractions of the screen with their times, for `touches` in step 6. Review
+each take with a contact sheet:
 
 ```bash
 FPS=2 COLS=8 ROWS=4 bash <skills>/game-clone-pipeline/scripts/contact-sheet.sh takes/take-01.mp4 sheets/take-01
@@ -162,8 +175,11 @@ From the timestamps, list candidate clips as `take @ in–out: what happens`.
 
 ### 5. Three directions — human gate
 
-Read `references/ad-structure.md` § Directions. Pick three directions that fit *this* game. For
-each one, render a board from a real hook frame:
+Read `references/ad-structure.md` § Directions. Pick three directions that fit *this* game:
+Satisfying, Challenge, Level 1 vs N, Fail → solve, Noob vs pro or Relax. Give each one a single
+promise and a hook angle (promise, number or conflict; see `references/mobile-ad-playbook.md`
+§ 2). The first 3 s are gameplay, never a logo. For each one, render a board from a real hook
+frame:
 
 ```bash
 build_ad.py board --ad ad.json --take takes/take-03.mp4 --at 4.2 \
@@ -192,19 +208,57 @@ huashu-design `camera-language.md` and `storyboard-basics.md`):
 - every push-in names its anchor;
 - no two shots in a row at the same framing;
 - one action per shot;
-- each profile is 15–30 s;
+- the length suits the channels (the `pacing` line lists Meta, TikTok, ironSource, Snapchat and
+  Unity);
 - every shot has a check frame.
 
-`render` refuses a profile outside 15–30 s. The App Preview drops the end card and refuses
-selling words (download, free, price) in its captions. Give a shot `caption_app_preview` to
-override its caption for that profile.
+Fix every `⚠` and `✗` line. They cover:
+
+- a caption too short to read;
+- no caption in a UA hook (most people watch muted);
+- the brand bug crowding a top caption;
+- a store text rule;
+- a shot running past its take.
+
+Make it clear and lively (`references/ad-structure.md` § Captions, § Touch indicators, § Brand
+bug and look):
+
+- **`touches: true` in the hook and loop shots.** The take's taps and swipes are drawn where they
+  happened, which shows how to play in one look. Apple allows touch hotspots.
+- **Captions pop in by default** (`anim`: `pop` / `slide` / `words` / `fade`), and one punchy line
+  may be a `sticker`.
+- **`zoom.punch`** on the payoff hit.
+- **`layout: "grid"` with 2 takes, `labels` and `vs`** for Level 1 vs N or noob vs pro, in any
+  ratio.
+- **`brand_bug`** names the game from the first frame.
+- **`look`** lifts a dark game in UA.
+- **The end card animates:** the CTA pulses.
+
+`render` refuses a profile outside its length. Store videos have text rules:
+
+- the App Preview drops the end card and refuses selling words (download, free, price);
+- `play-promo` refuses CTA and ranking words ("best", "#1") and drops the end card's CTA.
+
+Give a shot `caption_app_preview` (Play falls back to it) or `caption_play_promo` to override its
+caption for that profile.
+
+Add `variants` for the test matrix: the other two hook angles, a 15 s `short` cut (drop
+shots), and a language if needed. Ship 2–3 hooks × 2 lengths rather than one video
+(`references/ad-structure.md` § Ratios and variants).
 
 ### 7. Render
 
 ```bash
-build_ad.py render ad.json --profile ua
-build_ad.py render ad.json --profile app-preview
+build_ad.py render ad.json --profile ua                          # ad-ua-9x16.mp4
+build_ad.py render ad.json --profile ua --variant short           # ad-ua-9x16-short.mp4 (15 s)
+build_ad.py render ad.json --profile ua --variant hook-number     # …-hook-number.mp4
+build_ad.py render ad.json --profile ua-1x1                       # Meta feed; also ua-4x5, ua-16x9
+build_ad.py render ad.json --profile app-preview                  # App Store preview
+build_ad.py render ad.json --profile play-promo                   # Google Play preview (YouTube)
 ```
+
+Render only the ratios and stores the brief's channels use (`references/mobile-ad-playbook.md`
+§ 9–10).
 
 ### 8. Check and look
 
@@ -214,14 +268,19 @@ build_ad.py check app-preview-886x1920.mp4 --profile app-preview --ad ad.json
 FPS=2 COLS=8 ROWS=4 WIDTH=200 bash <skills>/game-clone-pipeline/scripts/contact-sheet.sh ad-ua-9x16.mp4 sheets/ua
 ```
 
-`check` tests size, fps, duration, H.264 yuv420p, AAC stereo, the 500 MB cap and that git
-ignores the file (inside a git repo), then runs
+Check a variant with the same `--variant`. `check` tests size, fps, duration, H.264 yuv420p,
+AAC stereo, the file cap (UA 30 MB, App Preview 500 MB) and that git ignores the file (inside a
+git repo). For UA it also checks the hook rule: gameplay from the first frame, no card before
+3 s. For store videos it checks the text rules and saves the poster frame at `poster_at`. Then
+it runs
 huashu-design's `verify-video.sh` (black frames, -14 LUFS loudness). It also extracts every check
 frame to `sheets/check-<profile>-fNNNN.jpg`.
 
 Read the check frames and the contact sheet. For each one, confirm:
 
 - the caption is readable and doesn't cover the game's HUD or the action;
+- the brand bug doesn't sit on the HUD or a caption;
+- the touch rings land on the thing being touched;
 - each push-in ends on its anchor;
 - the end card shows;
 - there are no frozen or black stretches.
@@ -234,7 +293,9 @@ Fix `ad.json` and re-render until both checks PASS and the frames look right.
 GAME AD VIDEO — <READY | NEEDS WORK>
 Direction   B · Challenge (chosen by <human>)
 UA          ad-ua-9x16.mp4          1080x1920 · 15.3s · -14 LUFS · check PASS
-Preview     app-preview-886x1920.mp4 886x1920 · 15.4s · check PASS
+Variants    hook-number, hook-conflict × short · ua, ua-1x1 · 6 files, all check PASS
+Preview     app-preview-886x1920.mp4 886x1920 · 15.4s · poster 0.5s · check PASS
+Play        play-promo-9x16.mp4      1080x1920 · 15.4s · check PASS (upload to YouTube, ads off)
 Takes       7 recorded, 4 used
 Audio       BGM huashu bgm-ad · 3 SFX cues · game audio: no (--audio off)
 Git         videos git-ignored, not pushed · files at marketing/video/
@@ -242,7 +303,8 @@ Open        <anything unresolved: music licence for a user track, a caption to c
 ```
 
 App Store Connect takes the preview per device size. 886×1920 covers the 6.9"/6.5" iPhone
-slots. Uploading is the human's job, or `game-clone-pipeline` stage 8's.
+slots. Google Play takes a YouTube link: public or unlisted, monetisation off, not
+age-restricted. Uploading is the human's job, or `game-clone-pipeline` stage 8's.
 
 ## Trailer mode
 
@@ -267,11 +329,19 @@ trailer burns through 15–25 shots. Then:
 build_ad.py beats ad --drop-at 9.5 --length 60
 ```
 
-It prints `bpm`, `beat0`, the sections and the rises. It suggests a `music.start` that lands the
-drop 9.5 s in and still leaves 60 s of track. Copy these into
-`trailer.json → music: {"bpm", "beat0", "start"}`. A cut-down usually starts later (at the drop):
-give it its own `music_trailer_9x16`. Low `confidence` (< 1.5) means a weak beat; check it by
-ear, or set `music.sync: false`.
+It prints `bpm`, `beat0`, the sections, the rises and the ending (`outro_at`). It suggests a
+`music.start` that lands the drop 9.5 s in and still leaves 60 s of track. Copy these into
+`trailer.json → music: {"bpm", "beat0", "start"}`.
+
+- **Cut-down.** It usually starts later (at the drop): give it its own `music_trailer_9x16`.
+- **Edit the music too:**
+  - `"stops": [{"before": <title card index>, "beats": 1}]` silences the music for the beat
+    before the title lands;
+  - `"end": "outro", "outro_at": …` ends on the track's own last hit;
+  - `"end": "stop"` cuts the music when the end card lands.
+
+  See `references/trailer-structure.md`.
+- **Low `confidence`** (< 1.5) means a weak beat; check it by ear, or set `music.sync: false`.
 
 **T6. Three directions — human gate.** Read `references/trailer-structure.md` § Directions and
 pick three that fit the game. Render a board for each with
@@ -283,12 +353,14 @@ pick three that fit the game. Render a board for each with
 - **Top level:** `"profiles": ["trailer", "trailer-9x16"]`.
 - **Timing:** give every item `beats` instead of `out` / `seconds`. It then ends on the beat grid,
   so every cut lands on a beat.
-- **Cards:** `{"card": {"text", "style": "title|feature|logo", "sub", "bg_take", "bg_at"}, "beats": 4}`.
-  The logo card uses `game.logo` (a wordmark PNG) if set, else icon + name.
+- **Cards:** `{"card": {"text", "style": "title|feature|logo", "sub", "bg_take", "bg_at", "anim"}, "beats": 4}`.
+  The logo card uses `game.logo` (a wordmark PNG) if set, else icon + name. Cards rise in by
+  default (`anim`: `rise` / `pop` / `words` / `settle`).
 - **Layout** places portrait footage in 16:9: `fit` (blurred fill), `fill` (cut a band, montage),
   `panel` (take on one side, the verb big on the other; `side`), `grid`
-  (`takes: [{take, in}]`, 2–3 side by side). In 9:16, `panel` and `grid` fall back to `fit`.
-  Check their captions against the game's HUD and give them `caption_trailer_9x16` where needed.
+  (`takes: [{take, in}]`, 2–3 side by side, `labels`, `vs`). In 9:16, `panel` and a grid of 3
+  fall back to `fit`. Check their captions against the game's HUD and give them
+  `caption_trailer_9x16` where needed.
 - **End card:** add `date` and `platforms` (text chips, never store badge art). Only true claims.
 - **Cut-down:** mark cold-open shots `"profiles": ["trailer"]`, add a hook shot with
   `"profiles": ["trailer-9x16"]`, and set `"fade_in": 0.6` with `"fade_in_trailer_9x16": 0`.
@@ -310,6 +382,9 @@ build_ad.py check trailer-9x16.mp4 --profile trailer-9x16 --ad trailer.json
 FPS=1 COLS=6 ROWS=8 WIDTH=320 bash <skills>/game-clone-pipeline/scripts/contact-sheet.sh trailer-16x9.mp4 sheets/t16
 ```
 
+Make a thumbnail for the YouTube upload:
+`build_ad.py thumb --ad trailer.json --take … --at … --text "One beam. *Every lamp.*" --out thumb.png`.
+
 `check` adds a rule for trailers: hard cuts must land on the beat (±1 frame). Read the check
 frames and the contact sheet. Confirm that:
 
@@ -328,6 +403,7 @@ Store takes App Previews, not trailers.
 | File | Read at |
 |---|---|
 | `references/ad-structure.md` | steps 5–8: beats, the three-direction menu, camera rules, captions, audio, App Preview rules, `ad.json` fields |
+| `references/mobile-ad-playbook.md` | steps 1, 5–7: what game-video studios, trailer editors (Derek Lieu), stores (Apple, Google Play) and networks (Meta, TikTok, Google, Unity, ironSource, AppLovin, Snapchat) ask for. It covers the brief, one promise, hook angles, the first seconds, touch cues, sound-off text, motion, formats that work, lengths and ratios, store rules, variants and refresh, and music edits. Sources listed |
 | `references/trailer-structure.md` | T5–T8: trailer acts, cut-down, trailer directions, beat-cut editing, cards, layouts, audio, specs |
 | `templates/ad.example.json` | step 6: a complete storyboard to copy |
 | `templates/trailer.example.json` | T7: a complete 16:9 + 9:16 trailer storyboard to copy |
@@ -336,10 +412,12 @@ Store takes App Previews, not trailers.
 
 ## Scope
 
-Does: record real gameplay of a game that runs on this machine, then cut and check a UA ad, an
-App Preview, and a 16:9 trailer with its 9:16 cut-down.
+Does: record real gameplay of a game that runs on this machine, then cut and check UA ads in
+four ratios, an App Preview, a Google Play preview video, and a 16:9 trailer with its 9:16
+cut-down and thumbnail.
 
-Does not: upload to App Store Connect, YouTube, Steam or ad networks, make still screenshots (`appstore-assets`),
+Does not: upload to App Store Connect, YouTube, Steam or ad networks, make playable ads or
+interactive end cards, make still screenshots (`appstore-assets`),
 build motion graphics from scratch (`huashu-design`), or license music. A user-supplied
 `audio.bgm` track is the user's responsibility. huashu-design's SFX were generated with
 ElevenLabs; the human confirms that commercial use is OK.
