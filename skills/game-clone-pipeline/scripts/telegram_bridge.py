@@ -740,9 +740,13 @@ def record_answer(repo, answer, by, **fields):
     pending = read_json(path)
     if not pending:
         return None
-    write_json(state_file(repo, f"answer-{pending['id']}.json"),
-               {'id': pending['id'], 'gate': pending['gate'], 'question': pending['question'],
-                'answer': answer, 'by': by, 'at': now_iso(), **fields})
+    decision = {'id': pending['id'], 'gate': pending['gate'], 'question': pending['question'],
+                'answer': answer, 'by': by, 'at': now_iso(), **fields}
+    write_json(state_file(repo, f"answer-{pending['id']}.json"), decision)
+    # The answer file goes once a session reads it, so a session that dies before writing the decision into
+    # status.md would lose it. decisions.jsonl keeps every decision for the next session.
+    with open(state_file(repo, 'decisions.jsonl'), 'a', encoding='utf-8') as f:
+        f.write(json.dumps(decision, ensure_ascii=False) + '\n')
     os.remove(path)
     return pending
 
@@ -897,6 +901,13 @@ class SleepGuard:
 
 # The serve daemon
 
+def with_links(text, entities):
+    """TEXT plus the addresses its hyperlinks hide: text pasted as "Link video game mới" carries the URL only in a
+    `text_link` entity, which the agent never sees otherwise."""
+    urls = [e['url'] for e in entities or () if e.get('type') == 'text_link' and e.get('url') and e['url'] not in text]
+    return '\n'.join([text, *urls]).strip() if urls else text
+
+
 def media_of(message):
     """(telegram object, kind) of the file in a message, or (None, None)."""
     for key, kind in (('video', 'video'), ('video_note', 'video'), ('animation', 'video'), ('document', 'document')):
@@ -933,7 +944,8 @@ def save_file(repo, cfg, message):
         dest, n = os.path.join(target_dir, f'{stem}-{n}{suffix}'), n + 1
     download(cfg, obj['file_id'], dest)
     rel = os.path.relpath(dest, repo)
-    to_inbox(repo, {'kind': 'file', 'path': rel, 'caption': message.get('caption')})
+    caption = with_links(message.get('caption') or '', message.get('caption_entities'))
+    to_inbox(repo, {'kind': 'file', 'path': rel, 'caption': caption or None})
     send_text(cfg, f'📎 <b>{esc(display_name(repo))}</b>: đã lưu {code(rel)}', disable_notification=True)
 
 
@@ -952,12 +964,16 @@ def on_button(cfg, query):
             if pending and pending['id'] == parts[1] and parts[2].isdigit() and int(parts[2]) < len(pending['options']):
                 answer = pending['options'][int(parts[2])]
                 settled = record_answer(repo, answer, 'telegram')
+    # A tap read late (the machine slept, the bot was busy) can no longer be acknowledged ("query is too old"):
+    # the answer is already recorded, so carry on to the card and the session that acts on it.
     if settled:
-        api(cfg, 'answerCallbackQuery', {'callback_query_id': query['id'], 'text': 'Đã nhận'})
+        with contextlib.suppress(BotError):
+            api(cfg, 'answerCallbackQuery', {'callback_query_id': query['id'], 'text': 'Đã nhận'})
         retire(cfg, message_id, settled_text(repo, settled['gate'], answer))
         ensure_session(cfg, repo)
     else:
-        api(cfg, 'answerCallbackQuery', {'callback_query_id': query['id'], 'text': 'Câu này đã được quyết rồi.'})
+        with contextlib.suppress(BotError):
+            api(cfg, 'answerCallbackQuery', {'callback_query_id': query['id'], 'text': 'Câu này đã được quyết rồi.'})
         with contextlib.suppress(BotError):
             api(cfg, 'editMessageReplyMarkup', {'chat_id': cfg['chat'], 'message_id': message_id,
                                                 'reply_markup': {'inline_keyboard': []}})
@@ -1025,7 +1041,8 @@ def on_session_command(cfg, command, rest):
         if not os.path.isdir(cfg['games_dir']):
             send_text(cfg, card('⚠️', 'Không thấy thư mục game', f"{code(cfg['games_dir'])} (GAMES_DIR) không tồn tại."))
             return
-        slug = '-'.join(re.findall(r'[a-z0-9]+', rest.lower())[:3]) or 'new-game'
+        # Without diacritics first: "game khó cực" is new-game-kho-cuc, not new-game-kh-c.
+        slug = '-'.join(re.findall(r'[a-z0-9]+', fold(rest))[:3]) or 'new-game'
         ref = launch(cfg, cfg['games_dir'], f'new-{slug}',
                      NEW_PROMPT.format(idea=rest, games_dir=cfg['games_dir']))
         send_text(cfg, card('🆕', 'Game mới', f'Đã mở phiên Claude (phiên {code(ref)}). Agent sẽ hỏi tiếp ở đây.',
@@ -1127,7 +1144,8 @@ def on_text(cfg, text):
         retire(cfg, settled['message_id'], settled_text(target, settled['gate'], text))
         ack = (f"✓ Đã nhận: build <b>{esc(fields['build'])}</b>, Apple ID <b>{esc(fields['apple_id'])}</b>."
                if fields else '✓ Đã nhận câu trả lời.')
-        send_text(cfg, ack, disable_notification=True)
+        with contextlib.suppress(BotError):
+            send_text(cfg, ack, disable_notification=True)
         ensure_session(cfg, target)
         return
     if held:
@@ -1161,7 +1179,7 @@ def handle(cfg, update):
     if not message or str(message.get('chat', {}).get('id')) != cfg['chat']:
         warn(f"ignored update {update.get('update_id')} from a chat that is not the allowlisted one")
         return
-    text = (message.get('text') or '').strip()
+    text = with_links((message.get('text') or '').strip(), message.get('entities'))
     if media_of(message)[0]:
         repo = resolve_game(cfg, None)
         if repo:

@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.16.3 — 2026-10-27
+
+A phone answer could sit unread after a late button tap, a decision a session had read could be
+lost with that session, and a hyperlink lost its address on the way to the agent.
+
+- A tap the bot reads late (the machine slept, or the bot was busy with the update before it) can
+  no longer be acknowledged: Telegram answers "query is too old" (logged 2026-10-26). The answer
+  was already recorded, but the error skipped the settled card and the session that acts on it,
+  so after a sleep the answer waited for whichever session came next. The acknowledgement is now
+  best-effort, and a failed "Đã nhận" message after a typed answer no longer skips the session.
+- Every decision is also appended to `.clone/telegram/decisions.jsonl`, which nothing deletes.
+  The answer file goes once a session reads it: Slipchute's G4 ("Duyệt, giữ IAP như cũ",
+  2026-10-26) was read by a session that then stopped on a permission prompt, and survived only
+  in its transcript. Start step 5 records a decision the Gate log lacks.
+- Text pasted as a hyperlink ("Link video game mới") reaches the inbox with its URL: Telegram
+  keeps a `text_link` address outside the text, which is how Beamfork's S1 lost a video link.
+  File captions keep theirs too.
+- `/new` session names fold Vietnamese diacritics (`new-game-kho-cuc`, not `new-game-kh-c`).
+
 ## 1.16.2 — 2026-10-27
 
 The bridge took a session the background service had retired for a running one. A background

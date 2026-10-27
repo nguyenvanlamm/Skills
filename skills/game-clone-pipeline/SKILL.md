@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.16.2
+  version: 1.16.3
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -200,8 +200,9 @@ A new site repo has no checkout yet: S7 writes it straight into its folder, then
    session. It registers the repo; when the service already serves the bot it prints
    "already running" and exits 0, otherwise it serves until the session ends. Exit 69 = not set
    up: skip Telegram and say so once. Set the status.md `Remote:` line to `Telegram on`, then run
-   `<tb> answers <repo>` and `<tb> inbox <repo>` and act on what they print. After G1's rename,
-   `<tb> register <new path>`.
+   `<tb> answers <repo>` and `<tb> inbox <repo>` and act on what they print. A decision in
+   `.clone/telegram/decisions.jsonl` that the Gate log lacks was read by a session that stopped
+   before recording it: record it now. After G1's rename, `<tb> register <new path>`.
 
 ## Telegram remote
 
