@@ -21,7 +21,7 @@ Waiting on: —
 - [ ] S6 codebase-modernizer → plan-to-issues → issues fixed, PRs merged, branches deleted; analyze + test exit 0
 - [ ] S7 Landing repo with privacy + support pages live on Pages
 - [ ] S8 iOS: only `main` left → flutter-ios-release + docs/APP-STORE-CONNECT.md → human web setup + Mac build/upload → TestFlight → store assets/ASO → review-checker → **G4** → ship + submit (no `asc`, rule 12)
-- [ ] S9 Landing polish: search-optimizer, design-optimizer; post-launch checks
+- [ ] S9 Landing polish: search-optimizer, design-optimizer on this site (store badge and post-launch checks wait under Deferred)
 
 ## Gate log
 

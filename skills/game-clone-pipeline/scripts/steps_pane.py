@@ -7,12 +7,14 @@ whenever .clone/status.md changes, so the human sees which stage the run is at.
   scripts/steps_pane.py once REPO    # print the steps once, plain text (no herdr: paste in chat)
   scripts/steps_pane.py close REPO   # close REPO's steps pane in this tab
 
-Reads REPO/.clone/status.md: the `- [x] S<n> …` stage lines with their `**G…**` gate, the Gate log
-table (a gate is passed once it has a row whose Decision does not start with reject, revise or
-no), and the `Now:` / `Waiting on:` lines. The current stage is the one `Now:` names, else the
-first unchecked one. `open` exits 69 when herdr is not available, after printing the steps.
-Standard library only.
+Reads the newest .clone/status.md of REPO and its worktrees (.claude/worktrees/*/, where a
+background session works each stage): the `- [x] S<n> …` stage lines with their `**G…**` gate,
+the Gate log table (a gate is passed once it has a row whose Decision does not start with reject,
+revise or no), and the `Now:` / `Waiting on:` lines. The current stage is the one a
+`Now: S<n> · …` line names, else the first unchecked one. `open` exits 69 when herdr is not
+available, after printing the steps. Standard library only.
 """
+import glob
 import json
 import os
 import re
@@ -45,8 +47,28 @@ NOT_PASSED = re.compile(r'^(reject|revise|no\b|từ chối|làm lại)', re.IGNO
 STYLES = {'done': '32', 'current': '1;33', 'todo': '2', 'wait': '35', 'title': '1'}
 
 
+def mtime(path):
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return None
+
+
 def status_path(repo):
-    return os.path.join(repo, '.clone', 'status.md')
+    """REPO's newest status.md: a background session updates its worktree's copy, and `main` only
+    catches up when the stage is merged. `main`'s copy wins a tie."""
+    best = os.path.join(repo, '.clone', 'status.md')
+    best_time = mtime(best)
+    for path in glob.glob(os.path.join(glob.escape(repo), '.claude', 'worktrees', '*', '.clone', 'status.md')):
+        if (stamp := mtime(path)) is not None and (best_time is None or stamp > best_time):
+            best, best_time = path, stamp
+    return best
+
+
+def worktree_of(repo, path):
+    """The worktree folder name when PATH is a worktree's copy, else None."""
+    parts = os.path.relpath(path, repo).split(os.sep)
+    return parts[2] if parts[:2] == ['.claude', 'worktrees'] and len(parts) > 2 else None
 
 
 def value(text):
@@ -84,10 +106,12 @@ def parse(text):
 
 
 def current_stage(state):
-    named = re.search(r'\bS\d+\b', state['now'] or '')
+    """The stage `Now: S<n> · …` names, else the first unchecked one. A free-form `Now:` that only mentions
+    stages (`S8 done: …`, `S0–S7 and S9 done`) names none."""
+    named = re.match(r'(S\d+)\s*·', state['now'] or '')
     ids = [stage['id'] for stage in state['stages']]
-    if named and named.group(0) in ids:
-        return named.group(0)
+    if named and named.group(1) in ids:
+        return named.group(1)
     return next((stage['id'] for stage in state['stages'] if not stage['done']), None)
 
 
@@ -156,7 +180,9 @@ def render(repo, columns, color):
     for label, text, style in (('Đang làm', state['now'], 'current'), ('Chờ bạn', state['waiting'], 'wait')):
         wrapped = textwrap.wrap(f'{label}: {text or "—"}', width=max(columns, 10), subsequent_indent='  ')
         lines.extend(emit([(part, style if text else 'todo')], columns, color) for part in wrapped)
-    lines.append(emit([(f'Cập nhật {updated}', 'todo')], columns, color))
+    worktree = worktree_of(repo, path)
+    lines.append(emit([(f'Cập nhật {updated}' + (f' · worktree {worktree}' if worktree else ''), 'todo')],
+                      columns, color))
     return lines
 
 
@@ -166,10 +192,10 @@ def watch(repo):
     try:
         while True:
             path = status_path(repo)
-            stamp = os.stat(path).st_mtime_ns if os.path.exists(path) else None
+            stamp = mtime(path)
             size = shutil.get_terminal_size()
-            if (stamp, size) != shown:
-                shown = (stamp, size)
+            if (path, stamp, size) != shown:
+                shown = (path, stamp, size)
                 lines = render(repo, max(size.columns, 10), color=True)
                 sys.stdout.write('\033[H\033[2J' + '\n'.join(lines[:size.lines]))
                 sys.stdout.flush()

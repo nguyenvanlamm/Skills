@@ -1,5 +1,48 @@
 # Changelog
 
+## 1.14.0 — 2026-10-26
+
+The two newest games looked stuck at S8–S9, unlike the ones before them. Slipchute was: its
+background session asked G4 from the S8 worktree, left that worktree with `keep` to start S9 in
+`slipchute-site` (`cd`) while G4 was open, and when the answer came a minute later called
+`EnterWorktree` with `path:` to go back. From the site repo that is a "permission-root
+relocation" prompt auto mode cannot answer, so the session sat on it with all of S8 on an
+unmerged branch, and the phone's `claude attach slipchute-site` named no session. Chiselturn's
+S8 only looked finished: it was ticked on Telegram button taps, while its private repo was never
+cloned onto a Mac, so no build exists and nothing reached Apple. Its pane showed ▶ S8 because of
+its `Now:` line, and the resume after "Next sang s9" died at once on "Login expired" without a
+warning.
+
+- Rule 5: a background session leaves a stage's worktree only at the stage end. A gate inside
+  the stage is waited for there (start `ask`, end the turn), the next stage starts after the
+  merge, and a worktree is never re-entered; S8 says so at G4. Telegram sessions start `ask` in
+  the background and end the turn (the old text said "in the foreground").
+- Site repo (S7, S9): one recipe under Workspace, from the game repo's root without `cd`: a
+  linked worktree made with `git -C <site> worktree add`, edited by absolute path and merged
+  with `git -C`. A background session refuses Edit in the site's own checkout, which is what
+  pushed runs into `cd` and shell-script edits. New site repos ignore `.claude/`.
+- `hook`: phone-started sessions also get a PreToolUse hook that refuses `EnterWorktree` with
+  `path:` and tells the agent to merge from the repo root instead. The permission-prompt message
+  names the game the session works on and gives `claude attach <session id>` (a `/new` session
+  is named after the idea), with `CLAUDE_CONFIG_DIR=…` when the session runs under another
+  config folder (an mcc profile); the bot's other attach hints use the same form.
+- Steps pane and `/games` read the newest `.clone/status.md` of the repo and its worktrees, so a
+  stage running in a worktree shows its real step (the pane names the worktree), not `main`'s
+  copy from the stage start. The current stage comes from `Now:` only when it starts
+  `S<n> ·`: Chiselturn's `Now: S8 done: …` had shown ▶ S8 and Snowpack Hop's
+  `Now: S0–S7 … done` ▶ S0. A session held by a permission prompt shows as such on `/games`,
+  ahead of "chờ bạn", with its attach command.
+- Rule 13 and S8 step 2: the deferred Apple steps resume only on two values the human reads off
+  App Store Connect and types: the VALID build number and the app's Apple ID. Their question
+  has `Để sau` as its only button. Chiselturn's offered "Build VALID" and "Có vấn đề"; one tap
+  ticked the steps, `/ship` then tagged "build 1", and "Đã nộp" recorded a submission, all
+  without a build. Snowpack Hop's offered "Để sau" too, and its steps are still deferred.
+- The stopped-session warning also fires when an answer of yours is still unread, even with
+  something in `Waiting on:` (Chiselturn had "Apple review" there).
+- S9 is ticked once `search-optimizer` and `design-optimizer` ran on the game's own site;
+  Chiselturn's S9 had applied Beamfork's audit fixes instead of running either. Store badges and
+  post-launch checks wait under `## Deferred (human)`.
+
 ## 1.13.0 — 2026-10-19
 
 A game that only waits on the human (Nightwall, at S8's App Store steps) stayed in `/games` with

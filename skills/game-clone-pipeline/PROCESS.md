@@ -1,4 +1,4 @@
-# Quy trình clone game (bản 1.11.0)
+# Quy trình clone game (bản 1.14.0)
 
 Biến một game casual/puzzle đang thành công, hoặc một ý tưởng game (đặt cạnh các game thành công gần nhất), thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
 
@@ -14,7 +14,7 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 8. **Commit ngay sau mỗi bước** bằng skill `commit`: message tiếng Anh, kèm push. Tag và release để `/ship` làm.
 9. **Đặt tên repo theo tên game.** Repo game (thư mục và GitHub) mang đúng tên game viết thường, nối bằng gạch ngang (Nightwall → `nightwall`); repo landing là `<tên-game>-site`. Không bao giờ có đuôi `-clone`. Trước G1 dùng tên tạm theo ý tưởng (cũng không có `-clone`); duyệt tên ở G1 xong thì đổi tên repo và thư mục.
 10. **Telegram chỉ là cổng thêm.** Ngồi ở máy thì vẫn quyết trong chat; chỉ khi bạn bật chế độ vắng mặt (`/away`) agent mới hỏi qua Telegram. Từ điện thoại bạn cũng mở được phiên Claude (`/open`, `/new`). Không gửi mật khẩu hay tài khoản Apple qua Telegram.
-11. **Agent ở yên trong repo game.** Muốn xem code của game khác (ví dụ phần shop của game trước), agent đọc bằng đường dẫn đầy đủ chứ không `cd` sang đó. Phiên chạy nền làm mỗi bước trong một worktree riêng rồi merge vào `main` khi xong bước.
+11. **Agent ở yên trong repo game.** Muốn xem code của game khác (ví dụ phần shop của game trước), agent đọc bằng đường dẫn đầy đủ chứ không `cd` sang đó. Repo landing (S7, S9) cũng vậy: agent tạo cho nó một worktree riêng bằng `git -C` rồi sửa trong đó. Phiên chạy nền làm mỗi bước trong một worktree riêng và chỉ ra khi xong bước, merge vào `main`. Cổng nằm giữa bước (ví dụ G4) thì chờ ngay trong worktree đó, không sang bước sau trước. Không bao giờ quay lại một worktree đã rời: từ repo khác, việc đó bật một hộp xin quyền chỉ bấm được ở máy, và phiên đứng chờ ở đó (Slipchute đã kẹt như vậy sau G4).
 
 ## Các bước
 
@@ -29,7 +29,7 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 | S6 | Agent | Soát codebase → issue → sửa, merge từng PR rồi xóa nhánh | `codebase-modernizer`, `plan-to-issues`, `issue-work-loop` | test xanh, chỉ còn `main` |
 | S7 | Agent | Repo landing tối thiểu có privacy + support, GitHub Pages deploy thẳng từ nhánh `main` (không dùng Actions) | `landing-page-generator` | 2 URL sống |
 | S8 | Agent + Người | iOS: chuẩn bị trên Ubuntu, **build và upload trên Mac**, TestFlight, ảnh store, ASO, soát, ship, nộp | `flutter-ios-release`, `appstore-assets`, `aso-marketing`, `appstore-review-checker`, `/ship` (không `asc`, luật 12) | **G4** duyệt nộp |
-| S9 | Agent | Hoàn thiện landing; bạn đọc review và số liệu trên App Store Connect rồi chuyển lại | `search-optimizer`, `design-optimizer` | |
+| S9 | Agent | Hoàn thiện landing (chạy thật cả hai skill trên site của game này) rồi tick S9; badge App Store chờ app lên store, ghi ở mục hoãn. Sau khi ra mắt, bạn đọc review và số liệu trên App Store Connect rồi chuyển lại | `search-optimizer`, `design-optimizer` | |
 
 ## Ô các bước
 
@@ -37,7 +37,8 @@ Khi chạy trong herdr, agent tách pane của mình và mở một ô bên ph�
 
 - `✓` là bước đã xong, `▶` là bước đang làm, `·` là bước chưa tới;
 - cột cổng có `✓` khi cổng đã duyệt, và hiện `⏸` khi agent đang chờ bạn;
-- dòng cuối ghi "Đang làm" (dòng `Now:` trong status.md) và "Chờ bạn" (dòng `Waiting on:`).
+- dòng cuối ghi "Đang làm" (dòng `Now:` trong status.md) và "Chờ bạn" (dòng `Waiting on:`);
+- ô đọc bản status.md mới nhất, kể cả bản trong worktree của bước đang chạy (dòng "Cập nhật" ghi tên worktree), nên thấy được tiến độ thật trước khi bước được merge vào `main`. Bước đang làm lấy từ `Now: S<n> · …`; dòng `Now:` viết kiểu khác thì ô coi bước chưa tick đầu tiên là bước đang làm.
 
 Nếu lỡ đóng ô, mở lại bằng `python3 ~/.claude/skills/game-clone-pipeline/scripts/steps_pane.py open .` trong repo game. Khi không có herdr, agent in khối này vào chat mỗi lần đổi bước.
 
@@ -75,13 +76,13 @@ Không bắt buộc. Ngồi ở máy thì mọi thứ như cũ, bạn quyết tr
 | `/new <ý tưởng hoặc link store>` | Mở phiên Claude bắt đầu game mới trong `GAMES_DIR`; agent tạo repo rồi hỏi tiếp bạn qua Telegram |
 | `/log [game]` | Xem phiên Claude vừa nói gì và vừa chạy lệnh gì (12 mục gần nhất) |
 | `/stop [game]` | Dừng phiên chạy nền do điện thoại mở (phiên đang mở trên máy tính thì không dừng từ xa được) |
-| Về máy: `claude attach <game>` (hoặc mã phiên bot gửi) | Mở phiên đó trong terminal và làm tiếp như bình thường |
+| Về máy: `claude attach <mã phiên>` (mã bot gửi kèm tin) | Mở phiên đó trong terminal và làm tiếp như bình thường. Phiên mở bằng `/new` mang tên ý tưởng chứ không phải tên game, nên gõ tên game sẽ không thấy; dùng mã phiên. Chạy trong terminal thường, không qua profile mcc (`maisie`): mỗi thư mục cấu hình Claude chỉ thấy phiên của nó |
 
-Phiên mở từ điện thoại chạy với chế độ quyền `auto`: Claude Code tự cho phép thao tác an toàn và chặn thao tác rủi ro. Nếu phiên vẫn phải dừng chờ cấp quyền, bot nhắn bạn; từ điện thoại không bấm cho phép được, về máy `claude attach <game>` để xử lý.
+Phiên mở từ điện thoại chạy với chế độ quyền `auto`: Claude Code tự cho phép thao tác an toàn và chặn thao tác rủi ro. Nếu phiên vẫn phải dừng chờ cấp quyền, bot nhắn bạn kèm tên game và lệnh `claude attach <mã phiên>`; từ điện thoại không bấm cho phép được, về máy chạy đúng lệnh đó để xử lý. `/games` cũng hiện game đó là "🟡 Claude chờ xác nhận trên máy" kèm lệnh. Phiên mở từ điện thoại còn có một hook chặn trước thao tác hay gây hộp xin quyền này (vào lại worktree bằng `path:`), báo agent làm cách khác thay vì đứng chờ.
 
 Khi đang ở chế độ vắng mặt, nếu một phiên Claude đang chạy mà 30 phút không ghi gì và không có câu hỏi nào chờ bạn, bot nhắn **một lần** kèm lệnh cuối cùng phiên đó chạy. Thường là phiên đang chờ một xác nhận chỉ bấm được trên máy. Xem bằng `/log`; mở lại bằng `/stop` rồi `/open`, hoặc về máy `claude attach`.
 
-Bot cũng nhắn **một lần** khi phiên của game đã dừng hẳn (từ 10 phút đến 24 giờ trước) mà game chưa xong, `Waiting on:` trống và không có câu hỏi nào chờ bạn. Tin nhắn kèm câu cuối của phiên, ví dụ "Login expired" khi Claude hết hạn đăng nhập. Chạy tiếp bằng `/open <game>`. Agent chỉ được dừng ở chỗ cần bạn quyết (luật 16), nên tin này nghĩa là phiên dừng ngoài ý muốn.
+Bot cũng nhắn **một lần** khi phiên của game đã dừng hẳn (từ 10 phút đến 24 giờ trước) mà game chưa xong, không có câu hỏi nào chờ bạn, và `Waiting on:` trống hoặc câu trả lời của bạn chưa được phiên nào đọc. Tin nhắn kèm câu cuối của phiên, ví dụ "Login expired" khi Claude hết hạn đăng nhập (Chiselturn: phiên mở sau câu "Next sang s9" chết ngay vì lý do này). Chạy tiếp bằng `/open <game>`. Agent chỉ được dừng ở chỗ cần bạn quyết (luật 16), nên tin này nghĩa là phiên dừng ngoài ý muốn.
 
 Bot nhận ra cả những phiên đang làm trong worktree của game (`.claude/worktrees/…`). Repo do pipeline tạo từ điện thoại chưa được Claude trust, nên `/open` sẽ mở phiên từ thư mục cha (`GAMES_DIR`) và báo cho bạn. Muốn sửa hẳn, ở máy chạy `claude` một lần trong repo đó và chấp nhận.
 
@@ -120,14 +121,14 @@ Không dùng GitHub Actions (luật 11). Agent chuẩn bị file trên Ubuntu, b
    - chép `scripts/build-ios.sh` và `ios/ExportOptions.plist` vào repo;
    - viết `docs/IOS-BUILD-ON-MAC.md` và `docs/APP-STORE-CONNECT.md` (bundle id, gói IAP, giá, URL, ghi chú review, checklist);
    - commit.
-2. Bạn làm trên web App Store Connect theo `docs/APP-STORE-CONNECT.md`: bundle id, app, gói IAP. Trên Mac: `TEAM_ID=… scripts/build-ios.sh upload`. Bạn báo khi build VALID trên TestFlight.
+2. Bạn làm trên web App Store Connect theo `docs/APP-STORE-CONNECT.md`: bundle id, app, gói IAP. Trên Mac: `TEAM_ID=… scripts/build-ios.sh upload`. Khi build VALID trên TestFlight, bạn gõ số build và Apple ID của app (mục App Information, một dãy số).
 3. Bạn thử trên TestFlight bằng tài khoản Sandbox: mua, huỷ, cài lại, Restore.
 4. Agent:
    - làm ảnh store bằng `appstore-assets`, viết tên và từ khoá bằng `aso-marketing` (chỉ en-US), lưu vào `store/`;
-   - soát bằng `appstore-review-checker` → **G4**. Bạn dán nội dung `store/` lên web.
+   - soát bằng `appstore-review-checker` → **G4**. Bạn dán nội dung `store/` lên web. Agent chờ G4 ngay trong worktree của S8; duyệt xong mới merge và sang S9.
 5. Agent chạy `/ship --no-auto` (version, tag). Bạn build bản chính thức trên Mac và bấm nộp trên web.
 
-**Hoãn việc cần tài khoản Apple (luật 13):** bước 2–3 (làm trên web App Store Connect, build/upload trên Mac, thử TestFlight) mặc định để sau, ghi vào `## Deferred (human)` trong status.md. Agent không dừng chờ mà làm tiếp bước 4 (ảnh store, ASO) và soát; chỉ bước 5 (ship, nộp) chờ bạn làm xong phần hoãn.
+**Hoãn việc cần tài khoản Apple (luật 13):** bước 2–3 (làm trên web App Store Connect, build/upload trên Mac, thử TestFlight) mặc định để sau, ghi vào `## Deferred (human)` trong status.md. Agent không dừng chờ mà làm tiếp bước 4 (ảnh store, ASO) và soát; chỉ bước 5 (ship, nộp) chờ bạn làm xong phần hoãn. Câu hỏi về phần hoãn chỉ có một nút "Để sau". Muốn báo xong thì bạn gõ số build và Apple ID của app; bấm nút hay gõ "xong" không được tính. Chiselturn từng bị đánh dấu xong S8, gắn tag và ghi "đã nộp" chỉ nhờ các cú bấm "Build VALID", "Đã nộp", trong khi chưa có bản build nào.
 
 **Hoãn `asc` (luật 12):** agent không chạy lệnh `asc` nào; mọi việc trên App Store Connect bạn làm trên web từ file agent chuẩn bị.
 

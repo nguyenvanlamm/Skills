@@ -25,12 +25,15 @@ registered repos. Per-game state lives in REPO/.clone/telegram/ (git-ignored); t
 and the update offset in ~/.local/state/game-clone-pipeline/telegram/.
 
 From the phone, `/open <game>` and `/new <idea>` start `claude --bg` sessions (permission mode auto);
-`claude attach <game>` takes one over at the computer. A Telegram answer for a game with no live
-session opens one, which reads it with `answers`. A session belongs to a game when it runs in the repo
-or one of its worktrees, carries the game's name, or ran a subcommand on the repo. In away mode `serve`
-warns the phone once when no question is pending and either a busy session has written nothing for
-STALL_MINUTES (most likely waiting on a prompt only the computer can answer) or the game's sessions
-have all stopped with stages left and nothing in `Waiting on:` (it quit without asking anything).
+`claude attach <session id>` takes one over at the computer (a `/new` session is named after the idea,
+not the game). A Telegram answer for a game with no live session opens one, which reads it with
+`answers`. A session belongs to a game when it runs in the repo or one of its worktrees, carries the
+game's name, or ran a subcommand on the repo. Phone-started sessions carry `hook`: it reports a
+permission prompt to the phone and refuses `EnterWorktree` with `path:` (SKILL.md rule 5). In away mode
+`serve` warns the phone once when no question is pending and either a busy session has written nothing
+for STALL_MINUTES (most likely waiting on a prompt only the computer can answer) or the game's sessions
+have all stopped with stages left and nothing in `Waiting on:` (it quit without asking anything) or
+with an answer of yours unread (it died before reading it, e.g. on an expired login).
 
 `ask` prints one JSON line and exits 0: {"event": "answer", "answer", "by": "telegram"|"computer", ...}
 or {"event": "inbox", "unread": n} when a command arrived first (read `inbox`, then ask again: the
@@ -438,8 +441,23 @@ def sessions_for(repo, include_done=False, listing=None):
     return sorted(mine, key=lambda s: s.get('startedAt') or 0, reverse=True)
 
 
+def session_repo(cfg, sid, cwd):
+    """The game a session works on, from its id and folder, or None."""
+    session = {'sessionId': sid, 'cwd': cwd}
+    return next((repo for repo in games(cfg).values() if belongs(session, repo)), None)
+
+
 def session_ref(session):
     return session.get('id') or session.get('name') or session.get('sessionId')
+
+
+def attach_command(ref):
+    """`claude attach REF` as typed in a terminal at the computer. Sessions live per config folder: one
+    under another CLAUDE_CONFIG_DIR (an mcc profile) is invisible to a plain `claude attach`."""
+    config = os.environ.get('CLAUDE_CONFIG_DIR')
+    if config and os.path.realpath(config) != os.path.realpath(os.path.expanduser('~/.claude')):
+        return f'CLAUDE_CONFIG_DIR={shlex.quote(config)} claude attach {ref}'
+    return f'claude attach {ref}'
 
 
 def session_state(session):
@@ -515,8 +533,9 @@ def minutes_since(path):
 
 
 def hook_settings():
-    command = shlex.join([sys.executable, SCRIPT, 'hook'])
-    return json.dumps({'hooks': {'Notification': [{'hooks': [{'type': 'command', 'command': command}]}]}})
+    hook = [{'type': 'command', 'command': shlex.join([sys.executable, SCRIPT, 'hook'])}]
+    return json.dumps({'hooks': {'Notification': [{'hooks': hook}],
+                                 'PreToolUse': [{'matcher': 'EnterWorktree', 'hooks': hook}]}})
 
 
 def launch(cfg, cwd, name, prompt):
@@ -552,7 +571,7 @@ def ensure_session(cfg, repo):
             return
         ref = resume(cfg, repo)
         send_text(cfg, f'▶ {game_name(repo)}: không có phiên Claude nào đang chạy, đã mở phiên mới để chạy tiếp. '
-                       f'Về máy: claude attach {ref}')
+                       f'Về máy: {attach_command(ref)}')
     except (BotError, subprocess.TimeoutExpired, ValueError) as error:
         warn(str(error))
         with contextlib.suppress(BotError):
@@ -821,11 +840,12 @@ def game_card(name, repo, current, live):
     state, pending = read_state(repo), read_json(state_file(repo, 'pending.json'))
     stage = steps_pane.current_stage(state) if state else None
     status = live[0].get('status') if live else None
+    prompt = status == 'waiting'  # a permission prompt holds the run until someone clicks it at the computer
     if pending:
         badge = f"❓ đang hỏi bạn ({pending['gate']})"
     elif status == 'busy':
         badge = '🟢 đang chạy'
-    elif state and state['waiting']:
+    elif state and state['waiting'] and not prompt:
         badge = '⏸ chờ bạn'
     elif live:
         badge = f"🟡 Claude {SESSION_LABEL.get(status, status or '?')}"
@@ -839,7 +859,9 @@ def game_card(name, repo, current, live):
     if stage:
         label = next(s['label'] for s in state['stages'] if s['id'] == stage)
         lines.append(f'{stage} · {html.escape(label)}')
-    if state and state['waiting'] and not pending:
+    if prompt and not pending:
+        lines.append(f'Ở máy: {html.escape(attach_command(session_ref(live[0])))}')
+    elif state and state['waiting'] and not pending:
         lines.append(f"Chờ: {html.escape(short(state['waiting']))}")
     return '\n'.join(lines)
 
@@ -872,7 +894,7 @@ def on_session_command(cfg, command, rest):
         ref = launch(cfg, cfg['games_dir'], f'new-{slug}',
                      NEW_PROMPT.format(idea=rest, games_dir=cfg['games_dir']))
         send_text(cfg, f'🆕 Đã mở phiên Claude cho game mới (phiên {ref}). Agent sẽ hỏi tiếp ở đây. '
-                       f'Về máy: claude attach {ref}')
+                       f'Về máy: {attach_command(ref)}')
         return
     repo = resolve_game(cfg, rest or None)
     if not repo:
@@ -898,7 +920,7 @@ def on_session_command(cfg, command, rest):
                            f'Xem bằng /log {name}.')
             return
         ref = resume(cfg, repo)
-        send_text(cfg, f'▶ {name}: đã mở phiên Claude (phiên {ref}). Về máy: claude attach {ref}')
+        send_text(cfg, f'▶ {name}: đã mở phiên Claude (phiên {ref}). Về máy: {attach_command(ref)}')
     elif command == 'log':
         found = sessions_for(repo) or sessions_for(repo, include_done=True)
         if not found:
@@ -996,26 +1018,32 @@ def handle(cfg, update):
         on_text(cfg, text)
 
 
+def unread_answers(repo):
+    """Decisions recorded for REPO that no session has read yet (`ask` and `answers` remove them)."""
+    return [name for name in os.listdir(state_dir(repo)) if name.startswith('answer-') and name.endswith('.json')]
+
+
 def check_ended(cfg, warned, repo, session):
     """Warn once when REPO's newest session, not busy, last wrote ENDED_MINUTES to ENDED_HOURS ago with stages
-    left and nothing in `Waiting on:`: it stopped without asking anything (a sibling skill's final report taken
-    for the end of the run, an expired login) and nothing restarts it. A session `/stop`ped from the phone is
-    left alone."""
+    left and either nothing in `Waiting on:` or an answer of yours unread: it stopped without asking anything
+    (a sibling skill's final report taken for the end of the run) or died before reading your answer (an
+    expired login), and nothing restarts it. A session `/stop`ped from the phone is left alone."""
     path = transcript(session)
     if not path or read_text(state_file(repo, 'stopped')) == session.get('sessionId'):
         return
     mtime, key = os.path.getmtime(path), ('ended', session.get('sessionId'))
     if not ENDED_MINUTES * 60 <= time.time() - mtime <= ENDED_HOURS * 3600 or warned.get(key) == mtime:
         return
-    state = read_state(repo)
-    if not state or state['waiting'] or all(stage['done'] for stage in state['stages']):
+    state, unread = read_state(repo), unread_answers(repo)
+    if not state or (state['waiting'] and not unread) or all(stage['done'] for stage in state['stages']):
         return
     warned[key] = mtime
     name, reply = game_name(repo), last_reply(path)
     with contextlib.suppress(BotError):
         send_text(cfg, f'⚠️ {name}: phiên Claude ({session_state(session)}) đã dừng lúc '
-                       f'{time.strftime("%H:%M", time.localtime(mtime))} mà không hỏi gì.\n'
-                       f"Đang làm: {state['now'] or '?'}\n" + (f'Câu cuối: {reply}\n' if reply else '')
+                       f'{time.strftime("%H:%M", time.localtime(mtime))} '
+                       + ('trước khi đọc câu trả lời của bạn.\n' if unread else 'mà không hỏi gì.\n')
+                       + f"Đang làm: {state['now'] or '?'}\n" + (f'Câu cuối: {reply}\n' if reply else '')
                        + f'Chạy tiếp: /open {name}. Xem: /log {name}.')
 
 
@@ -1049,7 +1077,7 @@ def check_stalls(cfg, warned):
                                f'{minutes_since(path)} phút' + (f', lệnh cuối: {tool}' if tool else '') + '.\n'
                                'Có thể đang chờ một xác nhận chỉ bấm được trên máy. '
                                f'Xem: /log {name}. Mở lại: /stop {name} rồi /open {name}. '
-                               f'Ở máy: claude attach {session_ref(session)}')
+                               f'Ở máy: {attach_command(session_ref(session))}')
 
 
 def cmd_serve():
@@ -1221,22 +1249,41 @@ def cmd_inbox(repo):
     return 0
 
 
+def guard_worktree(event):
+    """PreToolUse hook: refuse `EnterWorktree` with `path:` (SKILL.md rule 5). From another repo it raises a
+    permission prompt only the computer can answer, and the background session waits on it. Exit 2 hands
+    the reason to the agent instead."""
+    if event.get('tool_name') != 'EnterWorktree' or not (event.get('tool_input') or {}).get('path'):
+        return 0
+    print('game-clone-pipeline rule 5: do not re-enter a worktree with `path:`. From another repo that raises '
+          'a permission prompt only the computer can answer, and this session would wait on it. Go to the game '
+          'repo root (cd, then check pwd), merge the worktree branch there with git ("Closing a branch"), and '
+          'start any further work in a new worktree with `name:`.', file=sys.stderr)
+    return 2
+
+
 def cmd_hook():
-    """Notification hook of phone-started sessions: a permission prompt nobody can click goes to the phone."""
+    """Hook of phone-started sessions: a permission prompt nobody can click goes to the phone (Notification),
+    and `EnterWorktree` with `path:` is refused before it can raise one (PreToolUse)."""
     try:
         event = json.load(sys.stdin)
     except ValueError:
         return 0
+    if event.get('hook_event_name') == 'PreToolUse':
+        return guard_worktree(event)
     cfg = load_config()
     message = event.get('message') or ''
     if not (cfg['token'] and cfg['chat']) or event.get('notification_type', '') != 'permission_prompt' \
             and 'permission' not in message.lower():
         return 0
-    name = game_name(event.get('cwd') or os.getcwd())
+    # The session's folder is no handle for it: a /new session is named after the idea, and it may sit in a
+    # worktree or in the site repo. Attach by session id, and name the game it works on.
+    cwd, sid = event.get('cwd') or os.getcwd(), event.get('session_id') or os.environ.get('CLAUDE_CODE_SESSION_ID')
+    name = game_name(session_repo(cfg, sid, cwd) or cwd)
     with contextlib.suppress(BotError):
         send_text(cfg, f'⚠️ {name}: {message or "Claude đang chờ cấp quyền"}\n'
                        f'Phiên đứng chờ tới khi có người cho phép; từ điện thoại không bấm được. '
-                       f'Về máy: claude attach {name}')
+                       f'Về máy: {attach_command(sid[:8] if sid else name)}')
     return 0
 
 

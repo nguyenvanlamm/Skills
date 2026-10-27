@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.13.0
+  version: 1.14.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -60,8 +60,14 @@ version for people; this file is the operating manual.
    its branches or PRs is open. Before S8, `git branch -a` lists only `main` and `origin/main`
    and `gh pr list --state open` is empty. A background session (`claude --bg`) must isolate its
    changes, so it works each stage in one worktree: from the game repo's root (check `pwd`),
-   `EnterWorktree` with `name: s<N>-<stage>` (never `path:`); at the stage end `ExitWorktree`,
-   then close its `worktree-s<N>-…` branch like any other.
+   `EnterWorktree` with `name: s<N>-<stage>`; at the stage end `ExitWorktree`, then close its
+   `worktree-s<N>-…` branch like any other. It leaves that worktree only at the stage end: a gate
+   inside the stage is asked and waited for there (start `ask`, end the turn, carry on in the
+   same worktree when it returns), and the next stage starts after the merge. A worktree is
+   never re-entered (`path:`): from another repo that raises a permission prompt only the
+   computer can answer. Slipchute's session sat on one with all of S8 unmerged, after leaving
+   its S8 worktree to start S9 in the site repo while G4 was open. Merge a worktree left early
+   from the repo root with git.
 6. **Gates advance on evidence.** A command that ran in this session and exited 0, or a human
    answer recorded in `.clone/status.md`. Never on a claim.
 7. **Commit after every stage** with the `commit` skill (English conventional commit, secret
@@ -71,10 +77,11 @@ version for people; this file is the operating manual.
 9. **Human-only decisions stay human:** gates G0, G0b, G1, G2 (UI direction), G3 (prices), G4
    (submit), every App Store submission, every secret value, every paid action.
 10. **Keep the steps pane current.** `.clone/status.md` drives the steps pane: rewrite its
-    `Now:` line when a stage or a numbered step starts (`Now: S1 · 2 contact sheets`), and its
-    `Waiting on:` line with the human's next action whenever the run stops for them
-    (`Waiting on: G0b: trả lời ❓ trong SPEC.md`), back to `—` once they answered. The pane
-    redraws by itself.
+    `Now:` line when a stage or a numbered step starts, always as `S<n> · <step>`
+    (`Now: S1 · 2 contact sheets`), and its `Waiting on:` line with the human's next action
+    whenever the run stops for them (`Waiting on: G0b: trả lời ❓ trong SPEC.md`), back to `—`
+    once they answered. The pane and `/games` redraw by themselves from the newest copy, a stage
+    worktree's included; a `Now:` in another form shows the first unchecked stage.
 11. **No GitHub Actions.** No file under `.github/workflows/` in the game repo or the site repo,
     no CI job, no build on Actions. Checks run on the dev machine: `flutter analyze`,
     `flutter test`, the simulator, and pre-commit hooks once installed. Every delegate inherits
@@ -91,6 +98,10 @@ version for people; this file is the operating manual.
     under `## Deferred (human)` in status.md, do not stop for them, and continue with the steps
     that need no Apple account (S8 steps 4–5, then S9's site work). Only `/ship`, the release
     upload and the submission (S8 step 6) wait until the human resumes the deferred steps.
+    They resume only on what the human reads off App Store Connect, typed: the build number
+    TestFlight shows as VALID and the app's Apple ID (App Information, digits). Ask for them with
+    `Để sau` as the only button; a tap or a bare "xong" never counts. Chiselturn's S8 was
+    ticked, tagged and "submitted" on taps alone ("Build VALID", "Đã nộp") with no build made.
 14. **Telegram is an optional remote gate.** At the computer the human decides in the chat as
     always; Telegram only speaks up in away mode (see "Telegram remote"). Only the allowlisted
     chat counts as the human, and the gate log Notes say `via Telegram` or `tại máy`. Never ask
@@ -103,7 +114,8 @@ version for people; this file is the operating manual.
     reference project) by absolute path or `git -C <path>`; never `cd` into it. A session's
     working directory follows `cd`, so the next `EnterWorktree`, `git` or `flutter` command lands
     in the wrong repo. A background session once sat two days at the start of S5 this way,
-    holding a call only the computer could release.
+    holding a call only the computer could release. The site repo is written the same way, from
+    the game repo's root ("Site repo" under Workspace).
 16. **Only a human stop ends the turn.** End the turn at a human stop (a gate, a ❓ round, a
     `Waiting on:` asked with `ask` or in the chat) or at the Final report after S9, never
     elsewhere. A sibling skill's closing block (`Result / Evidence / Uncertainty / Decision`)
@@ -150,6 +162,19 @@ without `-clone`) and is renamed right after G1 (see S2).
 Then re-run `flutter analyze` and `flutter test` on `main`. Never force-push; delete unmerged
 work (`git branch -D`, closing a PR unmerged) only on the human's answer, logged in status.md.
 
+**Site repo** (`<game>-site`, S7 and S9), worked from the game repo's root (rule 15). A
+background session refuses Edit and Write in a checkout outside a worktree, so the site gets a
+linked worktree of its own, made while the session is in no game worktree (an isolated session
+refuses git aimed at another worktree). With `S=<parent>/<game>-site` and
+`W=$S/.claude/worktrees/s<N>-site`:
+- `git -C $S worktree add -b worktree-s<N>-site $W`; the site's `.gitignore` lists `.claude/`
+  (add it in `$W` if missing);
+- edit under `$W` by absolute path (sibling skills get `$W` as their target), then
+  `git -C $W add -A` and `git -C $W commit`;
+- `git -C $S merge --no-ff worktree-s<N>-site`, `git -C $S push`, `git -C $S worktree remove $W`,
+  `git -C $S branch -d worktree-s<N>-site`.
+A new site repo has no checkout yet: S7 writes it straight into its folder, then `git -C $S init`.
+
 ## Start or resume
 
 1. If `.clone/status.md` exists, read it and continue at the first unchecked stage. Re-run the
@@ -186,8 +211,10 @@ it, `watch` serves from inside the session. The agent talks to it through these 
 - **Sessions from the phone.** `/open <game>` starts `claude --bg -n <game> --permission-mode
   auto` in that repo with a resume prompt; `/new <idea or store URL>` starts one in `GAMES_DIR`;
   a Telegram answer for a game with no live session starts a resume session too. Such sessions
-  carry a Notification hook that tells the phone when a permission prompt is waiting. At the
-  computer, `claude attach <game>` takes the session over. The bot counts a session as a game's
+  carry a hook that tells the phone when a permission prompt is waiting (naming the game and the
+  session id) and refuses `EnterWorktree` with `path:` (rule 5). At the computer,
+  `claude attach <id>` with the id the bot sends takes the session over (a `/new` session is
+  named after the idea, not the game). The bot counts a session as a game's
   when it runs in the repo or one of its worktrees, or is named after the game. `claude --bg`
   refuses a folder Claude was never opened in ("Workspace not trusted"), which is every repo the
   pipeline created from the phone: the bot then starts the session from the repo's parent with the
@@ -197,15 +224,17 @@ it, `watch` serves from inside the session. The agent talks to it through these 
   written nothing for 30 minutes while no question is pending (most likely a prompt only the
   computer can answer), naming the last tool call and how to `/log`, `/stop` + `/open`, or
   attach. It also warns once when a game's sessions have all stopped 10 minutes to 24 hours
-  ago with stages left, nothing in `Waiting on:` and no question pending (the session quit
-  without asking, or died on an expired login), quoting the session's last reply and
+  ago with stages left, no question pending, and nothing in `Waiting on:` or an answer still
+  unread (the session quit without asking, or died on an expired login before reading the
+  answer, as Chiselturn's did), quoting the session's last reply and
   `/open <game>`. A session counts as the game's once it runs any subcommand on the repo
   (`register`, `inbox`, `ask`, …), so a `/new` session working from `GAMES_DIR` under the
   idea's name is seen too. Free text with no pending question is answered with the game's `Now:`, `Waiting on:`
   and session state; `help` without the slash returns the command list.
 - **A session started from Telegram** (its prompt says so): the human is away, so run
-  `answers` and `inbox` first, ask every human stop with `ask` in the foreground (no chat-only
-  question), and send the evidence with `send`. For `/new`, create the repo under `GAMES_DIR`
+  `answers` and `inbox` first, ask every human stop with `ask` started as in step 1 below, then
+  end the turn (no chat-only question; inside a stage, from its worktree, rule 5), and send the
+  evidence with `send`. For `/new`, create the repo under `GAMES_DIR`
   with a working slug without asking for the parent folder, run `<tb> register <repo>`, then ask
   the remaining start questions (sources, reference games) through `ask`.
 - **Modes.** `here` (default): Telegram stays silent. `away`: the human typed `/away` on the
@@ -371,7 +400,9 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
 
 - New repo `<game>-site`: `landing-page-generator` for copy, a simple English page,
   `privacy.html` and `support.html` from `templates/` filled from DESIGN.md (must match what the
-  app really collects). The site repo is public (free Pages). Enable Pages from the branch, no
+  app really collects), and a `.gitignore` with `.claude/`. Written from the game repo's root, and
+  changed after its first commit through a site worktree ("Site repo"). The site repo is public
+  (free Pages). Enable Pages from the branch, no
   workflow (hard rule 11):
   `gh api -X POST repos/<owner>/<game>-site/pages -f 'source[branch]=main' -f 'source[path]=/'`.
   Every push to `main` republishes the site.
@@ -386,11 +417,13 @@ Follow `references/ios-release-runbook.md`, skipping every `asc` step (hard rule
 0. Branch check (rule 5): only `main` / `origin/main`, no open PR; otherwise finish S6 first.
 1. `flutter-ios-release` (prep-report exit 0); copy `templates/build-ios.sh` →
    `scripts/build-ios.sh`, `templates/ExportOptions.plist` → `ios/ExportOptions.plist`; write
-   `docs/IOS-BUILD-ON-MAC.md` and `docs/APP-STORE-CONNECT.md` (bundle id, IAP product ids and
+   `docs/IOS-BUILD-ON-MAC.md` (ending with what to send back: the VALID build number and the
+   app's Apple ID, rule 13) and `docs/APP-STORE-CONNECT.md` (bundle id, IAP product ids and
    prices from DESIGN.md, Support/Privacy URLs from S7, review notes, web-UI checklist). Commit.
 2. *(Deferred, hard rule 13.)* Human in the App Store Connect web UI: register the bundle id,
    create the app record and the IAPs from `docs/APP-STORE-CONNECT.md`. On a Mac:
-   `TEAM_ID=… scripts/build-ios.sh upload`. Human reports when the build shows VALID in TestFlight.
+   `TEAM_ID=… scripts/build-ios.sh upload`. Human types the VALID build number and the app's
+   Apple ID (rule 13); record both in status.md.
 3. *(Deferred, hard rule 13.)* TestFlight with a Sandbox account: buy, cancel, reinstall,
    restore; IAP review screenshot.
 4. `appstore-assets` (en-US; iPad set only if iPad is targeted) and `aso-marketing` (en-US)
@@ -398,15 +431,18 @@ Follow `references/ios-release-runbook.md`, skipping every `asc` step (hard rule
    into the web UI, plus age rating and category from the checklist.
 5. `appstore-review-checker` on the source, the iOS project and `store/` (the build too, once
    steps 2–3 are done). **G4**: human reads the report and approves the package; with steps 2–3
-   still deferred, G4 approves everything except the build and is noted as partial.
+   still deferred, G4 approves everything except the build and is noted as partial. G4 is
+   waited for in the S8 worktree (rule 5); with steps 2–3 deferred, that worktree ends there:
+   merge it, then start S9.
 6. Waits for the deferred steps 2–3. `/ship --no-auto` (version bump, changelog, tag, push; asks per step) → human uploads the
    release build from the Mac and submits in the web UI ("Add for Review" with the first IAP).
    Record in status.md, commit.
 
 ### S9 — Landing polish and follow-up
 
-- In the site repo: `search-optimizer`, then `design-optimizer`; store badges and links once
-  the app is live. Commit; Pages redeploys on push.
+- In a site worktree ("Site repo"): `search-optimizer`, then `design-optimizer`, both run on
+  this site (another game's audit is no substitute). Merge; Pages redeploys on push. Tick S9
+  then; store badges and links wait for the live app under `## Deferred (human)`.
 - After launch: the human reads reviews and analytics in App Store Connect (no `asc`, hard rule
   12) and passes findings back; file them as issues.
 
@@ -428,7 +464,7 @@ leave the pane open.
 | `references/economy-and-monetization.md` | fail state, boosters, IAP, ads, analytics (S2, S5) |
 | `references/ios-release-runbook.md` | Ubuntu prep + Mac build/upload (S8); its `asc` commands are deferred by hard rule 12 |
 | `scripts/contact-sheet.sh` | recording → timestamped contact sheets and strips (S1) |
-| `scripts/steps_pane.py` | steps pane in herdr, redrawn from status.md: `open`, `close`, `once` (all stages) |
+| `scripts/steps_pane.py` | steps pane in herdr, redrawn from the newest status.md (a stage worktree's included): `open`, `close`, `once` (all stages) |
 | `scripts/telegram_bridge.py` | optional Telegram remote (rule 14): `setup`, `install-service`, `serve`/`watch`, `register`, `ask`, `close`, `answers`, `inbox`, `mode`, `send`, `hook` |
 | `templates/status.md` | `.clone/status.md` starter |
 | `templates/build-ios.sh`, `templates/ExportOptions.plist` | Mac archive/export/upload kit (S8) |
