@@ -1,4 +1,4 @@
-# Quy trình clone game (bản 1.14.0)
+# Quy trình clone game (bản 1.14.1)
 
 Biến một game casual/puzzle đang thành công, hoặc một ý tưởng game (đặt cạnh các game thành công gần nhất), thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
 
@@ -12,9 +12,9 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 6. **Cổng chỉ qua khi có bằng chứng**: lệnh thật chạy xong và exit 0, hoặc câu trả lời của người được ghi vào `.clone/status.md`.
 7. **Chỉ phát hành App Store.** Không có bước Google Play.
 8. **Commit ngay sau mỗi bước** bằng skill `commit`: message tiếng Anh, kèm push. Tag và release để `/ship` làm.
-9. **Đặt tên repo theo tên game.** Repo game (thư mục và GitHub) mang đúng tên game viết thường, nối bằng gạch ngang (Nightwall → `nightwall`); repo landing là `<tên-game>-site`. Không bao giờ có đuôi `-clone`. Trước G1 dùng tên tạm theo ý tưởng (cũng không có `-clone`); duyệt tên ở G1 xong thì đổi tên repo và thư mục.
+9. **Đặt tên repo theo tên game.** Repo game (thư mục và GitHub) mang đúng tên game viết thường, nối bằng gạch ngang (Moss Lantern → `moss-lantern`); repo landing là `<tên-game>-site`. Không bao giờ có đuôi `-clone`. Trước G1 dùng tên tạm theo ý tưởng (cũng không có `-clone`); duyệt tên ở G1 xong thì đổi tên repo và thư mục.
 10. **Telegram chỉ là cổng thêm.** Ngồi ở máy thì vẫn quyết trong chat; chỉ khi bạn bật chế độ vắng mặt (`/away`) agent mới hỏi qua Telegram. Từ điện thoại bạn cũng mở được phiên Claude (`/open`, `/new`). Không gửi mật khẩu hay tài khoản Apple qua Telegram.
-11. **Agent ở yên trong repo game.** Muốn xem code của game khác (ví dụ phần shop của game trước), agent đọc bằng đường dẫn đầy đủ chứ không `cd` sang đó. Repo landing (S7, S9) cũng vậy: agent tạo cho nó một worktree riêng bằng `git -C` rồi sửa trong đó. Phiên chạy nền làm mỗi bước trong một worktree riêng và chỉ ra khi xong bước, merge vào `main`. Cổng nằm giữa bước (ví dụ G4) thì chờ ngay trong worktree đó, không sang bước sau trước. Không bao giờ quay lại một worktree đã rời: từ repo khác, việc đó bật một hộp xin quyền chỉ bấm được ở máy, và phiên đứng chờ ở đó (Slipchute đã kẹt như vậy sau G4).
+11. **Agent ở yên trong repo game.** Muốn xem code của game khác (ví dụ phần shop của game trước), agent đọc bằng đường dẫn đầy đủ chứ không `cd` sang đó. Repo landing (S7, S9) cũng vậy: agent tạo cho nó một worktree riêng bằng `git -C` rồi sửa trong đó. Phiên chạy nền làm mỗi bước trong một worktree riêng và chỉ ra khi xong bước, merge vào `main`. Cổng nằm giữa bước (ví dụ G4) thì chờ ngay trong worktree đó, không sang bước sau trước. Không bao giờ quay lại một worktree đã rời: từ repo khác, việc đó bật một hộp xin quyền chỉ bấm được ở máy, và phiên đứng chờ ở đó.
 
 ## Các bước
 
@@ -82,7 +82,7 @@ Phiên mở từ điện thoại chạy với chế độ quyền `auto`: Claude
 
 Khi đang ở chế độ vắng mặt, nếu một phiên Claude đang chạy mà 30 phút không ghi gì và không có câu hỏi nào chờ bạn, bot nhắn **một lần** kèm lệnh cuối cùng phiên đó chạy. Thường là phiên đang chờ một xác nhận chỉ bấm được trên máy. Xem bằng `/log`; mở lại bằng `/stop` rồi `/open`, hoặc về máy `claude attach`.
 
-Bot cũng nhắn **một lần** khi phiên của game đã dừng hẳn (từ 10 phút đến 24 giờ trước) mà game chưa xong, không có câu hỏi nào chờ bạn, và `Waiting on:` trống hoặc câu trả lời của bạn chưa được phiên nào đọc. Tin nhắn kèm câu cuối của phiên, ví dụ "Login expired" khi Claude hết hạn đăng nhập (Chiselturn: phiên mở sau câu "Next sang s9" chết ngay vì lý do này). Chạy tiếp bằng `/open <game>`. Agent chỉ được dừng ở chỗ cần bạn quyết (luật 16), nên tin này nghĩa là phiên dừng ngoài ý muốn.
+Bot cũng nhắn **một lần** khi phiên của game đã dừng hẳn (từ 10 phút đến 24 giờ trước) mà game chưa xong, không có câu hỏi nào chờ bạn, và `Waiting on:` trống hoặc câu trả lời của bạn chưa được phiên nào đọc. Tin nhắn kèm câu cuối của phiên, ví dụ "Login expired" khi Claude hết hạn đăng nhập. Chạy tiếp bằng `/open <game>`. Agent chỉ được dừng ở chỗ cần bạn quyết (luật 16), nên tin này nghĩa là phiên dừng ngoài ý muốn.
 
 Bot nhận ra cả những phiên đang làm trong worktree của game (`.claude/worktrees/…`). Repo do pipeline tạo từ điện thoại chưa được Claude trust, nên `/open` sẽ mở phiên từ thư mục cha (`GAMES_DIR`) và báo cho bạn. Muốn sửa hẳn, ở máy chạy `claude` một lần trong repo đó và chấp nhận.
 
@@ -128,7 +128,7 @@ Không dùng GitHub Actions (luật 11). Agent chuẩn bị file trên Ubuntu, b
    - soát bằng `appstore-review-checker` → **G4**. Bạn dán nội dung `store/` lên web. Agent chờ G4 ngay trong worktree của S8; duyệt xong mới merge và sang S9.
 5. Agent chạy `/ship --no-auto` (version, tag). Bạn build bản chính thức trên Mac và bấm nộp trên web.
 
-**Hoãn việc cần tài khoản Apple (luật 13):** bước 2–3 (làm trên web App Store Connect, build/upload trên Mac, thử TestFlight) mặc định để sau, ghi vào `## Deferred (human)` trong status.md. Agent không dừng chờ mà làm tiếp bước 4 (ảnh store, ASO) và soát; chỉ bước 5 (ship, nộp) chờ bạn làm xong phần hoãn. Câu hỏi về phần hoãn chỉ có một nút "Để sau". Muốn báo xong thì bạn gõ số build và Apple ID của app; bấm nút hay gõ "xong" không được tính. Chiselturn từng bị đánh dấu xong S8, gắn tag và ghi "đã nộp" chỉ nhờ các cú bấm "Build VALID", "Đã nộp", trong khi chưa có bản build nào.
+**Hoãn việc cần tài khoản Apple (luật 13):** bước 2–3 (làm trên web App Store Connect, build/upload trên Mac, thử TestFlight) mặc định để sau, ghi vào `## Deferred (human)` trong status.md. Agent không dừng chờ mà làm tiếp bước 4 (ảnh store, ASO) và soát; chỉ bước 5 (ship, nộp) chờ bạn làm xong phần hoãn. Câu hỏi về phần hoãn chỉ có một nút "Để sau". Muốn báo xong thì bạn gõ số build và Apple ID của app; bấm nút hay gõ "xong" không được tính. Từng có game bị gắn tag và ghi "đã nộp" chỉ nhờ vài cú bấm nút, trong khi chưa có bản build nào.
 
 **Hoãn `asc` (luật 12):** agent không chạy lệnh `asc` nào; mọi việc trên App Store Connect bạn làm trên web từ file agent chuẩn bị.
 
@@ -171,7 +171,7 @@ Phải khác rõ ở tất cả các mục sau:
 - chữ khen, âm thanh, hiệu ứng đặc trưng;
 - phong cách ảnh store.
 
-Ngoài ra phải có **ít nhất một cơ chế riêng**. Lý do: Apple 4.1 (Copycats), 4.3 (Spam), và rủi ro trade dress. Bài học từ Coin Cubby: tự vẽ toàn bộ bằng code nhưng vẫn giống gần hết bản gốc.
+Ngoài ra phải có **ít nhất một cơ chế riêng**. Lý do: Apple 4.1 (Copycats), 4.3 (Spam), và rủi ro trade dress. Bài học từ một game clone trước: tự vẽ toàn bộ bằng code nhưng vẫn giống gần hết bản gốc.
 
 ## Checklist trước khi nộp App Store (cổng G4)
 

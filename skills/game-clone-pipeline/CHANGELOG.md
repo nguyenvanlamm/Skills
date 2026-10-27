@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.14.1 — 2026-10-27
+
+The rules no longer name the games they came from. SKILL.md, PROCESS.md and the references load
+into every game's session, where another game's name costs tokens, ages, and can read as
+something to act on. The incidents stay in this changelog.
+
+- Rules 5 and 13 and the stopped-session warning describe their incidents without the game.
+- The repo-naming example uses a made-up name (Moss Lantern → `moss-lantern`).
+- The differentiation and economy lessons keep their content without the game's name.
+- Pointers to other games' files are gone: the model SPEC, the App Store doc the runbook came
+  from, and the IAP fixes cited as a reference.
+
 ## 1.14.0 — 2026-10-26
 
 The two newest games looked stuck at S8–S9, unlike the ones before them. Slipchute was: its

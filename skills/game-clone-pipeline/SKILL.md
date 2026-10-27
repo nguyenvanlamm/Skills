@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.14.0
+  version: 1.14.1
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -65,9 +65,8 @@ version for people; this file is the operating manual.
    inside the stage is asked and waited for there (start `ask`, end the turn, carry on in the
    same worktree when it returns), and the next stage starts after the merge. A worktree is
    never re-entered (`path:`): from another repo that raises a permission prompt only the
-   computer can answer. Slipchute's session sat on one with all of S8 unmerged, after leaving
-   its S8 worktree to start S9 in the site repo while G4 was open. Merge a worktree left early
-   from the repo root with git.
+   computer can answer, and a session once sat on one with a whole stage unmerged after leaving
+   its worktree while a gate was open. Merge a worktree left early from the repo root with git.
 6. **Gates advance on evidence.** A command that ran in this session and exited 0, or a human
    answer recorded in `.clone/status.md`. Never on a claim.
 7. **Commit after every stage** with the `commit` skill (English conventional commit, secret
@@ -100,8 +99,8 @@ version for people; this file is the operating manual.
     upload and the submission (S8 step 6) wait until the human resumes the deferred steps.
     They resume only on what the human reads off App Store Connect, typed: the build number
     TestFlight shows as VALID and the app's Apple ID (App Information, digits). Ask for them with
-    `Để sau` as the only button; a tap or a bare "xong" never counts. Chiselturn's S8 was
-    ticked, tagged and "submitted" on taps alone ("Build VALID", "Đã nộp") with no build made.
+    `Để sau` as the only button; a tap or a bare "xong" never counts (a run was once tagged
+    and recorded as submitted on taps alone, with no build made).
 14. **Telegram is an optional remote gate.** At the computer the human decides in the chat as
     always; Telegram only speaks up in away mode (see "Telegram remote"). Only the allowlisted
     chat counts as the human, and the gate log Notes say `via Telegram` or `tại máy`. Never ask
@@ -151,7 +150,7 @@ Add `.clone/reference/`, `.clone/apk/`, `.clone/data/` and `.clone/telegram/` to
 at S0, before anything is copied in.
 
 **Names.** The game repo (folder and GitHub repo) carries the game's name in kebab-case,
-`<game>` (Nightwall → `nightwall`); the landing repo is `<game>-site`. Never a `-clone` suffix,
+`<game>` (Moss Lantern → `moss-lantern`); the landing repo is `<game>-site`. Never a `-clone` suffix,
 in either. Until G1 fixes the name, the repo uses a working slug of the idea or target (also
 without `-clone`) and is renamed right after G1 (see S2).
 
@@ -226,7 +225,7 @@ it, `watch` serves from inside the session. The agent talks to it through these 
   attach. It also warns once when a game's sessions have all stopped 10 minutes to 24 hours
   ago with stages left, no question pending, and nothing in `Waiting on:` or an answer still
   unread (the session quit without asking, or died on an expired login before reading the
-  answer, as Chiselturn's did), quoting the session's last reply and
+  answer), quoting the session's last reply and
   `/open <game>`. A session counts as the game's once it runs any subcommand on the repo
   (`register`, `inbox`, `ask`, …), so a `/new` session working from `GAMES_DIR` under the
   idea's name is seen too. Free text with no pending question is answered with the game's `Now:`, `Waiting on:`

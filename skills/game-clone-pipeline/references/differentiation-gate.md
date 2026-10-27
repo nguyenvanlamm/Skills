@@ -43,9 +43,9 @@ Write `DESIGN.md` §Differentiation as this table, against every reference game 
 2. Run `brand-name-checker` on the chosen name; act on its Proceed/Modify/Abandon verdict.
 3. At S8, `appstore-review-checker` re-checks 4.1/4.3 on the real build and listing.
 
-## Coin Cubby lesson
+## Lesson from an earlier clone
 
-Coin Cubby redrew everything in code yet kept the wooden 3×5 tray with gold padlocks, the
+An earlier clone redrew everything in code yet kept the wooden 3×5 tray with gold padlocks, the
 curtain backdrop, the same value→colour mapping, a green "Deal!" button with a coin icon, a
 blue bar with a red gift box and the same praise words. That is the pattern this gate exists to
 stop: decide theme and look at S2, build the core on placeholder art, apply the chosen look at S4.

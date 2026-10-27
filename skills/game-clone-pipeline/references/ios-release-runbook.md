@@ -7,7 +7,7 @@
 No CI build. The agent prepares every file on the Linux machine; a human builds and uploads on
 a Mac. App Store Connect work that needs no Xcode is done from Ubuntu with `asc`
 (`~/.local/bin/asc`, Rork's App Store Connect CLI; `asc <cmd> --help` for flags). Everything
-user-facing is English (en-US). Generalized from tile_bloom's `docs/APP-STORE.md`.
+user-facing is English (en-US).
 
 ## 0. One time per Apple account (human)
 

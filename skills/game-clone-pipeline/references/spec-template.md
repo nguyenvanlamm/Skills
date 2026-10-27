@@ -1,7 +1,7 @@
 # SPEC.md template (stage S1)
 
 Copy the skeleton below to `SPEC.md` at the game repo root and fill it. Internal docs may be
-written in Vietnamese; quoted on-screen text stays as it appears. Model: `coin-cubby/SPEC.md`.
+written in Vietnamese; quoted on-screen text stays as it appears.
 
 Rules for every SPEC:
 

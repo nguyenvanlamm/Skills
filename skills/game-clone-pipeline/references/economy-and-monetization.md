@@ -1,8 +1,9 @@
 # Economy and monetization (designed at S2, built at S5, prices approved at G3)
 
 Design the economy together with the core loop. Boosters and IAP only sell when the player can
-get stuck or fail; an unloseable game has nothing to sell (Coin Cubby: one long run that a
-careless bot wins 40/40, so Undo/Hammer were worthless, and new games could farm them).
+get stuck or fail; an unloseable game has nothing to sell (an earlier clone was one long run
+that a careless bot won 40 times out of 40, so Undo/Hammer were worthless, and new games could
+farm them).
 
 ## 1. Tension first
 
@@ -40,10 +41,10 @@ Pick from these shapes; record product IDs in `DESIGN.md` and keep them stable f
 Implementation checklist (Flutter `in_app_purchase` + `in_app_purchase_storekit`):
 
 - [ ] Restore purchases button in Settings; restore runs on reinstall.
-- [ ] Purchase, cancel, pending, failed and refunded paths tested (brick-volley's unlock fixes are
-      a good reference: acknowledge, restore, cancel reliably; take back a refunded unlock).
+- [ ] Purchase, cancel, pending, failed and refunded paths tested: acknowledge every purchase,
+      restore and cancel reliably, take back a refunded unlock.
 - [ ] When the store is unavailable, say "store unavailable" without naming another platform
-      (Guideline 2.3.1 lesson from Bus-Loop-Rush).
+      (Guideline 2.3.1).
 - [ ] No debug "unlock all" path reachable in release builds.
 - [ ] Prices shown come from the store (`ProductDetails.price`), never hard-coded.
 - [ ] First IAP is submitted together with the first app version (select it on the version page).
