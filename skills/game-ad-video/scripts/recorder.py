@@ -10,6 +10,7 @@ One long-lived server holds the game open; short client calls drive it, so the a
   recorder.py tap X Y
   recorder.py swipe X1 Y1 X2 Y2 [--ms 250]
   recorder.py key KEY                     # web only: ArrowLeft, Space, …
+  recorder.py goto URL                    # web only: open another level/mode (a script's "url" too)
   recorder.py wait MS
   recorder.py rec start NAME | rec stop   # manual take around interactive play
   recorder.py mark LABEL                  # timestamp a moment in the current take
@@ -87,6 +88,10 @@ def encode_frames(frames, end_time, frames_dir, mp4, audio=None):
     subprocess.run(cmd, check=True)
 
 
+TOUCH_PREFIX = "[[touch]] "
+MARK_PREFIX = "[[mark]] "
+
+
 class Take:
     def __init__(self, out, name, space=None):
         self.name = name
@@ -136,6 +141,8 @@ class WebBackend:
                   "args": ["--autoplay-policy=no-user-gesture-required",
                            # without this, screencast frames come at CSS size, not device size
                            f"--force-device-scale-factor={self.args.dpr}"]}
+        if self.args.audio:  # Playwright mutes headless Chrome; --audio would record silence
+            launch["ignore_default_args"] = ["--mute-audio"]
         try:
             self.browser = await self.pw.chromium.launch(channel="chrome", **launch)
         except Exception:
@@ -148,6 +155,25 @@ class WebBackend:
         await self.page.wait_for_timeout(self.args.boot_ms)
         self.cdp = await self.context.new_cdp_session(self.page)
         self.cdp.on("Page.screencastFrame", self._on_frame)
+        self.page.on("console", self._on_console)
+
+    def _on_console(self, msg):
+        """A page that plays itself (a bot, a demo mode) reports its touches on the console as
+        `[[touch]] {"kind": "tap", "at": [x, y]}` (fractions of the screen; a swipe adds "to" and
+        "ms"); they go into the take's inputs like the recorder's own taps. `[[mark]] LABEL` marks
+        a moment the page knows about (a death, a level clear) like `recorder.py mark`."""
+        text = msg.text
+        if self.take is not None and text.startswith(MARK_PREFIX):  # a moment the page saw: "down 2"
+            self.take.mark(text[len(MARK_PREFIX):].strip())
+            return
+        if self.take is None or not text.startswith(TOUCH_PREFIX):
+            return
+        try:
+            e = json.loads(text[len(TOUCH_PREFIX):])
+        except ValueError:
+            return
+        if e.get("kind") in ("tap", "swipe") and isinstance(e.get("at"), list):
+            self.take.inputs.append({"t": round(time.monotonic() - self.take.t0, 3), **e})
 
     def _on_frame(self, ev):
         if self.take is not None:
@@ -182,6 +208,10 @@ class WebBackend:
 
     async def reload(self):
         await self.page.reload(wait_until="load")
+        await self.page.wait_for_timeout(self.args.boot_ms)
+
+    async def goto(self, url):
+        await self.page.goto(url, wait_until="load")
         await self.page.wait_for_timeout(self.args.boot_ms)
 
     async def rec_start(self, name):
@@ -337,6 +367,10 @@ class Server:
             await b.swipe(req["x1"], req["y1"], req["x2"], req["y2"], req["ms"])
         elif cmd == "key":
             await b.key(req["key"])
+        elif cmd == "goto":
+            if b.take or not hasattr(b, "goto"):
+                raise RuntimeError("goto needs the web backend and no take recording")
+            await b.goto(req["url"])
         elif cmd == "wait":
             await asyncio.sleep(req["ms"] / 1000)
         elif cmd == "mark":
@@ -356,7 +390,11 @@ class Server:
             script = json.loads(Path(req["script"]).read_text())
             if b.take:
                 raise RuntimeError(f"already recording {b.take.name}")
-            if req.get("reload"):
+            if script.get("url"):  # a take of another level or mode: open it, then record
+                if not hasattr(b, "goto"):
+                    raise RuntimeError("a script url needs the web backend")
+                await b.goto(script["url"])
+            elif req.get("reload"):
                 await b.reload()
             await b.rec_start(req["take"])
             try:
@@ -452,6 +490,8 @@ def main():
     sw.add_argument("--ms", type=int, default=250)
     k = sub.add_parser("key")
     k.add_argument("key")
+    g = sub.add_parser("goto")
+    g.add_argument("url")
     w = sub.add_parser("wait")
     w.add_argument("ms", type=int)
     r = sub.add_parser("rec")
@@ -483,6 +523,8 @@ def main():
         req.update(x1=a.x1, y1=a.y1, x2=a.x2, y2=a.y2, ms=a.ms)
     elif a.cmd == "key":
         req["key"] = a.key
+    elif a.cmd == "goto":
+        req["url"] = a.url
     elif a.cmd == "wait":
         req["ms"] = a.ms
     elif a.cmd == "rec":

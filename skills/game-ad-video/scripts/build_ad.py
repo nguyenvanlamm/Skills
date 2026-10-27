@@ -14,6 +14,7 @@ Profiles
   ua-1x1        1080x1080, the same ad for Meta feed       ua-4x5   1080x1350, Meta feed
   ua-16x9       1920x1080, landscape UA (Unity / AppLovin / Meta desktop)
   app-preview   886x1920, 30 fps, 15–30 s, in-game footage only, no end card, AAC stereo 256k
+  app-preview-landscape   1920x886, the same App Preview for a landscape game
   play-promo    1080x1920, 15–30 s, Google Play preview video (YouTube): no CTA, no "best"/"#1"
   trailer       1920x1080, 30 fps, 45–120 s, cards + layouts + end card, music-led mix, AAC 320k
   trailer-9x16  1080x1920, 30 fps, 30–60 s, the vertical cut-down of the same trailer.json
@@ -60,6 +61,10 @@ PROFILES = {
                 "max_bytes": 30 * 1000 * 1000, "out": "ad-ua-16x9.mp4"},
     "app-preview": {"w": 886, "h": 1920, "min": 15, "max": 30, "end_card": False, "abr": "256k",
                     "max_bytes": 500 * 1024 * 1024, "store": True, "out": "app-preview-886x1920.mp4"},
+    # A landscape-only game previews in landscape: Apple's 6.9"/6.5" slot takes 1920x886 too.
+    "app-preview-landscape": {"w": 1920, "h": 886, "min": 15, "max": 30, "end_card": False, "abr": "256k",
+                              "max_bytes": 500 * 1024 * 1024, "store": True,
+                              "out": "app-preview-1920x886.mp4"},
     # Google Play's preview video is a YouTube link; only its first 30 s autoplay, muted.
     "play-promo": {"w": 1080, "h": 1920, "min": 15, "max": 30, "end_card": True, "no_cta": True,
                    "abr": "256k", "store": True, "out": "play-promo-9x16.mp4"},
@@ -71,7 +76,8 @@ PROFILES = {
 }
 AD_PROFILES = ["ua", "app-preview", "play-promo"]  # a storyboard without top-level "profiles" ("ua" = every ua*)
 # pick() falls back along these: a ua-1x1 shot uses caption_ua, a Play video uses caption_app_preview.
-PICK_FALLBACK = {"ua-1x1": ["ua"], "ua-4x5": ["ua"], "ua-16x9": ["ua"], "play-promo": ["app-preview"]}
+PICK_FALLBACK = {"ua-1x1": ["ua"], "ua-4x5": ["ua"], "ua-16x9": ["ua"], "play-promo": ["app-preview"],
+                 "app-preview-landscape": ["app-preview"]}
 # Network sweet spots for a UA cut's length (Meta, TikTok, ironSource, Snapchat, Unity guidance).
 NETWORK_LENGTHS = [("Meta", 15, 30), ("TikTok", 21, 34), ("ironSource", 25, 30), ("Snapchat", 0, 8),
                    ("Unity", 0, 60)]
@@ -194,11 +200,17 @@ def resolve(ad, rel, kind=None):
 
 def in_profile(item, profile, ad):
     wanted = item.get("profiles", ad.get("profiles", AD_PROFILES))
-    return profile in wanted or (is_ua(profile) and "ua" in wanted)
+    return profile in wanted or (is_ua(profile) and "ua" in wanted) or (
+        is_app_preview(profile) and "app-preview" in wanted)
 
 
 def is_ua(profile):
     return profile == "ua" or profile.startswith("ua-")
+
+
+def is_app_preview(profile):
+    """app-preview and app-preview-landscape: one set of App Store rules, two orientations."""
+    return profile.startswith("app-preview")
 
 
 def pick(item, key, profile):
@@ -700,6 +712,17 @@ def stage_geometry(n, iw, ih, w, h, side="left", top_caption=False):
         x = int(w * (0.3 if side == "left" else 0.7) - pw / 2) // 2 * 2
         box = (int(w * 0.53), int(w * 0.95)) if side == "left" else (int(w * 0.05), int(w * 0.47))
         return [(x, y, pw, ph)], box
+    if n == 2:
+        # Two landscape takes (a landscape game) read larger one above the other, with room for
+        # each label: the second label sits in the gap.
+        lab = int(min(w, h) * 0.045 * 2.4)
+        sh = min((h * 0.95 - 2 * lab) / 2, w * 0.92 * ih / iw)
+        if sh > ph:
+            sh = int(sh) // 2 * 2
+            sw = int(sh * iw / ih) // 2 * 2
+            y0 = (h - (2 * sh + 2 * lab)) // 2 + lab
+            x = (w - sw) // 2 // 2 * 2
+            return [(x, y0, sw, sh), (x, y0 + sh + lab, sw, sh)], None
     x0 = (w - (n * pw + (n - 1) * gap)) / 2
     return [(int(x0 + i * (pw + gap)) // 2 * 2, y, pw, ph) for i in range(n)], None
 
@@ -737,9 +760,10 @@ border-radius:999px;background:rgba(10,8,20,.7)}}</style></head><body>{shadows}{
 def vs_html(ad, w, h, rects):
     """A round "VS" badge over the gap between two grid panels (a layer above the footage)."""
     c, m = ad["game"]["colors"], min(w, h)
-    (x0, y0, pw, ph), (x1, *_), = rects[:2]
+    (x0, y0, pw, ph), (x1, y1, *_), = rects[:2]
     r = int(m * 0.065)
-    cx, cy = (x0 + pw + x1) // 2, y0 + ph // 2
+    # Side by side: in the gap between the panels. Stacked: on the right of the gap between them.
+    cx, cy = ((x0 + pw + x1) // 2, y0 + ph // 2) if x1 > x0 else (x0 + pw - r * 2, (y0 + ph + y1) // 2)
     return f"""<html><head><style>{font_css(ad)}
 .v{{position:absolute;left:{cx - r}px;top:{cy - r}px;width:{2 * r}px;height:{2 * r}px;border-radius:50%;
 display:flex;align-items:center;justify-content:center;background:{c['accent']};color:{c['bg']};
@@ -873,8 +897,11 @@ def look_filter(ad, profile):
     """`look` grades the footage a little ({"saturation": 1.1, "contrast": 1.05, "brightness":
     0.02}): dark games read badly in a feed (Voodoo). Store videos keep the true colours unless
     the storyboard sets look_app_preview / look_play_promo itself."""
-    key = f"look_{profile.replace('-', '_')}"
-    look = ad.get(key) if PROFILES[profile].get("store") else pick(ad, "look", profile)
+    if PROFILES[profile].get("store"):
+        look = next((ad[k] for k in (f"look_{p.replace('-', '_')}" for p in [profile] + PICK_FALLBACK.get(profile, []))
+                     if k in ad), None)
+    else:
+        look = pick(ad, "look", profile)
     if not look:
         return ""
     return (f",eq=contrast={look.get('contrast', 1.0)}:brightness={look.get('brightness', 0.0)}"
@@ -981,7 +1008,8 @@ def take_graph(inp, g, ad, r, tmp, k, take, src, shot, profile, d, label):
             pick(ad, "touch_style", profile) or "ring"
         iw, ih = video_size(take)
         cur = touch_layers(inp, g, cur, events, iw, ih, touch_assets(r, tmp, iw, style), style, d, label)
-    z = pick(shot, "zoom", profile) if "takes" not in shot or len(shot["takes"]) == 1 else None
+    # A grid's takes each take their own `zoom` (a landscape game reads better pushed in).
+    z = pick(shot, "zoom", profile) if "takes" not in shot or len(shot["takes"]) == 1 else src.get("zoom")
     g.append(f"{cur}{zoom_chain(take, z)}tpad=stop_mode=clone:stop=-1[{label}]")
 
 
@@ -1010,7 +1038,8 @@ def add_caption(inp, g, layer, vin, d):
 
 def render_shot(ad, shot, d, prof, profile, layout, cap_layer, r, tmp, i, out):
     """fit: the take scaled into the frame over a blurred copy of itself. fill: the frame cut out
-    of the take around fill_y (0 top … 1 bottom) and scaled up to cover it."""
+    of the take around fill_y (0 top … 1 bottom) and fill_x (0 left … 1 right: a landscape take in
+    a portrait frame) and scaled up to cover it."""
     rel, t_in = primary(shot)
     take = resolve(ad, rel)
     src = shot if "take" in shot else shot["takes"][0]
@@ -1019,9 +1048,9 @@ def render_shot(ad, shot, d, prof, profile, layout, cap_layer, r, tmp, i, out):
     k = inp.add("-ss", t_in, "-t", d * speed, "-i", take)
     take_graph(inp, g, ad, r, tmp, k, take, src, shot, profile, d, "tk")
     if layout == "fill":
-        fy = shot.get("fill_y", 0.5)
+        fx, fy = (0.5 if pick(shot, k, profile) is None else pick(shot, k, profile) for k in ("fill_x", "fill_y"))
         g.append(f"[tk]scale={w}:{h}:force_original_aspect_ratio=increase,"
-                 f"crop={w}:{h}:(iw-{w})/2:'clip({fy}*ih-{h}/2,0,ih-{h})',setsar=1[v0]")
+                 f"crop={w}:{h}:'clip({fx}*iw-{w}/2,0,iw-{w})':'clip({fy}*ih-{h}/2,0,ih-{h})',setsar=1[v0]")
     else:
         g.append(f"[tk]split[a][b];[b]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},"
                  f"gblur=sigma=40,eq=brightness=-0.12[bg];[a]scale={w}:{h}:force_original_aspect_ratio=decrease[fg];"
@@ -1274,7 +1303,7 @@ def store_problems(ad, profile):
     texts += [(i + 1, it["card"].get("text", "")) for i, (kind, it, *_) in enumerate(tl) if kind == "card"]
     texts += [(i + 1, " ".join(str(it.get(k, "")) for k in ("headline", "subline", "date")))
               for i, (kind, it, *_) in enumerate(tl) if kind == "end"]
-    banned = SELL_WORDS if profile == "app-preview" else CTA_WORDS + RANK_WORDS
+    banned = SELL_WORDS if is_app_preview(profile) else CTA_WORDS + RANK_WORDS
     fails, warns = [], []
     for i, t in texts:
         low = t.lower().replace("*", "")
@@ -1283,7 +1312,7 @@ def store_problems(ad, profile):
             fails.append(f"#{i} \"{t}\" uses {', '.join(hit)}")
         if re.search(r"\b(19|20)\d\d\b", low) or any(w in low for w in DATED):
             warns.append(f"#{i} \"{t}\" is dated: a year or a season ages a store video")
-    if profile == "app-preview":
+    if is_app_preview(profile):
         odd = [f"#{i + 1} {transition_of(it, profile)}" for i, (kind, it, st, d, tr) in enumerate(tl)
                if tr and transition_of(it, profile) not in STORE_TRANSITIONS]
         if odd:
@@ -1447,7 +1476,7 @@ def check(path, profile, ad=None):
             pt = float(ad.get("poster_at", 0.5))
             img = sheet_dir / f"poster-{profile}.jpg"
             ffmpeg("-ss", pt, "-i", path, "-frames:v", "1", "-q:v", 2, img)
-            where = ("set the same time in App Store Connect" if profile == "app-preview" else
+            where = ("set the same time in App Store Connect" if is_app_preview(profile) else
                      "Google Play covers the video with the feature graphic: build it from this frame")
             print(f"  ◦ poster frame at {pt:.2f}s → {img} ({where})")
     print(f"◇ {'PASS' if not fails else f'{len(fails)} FAIL'}")

@@ -1,5 +1,33 @@
 # Changelog
 
+## v1.5.0 — 2026-10-24
+
+From cutting a landscape run-and-gun (Hadal Relay) whose bot plays it.
+
+### Added
+- **`app-preview-landscape`** (1920×886): the App Preview of a landscape game, for Apple's
+  6.9"/6.5" slot. It keeps the App Store rules of `app-preview` (no selling words, plain
+  transitions, poster frame, no end card), and `caption_app_preview` / `look_app_preview` /
+  `"profiles": ["app-preview"]` cover it too.
+- **`fill_x`** (0 left … 1 right) places a `fill` crop across a landscape take in a portrait frame.
+  `fill_x` / `fill_y` take per-profile overrides (`fill_x_trailer_9x16`).
+- **Pages that play themselves.** `recorder.py` reads the page's console: `[[touch]] {json}` lines
+  become the take's `inputs` and `[[mark]] LABEL` lines become `marks`. A bot-driven dev entry
+  can report its synthetic touches and its deaths and clears.
+- **`goto URL`** and a script's `"url"`: open another level or mode before a take, without
+  restarting the recorder.
+
+### Fixed
+- `--audio` recorded silence in headless mode: Playwright starts headless Chrome with
+  `--mute-audio`. The recorder now drops that flag when `--audio` is on.
+
+## v1.4.1 — 2026-10-21
+
+### Fixed
+- The SKILL.md `description` was 1255 characters, over the 1024-character limit of the Agent
+  Skills format, so a loader could cut it off or reject the skill. It is now 960 characters and
+  keeps every trigger phrase and "Don't use" case. The huashu-design credit moved into the body.
+
 ## v1.4.0 — 2026-10-21
 
 A second research round: trailer editors (Derek Lieu), Apple's and Google Play's video rules,

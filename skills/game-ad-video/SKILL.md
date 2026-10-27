@@ -1,24 +1,20 @@
 ---
 name: game-ad-video
 description: >-
-  Run a Flutter game, let the agent play it while recording real gameplay, and cut the takes into
-  a UA ad (9:16, 1:1, 4:5, 16:9; 6–60 s; hook × length × language variants from one storyboard),
-  store videos (App Store App Preview 886x1920, Google Play preview), or a 16:9 gameplay trailer
-  (45–120 s, cut on the music's beat, full-frame cards, music stops and endings, plus a 9:16
-  cut-down and a YouTube thumbnail): facts from the repo → run on web (or Android via adb) →
-  explore and record scripted takes (every tap and swipe logged) → 3 directions, human picks one
-  → storyboard (ad.json / trailer.json) → render with animated captions and end card, touch
-  indicators, push-ins and punches, vs-grids, BGM + SFX → hard checks (hook, store text rules,
-  beat sync).
-  Borrows huashu-design's three-direction gate, storyboard card, camera rules, two-layer audio
-  and verify-video.sh. Use when asked to "make an ad video for my game", "record gameplay for an
-  ad", "app preview video", "make a game trailer", "làm video quảng cáo game", "quay gameplay
-  làm quảng cáo", "làm trailer game". Don't use for still screenshots (appstore-assets,
-  flutter-store-metadata), animated motion design built from scratch (huashu-design), or games
-  that are not playable on this machine.
+  Run a Flutter game, let the agent play it while recording real gameplay (every tap and swipe
+  logged), and cut the takes into UA ads (9:16, 1:1, 4:5, 16:9; hook × length × language
+  variants), store videos (App Store App Preview, Google Play preview) or a 16:9 gameplay trailer
+  cut on the music's beat, with a 9:16 cut-down and a thumbnail: facts → run on web or Android →
+  record takes → 3 directions, human picks one → storyboard (ad.json / trailer.json) → render
+  with animated captions, touch indicators, push-ins, vs-grids, BGM + SFX → hard checks (hook,
+  store text rules, beat sync). Use when asked to "make an ad video for my game", "record
+  gameplay for an ad", "app preview video", "make a game trailer", "làm video quảng cáo game",
+  "quay gameplay làm quảng cáo", "làm trailer game". Don't use for still screenshots
+  (appstore-assets, flutter-store-metadata), motion design built from scratch (huashu-design),
+  or games that are not playable on this machine.
 license: MIT
 metadata:
-  version: 1.4.0
+  version: 1.5.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -30,6 +26,8 @@ permissions:
 
 The footage is the product. An ad for a game shows real play — anything else is a promise the
 game doesn't keep, and the App Store rejects previews that aren't captured from the app.
+The skill borrows huashu-design's three-direction gate, storyboard card, camera rules, two-layer
+audio and verify-video.sh.
 
 ## Rules
 
@@ -51,7 +49,7 @@ game doesn't keep, and the App Store rejects previews that aren't captured from 
 | Script | Does |
 |---|---|
 | `scripts/recorder.py` | Holds the game open (Playwright + Chrome, or adb) and records takes: `serve`, `shot`, `tap`, `swipe`, `key`, `wait`, `rec start/stop`, `mark`, `play`, `status`, `stop`. Logs every tap and swipe in the take's `marks.json` so the render can draw them |
-| `scripts/build_ad.py` | `storyboard` (shot table + warnings), `board` (direction board PNG; `--wide` for a trailer), `beats` (music beat grid), `render` (profiles `ua` `ua-1x1` `ua-4x5` `ua-16x9` `app-preview` `play-promo` `trailer` `trailer-9x16`), `check` (hard checks + check frames + poster frame), `thumb` (YouTube / cover thumbnail) |
+| `scripts/build_ad.py` | `storyboard` (shot table + warnings), `board` (direction board PNG; `--wide` for a trailer), `beats` (music beat grid), `render` (profiles `ua` `ua-1x1` `ua-4x5` `ua-16x9` `app-preview` `app-preview-landscape` `play-promo` `trailer` `trailer-9x16`), `check` (hard checks + check frames + poster frame), `thumb` (YouTube / cover thumbnail) |
 | `scripts/beats.py` | BPM, first downbeat, sections, rises, drop and the track's real ending (`outro_at`), numpy only, so trailer cuts land on the beat and the music ends on its own hit. `build_ad.py beats` calls it |
 | `../game-clone-pipeline/scripts/contact-sheet.sh` | Take or final video → timestamped contact sheets you can read |
 | `huashu-design` (sibling skill, optional) | `assets/bgm-ad.mp3`, `assets/sfx/**`, `scripts/verify-video.sh`. Found at `$HUASHU_DESIGN_DIR` or `~/.claude/skills/huashu-design`. Without it, pass `audio.bgm` yourself; the checks skip black-frame and loudness tests |
@@ -113,12 +111,32 @@ python3 <skill>/scripts/recorder.py serve --url http://localhost:8080 &   # wait
 ```
 
 The viewport defaults to 430×932 CSS px at DPR 2.5, so takes come out at about 1075×2330. That
-aspect matches 886×1920 exactly, so the App Preview needs no letterboxing. Flutter/canvaskit needs
-a few seconds to boot (`--boot-ms`, default 3000).
+aspect matches 886×1920 exactly, so the App Preview needs no letterboxing. A landscape game uses
+`--width 960 --height 443 --dpr 2`: takes are 1920×886, the `app-preview-landscape` size.
+Flutter/canvaskit needs a few seconds to boot (`--boot-ms`, default 3000).
 
 `--audio` records the system audio monitor alongside the video, to keep the game's own sound
-effects. It hears every app on the machine, so keep everything else quiet. Without it, takes are
-silent and the ad gets BGM + SFX only.
+effects. Without it, takes are silent and the ad gets BGM + SFX only. The default monitor hears
+every app on the machine. To hear only the game, give the recorder's browser a null sink of its
+own (PipeWire):
+
+```bash
+pw-cli create-node adapter '{ factory.name=support.null-audio-sink node.name=game-rec media.class=Audio/Sink object.linger=true audio.position=[FL FR] }'
+PULSE_SINK=game-rec recorder.py serve --url … --audio --audio-source game-rec.monitor
+```
+
+A script's `"url"` (or `recorder.py goto URL`) opens another level or mode before the take, so
+one recorder serves every take.
+
+**A game that plays itself.** A one-hit platformer or shooter can't be played through one mouse
+pointer and key presses. When the game has a bot (`lib/sim/` in game-clone-pipeline games), give
+it a dev-only web entry in `tool/` that runs the real game screen and lets the bot drive the
+real touch controls with synthetic pointer events, deciding once per frame. Query parameters
+pick the level, the seed and a plan (which pilot plays, how many deaths it stages). The page
+prints `[[touch]] {"kind": "tap", "at": [x, y]}` for each finger landing and `[[mark]] LABEL`
+for each moment it knows (a death, a clear). The recorder logs them into the take's `inputs`
+and `marks`, so `touches: true` and `in` times work as with recorded taps. The footage is still
+the real game: real rules, real rendering, real sound.
 
 Android: `recorder.py serve --android [--serial X]`. It uses device-pixel coordinates and
 `screenrecord` (max 180 s per take). There's no `reload`, so restart the app with
