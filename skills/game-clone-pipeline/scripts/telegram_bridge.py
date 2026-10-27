@@ -501,7 +501,11 @@ def claude(*args, cwd=None, timeout=60):
 
 
 def agents(include_done=False):
-    return json.loads(claude('agents', '--json', *(['--all'] if include_done else [])) or '[]')
+    """Sessions with a running process; with INCLUDE_DONE, every session `claude agents` lists. The listing
+    keeps a background session the service retired (an hour idle at a prompt) as `blocked` but without a
+    pid, and `claude stop` on it fails once the service has exited."""
+    listing = json.loads(claude('agents', '--json', *(['--all'] if include_done else [])) or '[]')
+    return listing if include_done else [session for session in listing if session.get('pid')]
 
 
 def link_session(repo):
@@ -526,7 +530,8 @@ def belongs(session, repo):
 
 
 def sessions_for(repo, include_done=False, listing=None):
-    """REPO's Claude Code sessions, newest first; LISTING is a fetched `agents` list to reuse."""
+    """REPO's running Claude Code sessions (every listed one with INCLUDE_DONE), newest first; LISTING is a
+    fetched `agents` list to reuse."""
     mine = [s for s in (agents(include_done) if listing is None else listing) if belongs(s, repo)]
     return sorted(mine, key=lambda s: s.get('startedAt') or 0, reverse=True)
 

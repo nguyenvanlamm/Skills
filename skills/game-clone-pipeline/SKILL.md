@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.16.1
+  version: 1.16.2
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.16.2 — 2026-10-27
+
+The bridge took a session the background service had retired for a running one. A background
+session left an hour idle at a prompt is retired, and once no session is left the service exits,
+but `claude agents` keeps listing the retired one as `blocked`. So `/stop` called `claude stop` on
+it and got "couldn't confirm 0e999310 was stopped — the background service may be restarting";
+`/open` replied "Đã có phiên Claude đang chạy (blocked)" and opened nothing; and a phone answer
+opened no session to act on it, so it sat unread. ochrecut, haboob-run, swarm-gates and nibblume
+were all listed this way.
+
+- A session counts as running only when `claude agents` gives it a pid. `/stop`, `/open`,
+  `/status`, `/games` and opening a session after a phone answer all use that; `/log` and the
+  stopped-run warning still see every listed session.
+
 ## 1.16.1 — 2026-10-27
 
 `send` delivered only the last of several files. Its `--file` kept one value, so a call with
