@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.14.1
+  version: 1.16.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -98,9 +98,14 @@ version for people; this file is the operating manual.
     that need no Apple account (S8 steps 4–5, then S9's site work). Only `/ship`, the release
     upload and the submission (S8 step 6) wait until the human resumes the deferred steps.
     They resume only on what the human reads off App Store Connect, typed: the build number
-    TestFlight shows as VALID and the app's Apple ID (App Information, digits). Ask for them with
-    `Để sau` as the only button; a tap or a bare "xong" never counts (a run was once tagged
-    and recorded as submitted on taps alone, with no build made).
+    TestFlight shows as VALID and the app's Apple ID (App Information, digits). Ask as gate
+    `S8-apple` with `--option "Để sau"` only; the bot enforces the rest: it refuses other
+    buttons, settles only on the deferral or on both values (the answer then carries `build` and
+    `apple_id`), and files any other reply in the inbox marked `held`, which is never the answer
+    (a run was once tagged and recorded as submitted on taps alone, with no build made). Before
+    recording the values, check `gh api repos/<owner>/<repo>/traffic/clones --jq .count` (last
+    14 days): the Mac build starts with `git clone`, so 0 means asking once more and saying why;
+    a second answer with both values stands.
 14. **Telegram is an optional remote gate.** At the computer the human decides in the chat as
     always; Telegram only speaks up in away mode (see "Telegram remote"). Only the allowlisted
     chat counts as the human, and the gate log Notes say `via Telegram` or `tại máy`. Never ask
@@ -252,6 +257,13 @@ it, `watch` serves from inside the session. The agent talks to it through these 
      record it, continue); `"event": "inbox"` → handle the inbox (below) and start the same
      `ask` again (it reuses the question, it does not resend it).
   An answer that arrives while no session is waiting is kept; `<tb> answers <repo>` prints it.
+- **Writing for the phone.** `ask` and `send` text lands in a card whose bold first line
+  already names the game and the step, and a question gets a 👉 line for its buttons. So no
+  game name or gate id up front. First line: what happened or what you need, one sentence.
+  Then short lines, `- ` bullets or numbered steps, one fact each, a blank line between
+  blocks. Use the words the human sees on screen, not stage codes or files they will not open;
+  commands in backticks (the phone copies them on a tap), `**…**` for the one thing that
+  matters. Buttons of 1–3 words. Keep it near 600 characters; send the rest as a file.
 - **Evidence for a gate** while away: `<tb> send <repo> "<summary>" --file <path>` with what the
   human would look at (SPEC excerpt, S4 direction screenshots, simulator numbers, the review
   report). Up to 50 MB per file.
@@ -421,8 +433,8 @@ Follow `references/ios-release-runbook.md`, skipping every `asc` step (hard rule
    prices from DESIGN.md, Support/Privacy URLs from S7, review notes, web-UI checklist). Commit.
 2. *(Deferred, hard rule 13.)* Human in the App Store Connect web UI: register the bundle id,
    create the app record and the IAPs from `docs/APP-STORE-CONNECT.md`. On a Mac:
-   `TEAM_ID=… scripts/build-ios.sh upload`. Human types the VALID build number and the app's
-   Apple ID (rule 13); record both in status.md.
+   `TEAM_ID=… scripts/build-ios.sh upload`. Human answers `S8-apple` with the VALID build
+   number and the app's Apple ID (rule 13); after the clone check, record both in status.md.
 3. *(Deferred, hard rule 13.)* TestFlight with a Sandbox account: buy, cancel, reinstall,
    restore; IAP review screenshot.
 4. `appstore-assets` (en-US; iPad set only if iPad is targeted) and `aso-marketing` (en-US)

@@ -37,8 +37,11 @@ with an answer of yours unread (it died before reading it, e.g. on an expired lo
 
 `ask` prints one JSON line and exits 0: {"event": "answer", "answer", "by": "telegram"|"computer", ...}
 or {"event": "inbox", "unread": n} when a command arrived first (read `inbox`, then ask again: the
-same question is reused, not resent). Exit codes: 64 usage, 66 no such repo, 69 Telegram not set up
-or `serve` not running, 70 Telegram API or systemctl error. Standard library only.
+same question is reused, not resent). GATE `S8-apple` (SKILL.md rule 13) takes only `--option "Để sau"`
+and settles only on that deferral or on a reply with the VALID build number and the app's Apple ID, which
+its answer carries as "build" and "apple_id"; any other reply keeps the question open and goes to the
+inbox marked "held", and `close` refuses it. Exit codes: 64 usage, 66 no such repo, 69 Telegram not set
+up or `serve` not running, 70 Telegram API or systemctl error. Standard library only.
 """
 import argparse
 import contextlib
@@ -57,6 +60,7 @@ import subprocess
 import sys
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 import uuid
@@ -101,25 +105,46 @@ NEW_PROMPT = ('/game-clone-pipeline Start a new game: {idea}\n\nStarted from Tel
               'the repo under {games_dir} with a working slug, run `register` on it, and ask everything else '
               'with `ask` as the "Telegram remote" section says.')
 HELP = '\n'.join([
-    'Lệnh:',
-    '/away: ra ngoài, hỏi quyết định ở đây và giữ máy thức',
-    '/back: về máy, Telegram im lặng',
-    '/games: danh sách game, bước, phiên Claude',
-    '/hide <game>, /unhide <game>: ẩn hoặc hiện game trong /games',
-    '/use <game>: chọn game để nói chuyện',
-    '/open [game]: mở phiên Claude chạy tiếp game',
-    '/new <ý tưởng hoặc link store>: mở phiên Claude làm game mới',
-    '/log [game]: xem phiên Claude đang làm gì',
-    '/stop [game]: dừng phiên Claude mở từ điện thoại',
-    '/status [game]: đang ở bước nào',
-    '/pause, /resume: dừng sau bước hiện tại, chạy tiếp',
-    '/skip <bước>: bỏ qua một bước',
-    '/redo <S…>: làm lại một stage',
-    '/note <chữ>: ghi chú cho agent',
-    'Gửi video, APK hay file data: lưu vào .clone/ của game đang chọn (tối đa 20 MB).',
-    'Khi có câu hỏi: bấm nút hoặc nhắn câu trả lời.',
+    '<b>📖 Lệnh</b>',
+    '',
+    '<b>Ra ngoài, về máy</b>',
+    '/away · hỏi quyết định ở đây, giữ máy thức',
+    '/back · về máy, Telegram im lặng',
+    '',
+    '<b>Game</b>',
+    '/games · danh sách game, bước, phiên Claude',
+    '/status [game] · đang ở bước nào',
+    '/use &lt;game&gt; · chọn game để nói chuyện',
+    '/hide &lt;game&gt;, /unhide &lt;game&gt; · ẩn, hiện trong /games',
+    '',
+    '<b>Phiên Claude</b>',
+    '/open [game] · mở phiên chạy tiếp game',
+    '/new &lt;ý tưởng hoặc link store&gt; · làm game mới',
+    '/log [game] · phiên đang làm gì',
+    '/stop [game] · dừng phiên mở từ điện thoại',
+    '',
+    '<b>Nhắn agent</b>',
+    '/pause, /resume · dừng sau bước đang làm, chạy tiếp',
+    '/skip &lt;bước&gt; · bỏ qua một bước',
+    '/redo &lt;S…&gt; · làm lại một stage',
+    '/note &lt;chữ&gt; · ghi chú cho agent',
+    'Gửi video, APK, file data: lưu vào .clone/ của game đang chọn (tối đa 20 MB).',
+    '',
+    '👉 Có câu hỏi thì bấm nút hoặc gõ câu trả lời.',
 ])
 HELP_WORDS = {'help', 'trợ giúp', 'tro giup', 'lệnh', 'menu'}
+NO_GAME = '<b>❔ Chưa chọn game</b>\n\n👉 Xem /games, rồi chọn bằng /use &lt;game&gt;'
+APPLE_GATE = 'S8-apple'
+APPLE_LATER = 'Để sau'
+APPLE_HINT = (f'Bấm {APPLE_LATER}. Khi build đã VALID trên TestFlight thì gõ số build và Apple ID của app '
+              '(App Information → Apple ID), ví dụ: <code>build 1, Apple ID 1234567890</code>')
+GATE_LABELS = {'G0': 'Chọn game (G0)', 'G0b': 'Duyệt SPEC (G0b)', 'G1': 'Duyệt thiết kế + tên (G1)',
+               'G2': 'Chọn giao diện (G2)', 'G3': 'Duyệt IAP + giá (G3)', 'G4': 'Duyệt gói App Store (G4)',
+               APPLE_GATE: 'Build trên Mac'}
+APPLE_ID = re.compile(r'(?<!\d)\d{9,10}(?!\d)')
+APPLE_BUILD = (re.compile(r'\(\s*(\d{1,6})\s*\)'),
+               re.compile(r'build\D{0,12}?(?<![\d.])(\d{1,6})(?![\d.])', re.IGNORECASE),
+               re.compile(r'(?<![\d.])(\d{1,6})(?![\d.])'))
 
 
 class BotError(Exception):
@@ -205,12 +230,57 @@ def api(cfg, method, params=None, file=None, timeout=30):
     return payload['result']
 
 
+# Messages are phone-sized cards in Telegram HTML: a bold first line, short lines, a 👉 line for the action.
+
+def esc(text):
+    return html.escape(str(text), quote=False)
+
+
+def code(text):
+    """Monospace, which the phone copies on a tap."""
+    return f'<code>{esc(text)}</code>'
+
+
+def card(icon, title, *blocks, action=None):
+    """A message: bold ICON and TITLE, then the non-empty BLOCKS (HTML) a blank line apart, then 👉 ACTION."""
+    parts = [f'<b>{icon} {esc(title)}</b>', *(block for block in blocks if block)]
+    if action:
+        parts.append(f'👉 {action}')
+    return '\n\n'.join(parts)
+
+
+def markup(text, repo=None):
+    """Agent-written TEXT as card HTML: escaped, `code` tap-to-copy, **bold** bold, '- ' and '* ' bullets '• '.
+    A leading '<game> · ' goes, since the card's first line names the game already."""
+    text = text.strip()
+    if repo:
+        names = '|'.join(re.escape(name) for name in {display_name(repo), game_name(repo)})
+        text = re.sub(rf'^(?:{names})\s*[·:–-]\s*', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'^(\s*)[-*] ', r'\1• ', esc(text), flags=re.MULTILINE)
+    text = re.sub(r'`([^`\n]+)`', r'<code>\1</code>', text)
+    text = re.sub(r'\*\*([^*\n]+)\*\*', r'<b>\1</b>', text)
+    return re.sub(r'\n{3,}', '\n\n', text)
+
+
+def plain(text):
+    """Card HTML as plain text, for when Telegram rejects the markup."""
+    return html.unescape(re.sub(r'</?(?:b|i|code|pre)>', '', text))
+
+
 def send_text(cfg, text, **extra):
-    return api(cfg, 'sendMessage', {'chat_id': cfg['chat'], 'text': text[:4000], **extra})
+    """Send TEXT (card HTML); markup Telegram rejects, a cut tag say, goes again as plain text."""
+    params = {'chat_id': cfg['chat'], 'text': text[:4000], 'parse_mode': 'HTML', **extra}
+    try:
+        return api(cfg, 'sendMessage', params)
+    except BotError as error:
+        if "can't parse entities" not in str(error):
+            raise
+    del params['parse_mode']
+    return api(cfg, 'sendMessage', {**params, 'text': plain(text)[:4000]})
 
 
 def send_pre(cfg, text):
-    return send_text(cfg, '<pre>' + html.escape(text[-3800:]) + '</pre>', parse_mode='HTML')
+    return send_text(cfg, '<pre>' + esc(text[-3800:]) + '</pre>')
 
 
 def send_file(cfg, path, caption=None):
@@ -232,9 +302,10 @@ def send_file(cfg, path, caption=None):
 
 
 def retire(cfg, message_id, text):
-    """Replace a question's text and drop its buttons."""
+    """Replace a question's text (card HTML) and drop its buttons."""
     try:
-        api(cfg, 'editMessageText', {'chat_id': cfg['chat'], 'message_id': message_id, 'text': text[:4000]})
+        api(cfg, 'editMessageText', {'chat_id': cfg['chat'], 'message_id': message_id, 'text': text[:4000],
+                                     'parse_mode': 'HTML'})
     except BotError as error:
         warn(str(error))
 
@@ -395,6 +466,11 @@ def resolve_game(cfg, name):
 
 def game_name(repo):
     return os.path.basename(repo)
+
+
+def display_name(repo):
+    """The game's name as status.md spells it (Moss Lantern); the folder name until it has one."""
+    return (read_state(repo) or {}).get('name') or game_name(repo)
 
 
 # Claude Code sessions
@@ -559,8 +635,10 @@ def resume(cfg, repo):
     parent = os.path.dirname(repo)
     ref = launch(cfg, parent, game_name(repo), prompt)
     with contextlib.suppress(BotError):
-        send_text(cfg, f'ℹ️ {game_name(repo)}: Claude chưa được trust trong thư mục game nên phiên chạy từ {parent}. '
-                       f'Sửa hẳn: ở máy chạy `claude` một lần trong {repo} và chấp nhận.', disable_notification=True)
+        send_text(cfg, card('ℹ️', display_name(repo),
+                            f'Claude chưa được tin cậy (trust) trong thư mục game, nên phiên chạy từ {code(parent)}.',
+                            action=f'Sửa hẳn: ở máy chạy {code("claude")} một lần trong {code(repo)} và chấp nhận.'),
+                  disable_notification=True)
     return ref
 
 
@@ -570,19 +648,37 @@ def ensure_session(cfg, repo):
         if sessions_for(repo):
             return
         ref = resume(cfg, repo)
-        send_text(cfg, f'▶ {game_name(repo)}: không có phiên Claude nào đang chạy, đã mở phiên mới để chạy tiếp. '
-                       f'Về máy: {attach_command(ref)}')
+        send_text(cfg, card('▶', display_name(repo), 'Không có phiên Claude nào đang chạy, đã mở phiên mới để chạy tiếp.',
+                            action=f'Ở máy: {code(attach_command(ref))}'))
     except (BotError, subprocess.TimeoutExpired, ValueError) as error:
         warn(str(error))
         with contextlib.suppress(BotError):
-            send_text(cfg, f'⚠️ {game_name(repo)}: đã ghi câu trả lời nhưng không mở được phiên Claude: {error}')
+            send_text(cfg, card('⚠️', display_name(repo), 'Đã ghi câu trả lời nhưng không mở được phiên Claude.',
+                                esc(error), action=f'Thử lại: /open {game_name(repo)}'))
 
 
 # Questions and answers
 
+def gate_label(gate):
+    """What a question is about in the human's words: the gate's name, else its stage's (S8-submit → iOS + nộp)."""
+    stage = re.match(r'S\d+', gate)
+    return GATE_LABELS.get(gate) or (stage and steps_pane.LABELS.get(stage.group())) or gate
+
+
 def question_text(repo, pending):
-    hint = 'Bấm một nút hoặc nhắn câu trả lời.' if pending['options'] else 'Nhắn câu trả lời.'
-    return f"❓ {game_name(repo)} · {pending['gate']}\n\n{pending['question']}\n\n{hint}"
+    if pending['gate'] == APPLE_GATE:
+        action = APPLE_HINT
+    else:
+        action = 'Bấm một nút, hoặc gõ câu trả lời.' if pending['options'] else 'Gõ câu trả lời.'
+    return card('❓', f"{display_name(repo)} · {gate_label(pending['gate'])}", markup(pending['question'], repo),
+                action=action)
+
+
+def settled_text(repo, gate, answer, by='telegram'):
+    """What a question becomes once decided: its subject and the decision."""
+    who = 'Bạn chọn' if by == 'telegram' else 'Đã quyết trên máy tính'
+    return card('✓', f'{display_name(repo)} · {gate_label(gate)}', f'{who}: <b>{esc(answer)}</b>',
+                'Agent đang chạy tiếp.' if by == 'telegram' else '')
 
 
 def deliver_pending(repo, cfg):
@@ -600,7 +696,26 @@ def deliver_pending(repo, cfg):
     set_current(repo)
 
 
-def record_answer(repo, answer, by):
+def fold(text):
+    """TEXT in lower case without Vietnamese diacritics, for matching typed words."""
+    text = unicodedata.normalize('NFD', text.lower().replace('đ', 'd'))
+    return ''.join(c for c in text if not unicodedata.combining(c)).strip(' .!')
+
+
+def apple_answer(text):
+    """What a reply to the `S8-apple` question settles it with: the deferral, or the reply plus the build number
+    and the app's Apple ID typed off App Store Connect (SKILL.md rule 13). None for anything else, so "Build
+    VALID" or "xong" never confirms a build."""
+    if fold(text) in ('de sau', 'later'):
+        return APPLE_LATER, {}
+    if not (apple_id := APPLE_ID.search(text)):
+        return None
+    rest = f'{text[:apple_id.start()]} {text[apple_id.end():]}'
+    build = next((match.group(1) for pattern in APPLE_BUILD if (match := pattern.search(rest))), None)
+    return (text, {'build': build, 'apple_id': apple_id.group()}) if build else None
+
+
+def record_answer(repo, answer, by, **fields):
     """Settle REPO's pending question; returns it, or None when nothing was pending. Hold the lock."""
     path = state_file(repo, 'pending.json')
     pending = read_json(path)
@@ -608,7 +723,7 @@ def record_answer(repo, answer, by):
         return None
     write_json(state_file(repo, f"answer-{pending['id']}.json"),
                {'id': pending['id'], 'gate': pending['gate'], 'question': pending['question'],
-                'answer': answer, 'by': by, 'at': now_iso()})
+                'answer': answer, 'by': by, 'at': now_iso(), **fields})
     os.remove(path)
     return pending
 
@@ -621,14 +736,14 @@ def set_mode(cfg, mode, quiet=False):
     try:
         if mode == 'away':
             if not quiet:
-                send_text(cfg, '🛫 Đã bật chế độ vắng mặt: quyết định được hỏi ở đây, máy được giữ thức. '
-                               'Gõ /back khi về máy.')
+                send_text(cfg, card('🛫', 'Chế độ vắng mặt', 'Quyết định sẽ được hỏi ở đây.\nMáy được giữ thức.',
+                                    action='Về máy thì gõ /back'))
             for repo in games(cfg).values():
                 with locked(repo):
                     deliver_pending(repo, cfg)
         else:
-            send_text(cfg, '🏠 Đã về máy: Telegram im lặng, quyết định trong chat trên máy tính. '
-                           'Gõ /away khi ra ngoài.', disable_notification=True)
+            send_text(cfg, card('🏠', 'Đã về máy', 'Telegram im lặng, quyết định trong chat trên máy tính.',
+                                action='Ra ngoài thì gõ /away'), disable_notification=True)
     except BotError as error:
         warn(str(error))
 
@@ -657,18 +772,18 @@ def status_snapshot(repo):
 
 
 def brief(repo):
-    """REPO's step, what it waits on, and its Claude session with the minutes since it last wrote."""
+    """REPO's step, what it waits on, and its Claude session with the minutes since it last wrote, as card HTML."""
     now, waiting = status_snapshot(repo)
-    lines = [f"Đang làm: {now or 'chưa có status.md'}"] + ([f'Chờ bạn: {waiting}'] if waiting else [])
+    lines = [f"▶ Đang làm: {esc(now or 'chưa có status.md')}"] + ([f'⏸ Chờ bạn: {esc(waiting)}'] if waiting else [])
     try:
         live = sessions_for(repo)
     except (BotError, subprocess.TimeoutExpired, ValueError):
         return '\n'.join(lines)
     if not live:
-        lines.append(f'Claude: không chạy. Gõ /open {game_name(repo)} để chạy tiếp.')
+        lines.append(f'💤 Claude không chạy · /open {game_name(repo)} để chạy tiếp')
     else:
         path = transcript(live[0])
-        lines.append(f'Claude: {session_state(live[0])}'
+        lines.append(f'🤖 Claude: {esc(session_state(live[0]))}'
                      + (f', ghi lần cuối {minutes_since(path)} phút trước' if path else ''))
     return '\n'.join(lines)
 
@@ -726,7 +841,8 @@ class SleepGuard:
             if self.block is None and not self.told_no_tool:
                 self.told_no_tool = True
                 with contextlib.suppress(BotError):
-                    send_text(self.cfg, '⚠️ Không chặn được chế độ ngủ trên máy này: nếu máy ngủ, lệnh sẽ chờ tới khi máy thức.')
+                    send_text(self.cfg, card('⚠️', 'Máy có thể ngủ', 'Không chặn được chế độ ngủ trên máy này.\n'
+                                                                       'Nếu máy ngủ, lệnh gửi lúc đó sẽ chờ tới khi máy thức.'))
         elif not away and self.block is not None:
             release(self.block)
             self.block = None
@@ -748,8 +864,8 @@ class SleepGuard:
             if '(true,)' in line:
                 if get_mode() == 'away':
                     with contextlib.suppress(BotError):
-                        send_text(self.cfg, '😴 Máy sắp ngủ. Lệnh gửi lúc này sẽ chờ tới khi máy thức '
-                                            '(Telegram giữ tối đa 24 giờ).')
+                        send_text(self.cfg, card('😴', 'Máy sắp ngủ', 'Lệnh gửi lúc này sẽ chờ tới khi máy thức.\n'
+                                                                      'Telegram giữ tin tối đa 24 giờ.'))
                 release(self.delay)
                 self.delay = None
             elif '(false,)' in line and self.delay is None:
@@ -781,8 +897,8 @@ def save_file(repo, cfg, message):
     size = obj.get('file_size') or 0
     if size > DOWNLOAD_LIMIT:
         to_inbox(repo, {'kind': 'file_too_big', 'name': name, 'size': size})
-        send_text(cfg, f'⚠️ {name} nặng {size // 2**20} MB, quá giới hạn 20 MB bot tải được. '
-                       'Gửi link (Drive, Dropbox…) hoặc cắt clip ngắn hơn.')
+        send_text(cfg, card('⚠️', f'File quá lớn: {name}', f'Nặng {size // 2**20} MB, bot chỉ tải được tối đa 20 MB.',
+                            action='Gửi link (Drive, Dropbox…) hoặc cắt clip ngắn hơn.'))
         return
     if ext in APK_EXT:
         folder = 'apk'
@@ -799,7 +915,7 @@ def save_file(repo, cfg, message):
     download(cfg, obj['file_id'], dest)
     rel = os.path.relpath(dest, repo)
     to_inbox(repo, {'kind': 'file', 'path': rel, 'caption': message.get('caption')})
-    send_text(cfg, f'📎 {game_name(repo)}: đã lưu {rel}', disable_notification=True)
+    send_text(cfg, f'📎 <b>{esc(display_name(repo))}</b>: đã lưu {code(rel)}', disable_notification=True)
 
 
 def on_button(cfg, query):
@@ -819,7 +935,7 @@ def on_button(cfg, query):
                 settled = record_answer(repo, answer, 'telegram')
     if settled:
         api(cfg, 'answerCallbackQuery', {'callback_query_id': query['id'], 'text': 'Đã nhận'})
-        retire(cfg, message_id, f"✓ {game_name(repo)} · {settled['gate']}: {answer}\nAgent đang chạy tiếp.")
+        retire(cfg, message_id, settled_text(repo, settled['gate'], answer))
         ensure_session(cfg, repo)
     else:
         api(cfg, 'answerCallbackQuery', {'callback_query_id': query['id'], 'text': 'Câu này đã được quyết rồi.'})
@@ -884,68 +1000,71 @@ def games_text(cfg):
 
 def on_session_command(cfg, command, rest):
     if command == 'games':
-        send_text(cfg, games_text(cfg), parse_mode='HTML')
+        send_text(cfg, games_text(cfg))
         return
     if command == 'new':
         if not os.path.isdir(cfg['games_dir']):
-            send_text(cfg, f"⚠️ Không có thư mục {cfg['games_dir']} (GAMES_DIR).")
+            send_text(cfg, card('⚠️', 'Không thấy thư mục game', f"{code(cfg['games_dir'])} (GAMES_DIR) không tồn tại."))
             return
         slug = '-'.join(re.findall(r'[a-z0-9]+', rest.lower())[:3]) or 'new-game'
         ref = launch(cfg, cfg['games_dir'], f'new-{slug}',
                      NEW_PROMPT.format(idea=rest, games_dir=cfg['games_dir']))
-        send_text(cfg, f'🆕 Đã mở phiên Claude cho game mới (phiên {ref}). Agent sẽ hỏi tiếp ở đây. '
-                       f'Về máy: {attach_command(ref)}')
+        send_text(cfg, card('🆕', 'Game mới', f'Đã mở phiên Claude (phiên {code(ref)}). Agent sẽ hỏi tiếp ở đây.',
+                            action=f'Ở máy: {code(attach_command(ref))}'))
         return
     repo = resolve_game(cfg, rest or None)
     if not repo:
-        send_text(cfg, f"Không rõ game nào{': ' + rest if rest else ''}. Xem /games, chọn bằng /use <game>.")
+        send_text(cfg, card('❔', f"Không rõ game{': ' + rest if rest else ''}",
+                            action='Xem /games, rồi chọn bằng /use &lt;game&gt;'))
         return
-    name = game_name(repo)
+    name, shown = game_name(repo), esc(display_name(repo))
     if command == 'use':
         set_current(repo)
-        send_text(cfg, f'✓ Đang nói chuyện với {name}.')
+        send_text(cfg, f'✓ Đang nói chuyện với <b>{shown}</b>.')
     elif command == 'status':
         send_pre(cfg, status_text(repo))
     elif command == 'hide':
         set_hidden(repo, True)
-        send_text(cfg, f'🙈 Đã ẩn {name} khỏi /games. Hiện lại: /unhide {name}')
+        send_text(cfg, f'🙈 Đã ẩn <b>{shown}</b> khỏi /games.\nHiện lại: /unhide {name}')
     elif command == 'unhide':
         set_hidden(repo, False)
-        send_text(cfg, f'✓ {name} hiện lại trong /games.')
+        send_text(cfg, f'✓ <b>{shown}</b> hiện lại trong /games.')
     elif command == 'open':
         set_current(repo)
         set_hidden(repo, False)
         if live := sessions_for(repo):
-            send_text(cfg, f'{name}: đã có phiên Claude đang chạy ({session_state(live[0])}). '
-                           f'Xem bằng /log {name}.')
+            send_text(cfg, card('▶', display_name(repo), f'Đã có phiên Claude đang chạy ({esc(session_state(live[0]))}).',
+                                action=f'Xem nó làm gì: /log {name}'))
             return
         ref = resume(cfg, repo)
-        send_text(cfg, f'▶ {name}: đã mở phiên Claude (phiên {ref}). Về máy: {attach_command(ref)}')
+        send_text(cfg, card('▶', display_name(repo), f'Đã mở phiên Claude (phiên {code(ref)}).',
+                            action=f'Ở máy: {code(attach_command(ref))}'))
     elif command == 'log':
         found = sessions_for(repo) or sessions_for(repo, include_done=True)
         if not found:
-            send_text(cfg, f'{name}: chưa có phiên Claude nào.')
+            send_text(cfg, f'<b>{shown}</b>: chưa có phiên Claude nào.')
             return
         activity = recent_activity(found[0])
         if activity is None:
             screen = ANSI.sub('', claude('logs', session_ref(found[0])))
             activity = re.sub(r'\s+', ' ', screen).strip()[-3000:] or '(trống)'
-        send_text(cfg, f'🧾 {name} · {session_state(found[0])}\n\n{activity}')
+        send_text(cfg, card('🧾', f'{display_name(repo)} · {session_state(found[0])}', esc(activity[-3500:])))
     elif command == 'stop':
         background = [s for s in sessions_for(repo) if s.get('kind') != 'interactive']
         if not background:
-            send_text(cfg, f'{name}: không có phiên chạy nền nào để dừng (phiên trên máy tính thì dừng ở máy).')
+            send_text(cfg, card('⏹', display_name(repo), 'Không có phiên chạy nền nào để dừng.\n'
+                                                         'Phiên trên máy tính thì dừng ở máy.'))
             return
         claude('stop', session_ref(background[0]))
         write_text(state_file(repo, 'stopped'), background[0].get('sessionId') or '')
-        send_text(cfg, f'⏹ {name}: đã dừng phiên Claude. Mở lại bằng /open {name}.')
+        send_text(cfg, card('⏹', display_name(repo), 'Đã dừng phiên Claude.', action=f'Mở lại: /open {name}'))
 
 
 def on_command(cfg, text):
     head, _, rest = text.partition(' ')
     command, rest = head[1:].split('@')[0].lower(), rest.strip()
     if command in NEEDS_ARGS and not rest:
-        send_text(cfg, f'Thiếu nội dung: /{command} <…>')
+        send_text(cfg, f'Thiếu nội dung: /{command} &lt;…&gt;')
     elif command == 'away':
         set_mode(cfg, 'away')
     elif command == 'back':
@@ -954,15 +1073,15 @@ def on_command(cfg, text):
         try:
             on_session_command(cfg, command, rest)
         except (BotError, subprocess.TimeoutExpired, ValueError) as error:
-            send_text(cfg, f'⚠️ /{command}: {error}')
+            send_text(cfg, card('⚠️', f'/{command} không chạy được', esc(error)))
     elif command in INBOX_COMMANDS:
         repo = resolve_game(cfg, None)
         if not repo:
-            send_text(cfg, 'Chưa chọn game: xem /games, chọn bằng /use <game>.')
+            send_text(cfg, NO_GAME)
             return
         to_inbox(repo, {'kind': 'command', 'command': command, 'args': rest})
-        send_text(cfg, f'📥 {game_name(repo)}: đã ghi /{command} {rest}'.rstrip() + '. Agent đọc ở ranh giới bước tới.',
-                  disable_notification=True)
+        send_text(cfg, card('📥', display_name(repo), esc(f'Đã ghi /{command} {rest}'.rstrip() + '.'),
+                            'Agent đọc khi xong bước đang làm.'), disable_notification=True)
     else:
         send_text(cfg, HELP)
 
@@ -972,26 +1091,44 @@ def on_text(cfg, text):
     asked = [repo for repo in games(cfg).values()
              if (read_json(state_file(repo, 'pending.json')) or {}).get('message_id')]
     target = current if current in asked else (asked[0] if len(asked) == 1 else None)
-    settled = None
+    settled = held = None
+    fields = {}
     if target:
         with locked(target):
             pending = read_json(state_file(target, 'pending.json'))
-            settled = record_answer(target, text, 'telegram') if pending and pending.get('message_id') else None
+            if pending and pending.get('message_id'):
+                if pending['gate'] != APPLE_GATE:
+                    settled = record_answer(target, text, 'telegram')
+                elif reply := apple_answer(text):
+                    fields = reply[1]
+                    settled = record_answer(target, reply[0], 'telegram', **fields)
+                else:
+                    held = pending
     if settled:
-        retire(cfg, settled['message_id'], f"✓ {game_name(target)} · {settled['gate']}: {text}\nAgent đang chạy tiếp.")
-        send_text(cfg, '✓ Đã nhận câu trả lời.', disable_notification=True)
+        retire(cfg, settled['message_id'], settled_text(target, settled['gate'], text))
+        ack = (f"✓ Đã nhận: build <b>{esc(fields['build'])}</b>, Apple ID <b>{esc(fields['apple_id'])}</b>."
+               if fields else '✓ Đã nhận câu trả lời.')
+        send_text(cfg, ack, disable_notification=True)
         ensure_session(cfg, target)
+        return
+    if held:
+        # Rule 13: only the deferral or both values settle it; the agent still reads the text, as a note.
+        to_inbox(target, {'kind': 'text', 'text': text,
+                          'held': f'{APPLE_GATE}: no build number and Apple ID, so not an answer'})
+        send_text(cfg, card('📥', f'{display_name(target)} · {gate_label(APPLE_GATE)}',
+                            'Chưa tính là báo xong: câu hỏi vẫn mở.\nTin của bạn đã chuyển cho agent như một ghi chú.',
+                            action=APPLE_HINT), disable_notification=True)
         return
     if text.lower().strip(' ?!.') in HELP_WORDS:
         send_text(cfg, HELP)
         return
     repo = resolve_game(cfg, None)
     if not repo:
-        send_text(cfg, 'Chưa chọn game: xem /games, chọn bằng /use <game>.')
+        send_text(cfg, NO_GAME)
         return
     to_inbox(repo, {'kind': 'text', 'text': text})
     # A session stuck inside one step never reaches the boundary where it reads this: show the human where it is.
-    send_text(cfg, f'📥 {game_name(repo)}: đã ghi cho agent. Agent đọc ở ranh giới bước tới.\n\n{brief(repo)}',
+    send_text(cfg, card('📥', display_name(repo), 'Đã ghi cho agent. Agent đọc khi xong bước đang làm.', brief(repo)),
               disable_notification=True)
 
 
@@ -1011,7 +1148,7 @@ def handle(cfg, update):
         if repo:
             save_file(repo, cfg, message)
         else:
-            send_text(cfg, 'Chưa chọn game để lưu file: xem /games, chọn bằng /use <game>.')
+            send_text(cfg, card('❔', 'Chưa chọn game để lưu file', action='Xem /games, rồi chọn bằng /use &lt;game&gt;'))
     elif text.startswith('/'):
         on_command(cfg, text)
     elif text:
@@ -1040,11 +1177,11 @@ def check_ended(cfg, warned, repo, session):
     warned[key] = mtime
     name, reply = game_name(repo), last_reply(path)
     with contextlib.suppress(BotError):
-        send_text(cfg, f'⚠️ {name}: phiên Claude ({session_state(session)}) đã dừng lúc '
-                       f'{time.strftime("%H:%M", time.localtime(mtime))} '
-                       + ('trước khi đọc câu trả lời của bạn.\n' if unread else 'mà không hỏi gì.\n')
-                       + f"Đang làm: {state['now'] or '?'}\n" + (f'Câu cuối: {reply}\n' if reply else '')
-                       + f'Chạy tiếp: /open {name}. Xem: /log {name}.')
+        send_text(cfg, card('⚠️', f'{display_name(repo)} · phiên Claude đã dừng',
+                            f'Dừng lúc {time.strftime("%H:%M", time.localtime(mtime))}, '
+                            + ('trước khi đọc câu trả lời của bạn.' if unread else 'mà không hỏi gì.'),
+                            f"▶ Đang làm: {esc(state['now'] or '?')}" + (f'\n💬 Câu cuối: {esc(reply)}' if reply else ''),
+                            action=f'Chạy tiếp: /open {name} · Xem: /log {name}'))
 
 
 def check_stalls(cfg, warned):
@@ -1073,11 +1210,12 @@ def check_stalls(cfg, warned):
             warned[key] = mtime
             name, tool = game_name(repo), last_tool(path)
             with contextlib.suppress(BotError):
-                send_text(cfg, f'⚠️ {name}: phiên Claude ({session_state(session)}) không ghi gì '
-                               f'{minutes_since(path)} phút' + (f', lệnh cuối: {tool}' if tool else '') + '.\n'
-                               'Có thể đang chờ một xác nhận chỉ bấm được trên máy. '
-                               f'Xem: /log {name}. Mở lại: /stop {name} rồi /open {name}. '
-                               f'Ở máy: {attach_command(session_ref(session))}')
+                send_text(cfg, card('⚠️', f'{display_name(repo)} · phiên Claude đứng im',
+                                    f'Không ghi gì {minutes_since(path)} phút.'
+                                    + (f'\nLệnh cuối: {esc(tool)}' if tool else '')
+                                    + '\nCó thể đang chờ một xác nhận chỉ bấm được trên máy.',
+                                    f'Xem: /log {name}\nMở lại: /stop {name} rồi /open {name}',
+                                    action=f'Ở máy: {code(attach_command(session_ref(session)))}'))
 
 
 def cmd_serve():
@@ -1119,10 +1257,9 @@ def cmd_serve():
                     seen[repo] = snapshot
                     if away and not first and any(snapshot):
                         now, waiting = snapshot
-                        lines = [f'▶ {game_name(repo)} · {now}'] if now else [f'▶ {game_name(repo)}']
-                        lines += [f'⏸ Chờ bạn: {waiting}'] if waiting else []
                         with contextlib.suppress(BotError):
-                            send_text(cfg, '\n'.join(lines))
+                            send_text(cfg, card('▶', display_name(repo), esc(now or ''),
+                                                f'⏸ Chờ bạn: {esc(waiting)}' if waiting else ''))
             params = {'timeout': POLL_SECONDS, 'allowed_updates': ['message', 'callback_query']}
             if offset is not None:
                 params['offset'] = offset
@@ -1138,8 +1275,8 @@ def cmd_serve():
             if woke:
                 if away:
                     with contextlib.suppress(BotError):
-                        send_text(cfg, f'☀️ Máy vừa thức sau {round(woke / 60)} phút ngủ, '
-                                       f'đang xử lý {len(updates)} tin chờ.')
+                        send_text(cfg, card('☀️', 'Máy vừa thức', f'Ngủ {round(woke / 60)} phút, '
+                                                                    f'đang xử lý {len(updates)} tin chờ.'))
                 woke = 0.0
             for update in updates:
                 offset = update['update_id'] + 1
@@ -1160,6 +1297,10 @@ def cmd_serve():
 # The other subcommands
 
 def cmd_ask(repo, gate, question, options):
+    if gate == APPLE_GATE and options != [APPLE_LATER]:
+        warn(f'{APPLE_GATE} takes one button, --option "{APPLE_LATER}": the human types the VALID build number and '
+             "the app's Apple ID instead (SKILL.md rule 13)")
+        return 64
     cfg = require_config()
     if not serve_pid():
         warn('serve is not running: install the service (`install-service`) or start `watch REPO` in the background')
@@ -1211,9 +1352,17 @@ def cmd_answers(repo):
 def cmd_close(repo, answer):
     cfg = require_config()
     with locked(repo):
-        settled = record_answer(repo, answer, 'computer')
+        pending = read_json(state_file(repo, 'pending.json'))
+        fields = {}
+        if pending and pending['gate'] == APPLE_GATE:
+            if not (reply := apple_answer(answer)):
+                warn(f'{APPLE_GATE} settles only on "{APPLE_LATER}" or the build number and the Apple ID, not '
+                     f'{answer!r}: ask the human for both (SKILL.md rule 13)')
+                return 64
+            answer, fields = reply
+        settled = record_answer(repo, answer, 'computer', **fields)
     if settled and settled.get('message_id'):
-        retire(cfg, settled['message_id'], f"✓ {game_name(repo)} · {settled['gate']}: đã quyết trên máy tính: {answer}")
+        retire(cfg, settled['message_id'], settled_text(repo, settled['gate'], answer, by='computer'))
     set_mode(cfg, 'here')
     print(f"closed {settled['gate']}" if settled else 'no pending question')
     return 0
@@ -1228,11 +1377,11 @@ def cmd_mode(mode):
     return 0
 
 
-def cmd_send(text, path, caption):
+def cmd_send(repo, text, path, caption):
     cfg = require_config()
     try:
         if text:
-            send_text(cfg, text)
+            send_text(cfg, card('💬', display_name(repo), markup(text, repo)))
         if path:
             send_file(cfg, path, caption)
     except BotError as error:
@@ -1279,11 +1428,12 @@ def cmd_hook():
     # The session's folder is no handle for it: a /new session is named after the idea, and it may sit in a
     # worktree or in the site repo. Attach by session id, and name the game it works on.
     cwd, sid = event.get('cwd') or os.getcwd(), event.get('session_id') or os.environ.get('CLAUDE_CODE_SESSION_ID')
-    name = game_name(session_repo(cfg, sid, cwd) or cwd)
+    repo = session_repo(cfg, sid, cwd) or cwd
     with contextlib.suppress(BotError):
-        send_text(cfg, f'⚠️ {name}: {message or "Claude đang chờ cấp quyền"}\n'
-                       f'Phiên đứng chờ tới khi có người cho phép; từ điện thoại không bấm được. '
-                       f'Về máy: {attach_command(sid[:8] if sid else name)}')
+        send_text(cfg, card('⚠️', f'{display_name(repo)} · cần cấp quyền ở máy',
+                            esc(message or 'Claude đang chờ cấp quyền.'),
+                            'Phiên đứng chờ tới khi có người cho phép; từ điện thoại không bấm được.',
+                            action=f'Ở máy: {code(attach_command(sid[:8] if sid else game_name(repo)))}'))
     return 0
 
 
@@ -1370,8 +1520,8 @@ def cmd_setup():
                     f"GAMES_DIR={cfg['games_dir']}\n")
         os.chmod(CONFIG, 0o600)
         cfg['chat'] = chat
-        send_text(cfg, '✅ Đã kết nối với game-clone-pipeline. Ở máy thì quyết trong chat; '
-                       'ra ngoài thì gõ /away.\n\n' + HELP)
+        send_text(cfg, card('✅', 'Đã kết nối với game-clone-pipeline',
+                            'Ở máy thì quyết trong chat; ra ngoài thì gõ /away.') + '\n\n' + HELP)
     except BotError as error:
         warn(str(error) + (' (another program polls this bot: create a separate bot for the pipeline)'
                            if 'Conflict' in str(error) else ''))
@@ -1436,7 +1586,7 @@ def main(argv):
         if args.file and not os.path.isfile(args.file):
             warn(f'no such file: {args.file}')
             return 66
-        return cmd_send(args.text, args.file, args.caption)
+        return cmd_send(repo, args.text, args.file, args.caption)
     return cmd_inbox(repo)
 
 

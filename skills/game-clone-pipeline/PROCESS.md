@@ -1,4 +1,4 @@
-# Quy trình clone game (bản 1.14.1)
+# Quy trình clone game (bản 1.16.0)
 
 Biến một game casual/puzzle đang thành công, hoặc một ý tưởng game (đặt cạnh các game thành công gần nhất), thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
 
@@ -86,6 +86,8 @@ Bot cũng nhắn **một lần** khi phiên của game đã dừng hẳn (từ 1
 
 Bot nhận ra cả những phiên đang làm trong worktree của game (`.claude/worktrees/…`). Repo do pipeline tạo từ điện thoại chưa được Claude trust, nên `/open` sẽ mở phiên từ thư mục cha (`GAMES_DIR`) và báo cho bạn. Muốn sửa hẳn, ở máy chạy `claude` một lần trong repo đó và chấp nhận.
 
+Mọi tin trên Telegram có dạng thẻ gọn để đọc trên điện thoại. Dòng đầu in đậm, gồm biểu tượng, tên game và tên bước (ví dụ "❓ Moss Lantern · Duyệt gói App Store (G4)"). Sau đó mỗi ý một dòng ngắn. Dòng 👉 ở cuối nói bạn cần bấm hay gõ gì. Lệnh hiện bằng chữ đơn cách, chạm vào là copy.
+
 **Lưu ý:**
 - Máy đang ngủ hay ngủ đông thì không chạy gì cả, Telegram cũng không đánh thức được máy. Lúc bật `/away`, máy được chặn ngủ tự động. Nếu máy vẫn ngủ (bạn tự cho ngủ, mất điện), bot cố nhắn trước "máy sắp ngủ". Khi máy thức dậy, bot báo và chạy các lệnh đã gửi trong vòng 24 giờ.
 - Phiên Claude chạy nền mà đứng chờ quá khoảng 1 giờ thì Claude Code tự dừng nó (cuộc trò chuyện vẫn được giữ). Không sao: khi bạn trả lời, bot mở phiên mới và phiên này đọc câu trả lời từ `.clone/telegram/`.
@@ -128,7 +130,7 @@ Không dùng GitHub Actions (luật 11). Agent chuẩn bị file trên Ubuntu, b
    - soát bằng `appstore-review-checker` → **G4**. Bạn dán nội dung `store/` lên web. Agent chờ G4 ngay trong worktree của S8; duyệt xong mới merge và sang S9.
 5. Agent chạy `/ship --no-auto` (version, tag). Bạn build bản chính thức trên Mac và bấm nộp trên web.
 
-**Hoãn việc cần tài khoản Apple (luật 13):** bước 2–3 (làm trên web App Store Connect, build/upload trên Mac, thử TestFlight) mặc định để sau, ghi vào `## Deferred (human)` trong status.md. Agent không dừng chờ mà làm tiếp bước 4 (ảnh store, ASO) và soát; chỉ bước 5 (ship, nộp) chờ bạn làm xong phần hoãn. Câu hỏi về phần hoãn chỉ có một nút "Để sau". Muốn báo xong thì bạn gõ số build và Apple ID của app; bấm nút hay gõ "xong" không được tính. Từng có game bị gắn tag và ghi "đã nộp" chỉ nhờ vài cú bấm nút, trong khi chưa có bản build nào.
+**Hoãn việc cần tài khoản Apple (luật 13):** bước 2–3 (làm trên web App Store Connect, build/upload trên Mac, thử TestFlight) mặc định để sau, ghi vào `## Deferred (human)` trong status.md. Agent không dừng chờ mà làm tiếp bước 4 (ảnh store, ASO) và soát; chỉ bước 5 (ship, nộp) chờ bạn làm xong phần hoãn. Câu hỏi về phần hoãn chỉ có một nút "Để sau". Muốn báo xong thì bạn gõ số build và Apple ID của app; bấm nút hay gõ "xong" không được tính. Từng có game bị gắn tag và ghi "đã nộp" chỉ nhờ vài cú bấm nút, trong khi chưa có bản build nào. Bot tự kiểm tra việc này: tin bạn gõ mà thiếu số build hoặc Apple ID thì không được tính là câu trả lời, câu hỏi vẫn mở, tin đó chỉ chuyển cho agent như một ghi chú. Trước khi ghi nhận, agent xem trên GitHub repo game có được clone lần nào trong 14 ngày qua không (build trên Mac phải clone repo về trước). Nếu chưa có lượt nào, agent hỏi lại bạn một lần.
 
 **Hoãn `asc` (luật 12):** agent không chạy lệnh `asc` nào; mọi việc trên App Store Connect bạn làm trên web từ file agent chuẩn bị.
 

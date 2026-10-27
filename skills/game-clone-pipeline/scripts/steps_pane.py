@@ -77,8 +77,8 @@ def value(text):
 
 
 def parse(text):
-    """status.md → {'title', 'stages': [{'id', 'done', 'label', 'gate'}], 'passed', 'now', 'waiting'}."""
-    state = {'title': None, 'stages': [], 'passed': set(), 'now': None, 'waiting': None}
+    """status.md → {'title', 'name', 'stages': [{'id', 'done', 'label', 'gate'}], 'passed', 'now', 'waiting'}."""
+    state = {'title': None, 'name': None, 'stages': [], 'passed': set(), 'now': None, 'waiting': None}
     in_gate_log = False
     for line in text.splitlines():
         if line.startswith('## '):
@@ -87,6 +87,7 @@ def parse(text):
         if m := re.match(r'#\s*Clone status:\s*(.+?)\s*\(clone of\s*(.+?)\)\s*$', line):
             name, refs = (part if '{{' not in part else None for part in m.groups())
             if name:
+                state['name'] = name
                 state['title'] = f'{name} ← {refs}' if refs else name
         elif m := re.match(r'Now:\s*(.*)$', line, re.IGNORECASE):
             state['now'] = value(m.group(1))

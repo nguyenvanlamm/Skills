@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.16.0 — 2026-10-27
+
+Telegram messages read better on a phone. Before, they were plain text: an agent's question or
+reply was one block of about 350 characters (the median; nearly half ran over 400), repeated
+the game and gate id the bot had just printed, and buried the action at the end; commands
+could not be copied.
+
+- Every message is a card in Telegram HTML: a bold first line with an icon, the game's name as
+  status.md spells it, and the step in words (`Duyệt gói App Store (G4)`, `S8-submit` →
+  `iOS + nộp`); then short lines; then a 👉 line saying what to tap or type. Commands are
+  monospace, so the phone copies them on a tap. Help is grouped under headings.
+- `ask` and `send` text is escaped and rendered: backticks become monospace, `**…**` bold,
+  `- ` bullets `•`, and a leading "<game> · " is dropped. `send` now uses its REPO for the
+  card's title.
+- A question settled from the phone or at the computer becomes a card that keeps its subject
+  and the decision.
+- Markup Telegram rejects (a tag cut at 4000 characters) is sent again as plain text, so
+  nothing is lost.
+- "Writing for the phone" under "Telegram remote" tells agents how to write for the card:
+  no game or gate up front, one-sentence first line, one fact per line, words the human sees,
+  commands in backticks, about 600 characters.
+
+## 1.15.0 — 2026-10-27
+
+The Apple-step rule now holds in code. 1.14.0 only wrote it down, so a session that ignored it
+could still offer a "done" button, and any reply still settled the question.
+
+- `ask` reserves gate `S8-apple` for the deferred Apple steps: it takes only `--option "Để sau"`
+  (exit 64 otherwise). A reply settles it only as that deferral or with both the build number
+  and a 9–10-digit Apple ID, which the answer carries as `build` and `apple_id` and the phone
+  gets read back. Any other reply ("Build VALID", "xong", a question) keeps the question open,
+  reaches the session through the inbox marked `held`, and tells the phone what is missing.
+  `close --answered-here` refuses the same (exit 64).
+- Rule 13 and S8 step 2: ask the Apple steps as `S8-apple`, and before recording the values check
+  that the game repo was cloned in the last 14 days (`gh api …/traffic/clones`). The Mac build
+  starts with `git clone`, so 0 means asking once more. Chiselturn's repo had 0 clones when its
+  build was reported VALID.
+
 ## 1.14.1 — 2026-10-27
 
 The rules no longer name the games they came from. SKILL.md, PROCESS.md and the references load
