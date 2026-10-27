@@ -15,8 +15,8 @@ awake then.
   scripts/telegram_bridge.py answers REPO                   # decisions that arrived while no session waited
   scripts/telegram_bridge.py inbox REPO                     # unread commands, texts and files, as JSON lines
   scripts/telegram_bridge.py mode here|away                 # switch from the chat
-  scripts/telegram_bridge.py send REPO [TEXT] [--file PATH] [--caption TEXT]
-  scripts/telegram_bridge.py hook                           # Claude Code Notification hook (stdin JSON)
+  scripts/telegram_bridge.py send REPO [TEXT] [--file PATH [--caption TEXT]]...  # files go in order
+  scripts/telegram_bridge.py hook                          # Claude Code Notification hook (stdin JSON)
 
 Config lives outside every repo: ~/.config/game-clone-pipeline/telegram.env (chmod 600) with
 TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (the only chat that counts as the human) and GAMES_DIR (default
@@ -156,6 +156,20 @@ class Parser(argparse.ArgumentParser):
         self.print_usage(sys.stderr)
         print(f'{self.prog}: {message}', file=sys.stderr)
         sys.exit(64)
+
+
+class Attach(argparse.Action):
+    """`send` files: every --file joins the list in order, and a --caption labels the --file right before it."""
+
+    def __call__(self, parser, namespace, value, option_string=None):
+        files = list(getattr(namespace, 'files', None) or [])
+        if '--file' in self.option_strings:
+            files.append((value, None))
+        elif files and files[-1][1] is None:
+            files[-1] = (files[-1][0], value)
+        else:
+            parser.error('each --caption goes right after its own --file')
+        namespace.files = files
 
 
 def warn(text):
@@ -1377,17 +1391,26 @@ def cmd_mode(mode):
     return 0
 
 
-def cmd_send(repo, text, path, caption):
+def cmd_send(repo, text, files):
+    """TEXT as a card, then each (path, caption) of FILES in order, one message each; a failure skips only itself."""
     cfg = require_config()
-    try:
-        if text:
+    sent, failed = [], []
+    if text:
+        try:
             send_text(cfg, card('💬', display_name(repo), markup(text, repo)))
-        if path:
+            sent.append('text')
+        except BotError as error:
+            warn(str(error))
+            failed.append('text')
+    for path, caption in files:
+        try:
             send_file(cfg, path, caption)
-    except BotError as error:
-        warn(str(error))
-        return 70
-    return 0
+            sent.append(os.path.basename(path))
+        except BotError as error:
+            warn(str(error))
+            failed.append(os.path.basename(path))
+    print('sent: ' + (', '.join(sent) or 'nothing') + (f'; not sent: {", ".join(failed)}' if failed else ''))
+    return 70 if failed else 0
 
 
 def cmd_inbox(repo):
@@ -1551,8 +1574,10 @@ def main(argv):
     send = sub.add_parser('send')
     send.add_argument('repo')
     send.add_argument('text', nargs='?')
-    send.add_argument('--file')
-    send.add_argument('--caption')
+    send.add_argument('--file', dest='files', action=Attach, default=[], metavar='PATH',
+                      help='a file to send; repeat for more, they go in order, one message each')
+    send.add_argument('--caption', dest='files', action=Attach, metavar='TEXT',
+                      help='caption of the --file right before it')
     args = parser.parse_args(argv[1:])
 
     simple = {'setup': cmd_setup, 'serve': cmd_serve, 'hook': cmd_hook,
@@ -1581,12 +1606,13 @@ def main(argv):
     if args.command == 'answers':
         return cmd_answers(repo)
     if args.command == 'send':
-        if not (args.text or args.file):
+        if not (args.text or args.files):
             parser.error('send needs TEXT or --file')
-        if args.file and not os.path.isfile(args.file):
-            warn(f'no such file: {args.file}')
+        missing = [path for path, _ in args.files if not os.path.isfile(path)]
+        if missing:
+            warn('no such file: ' + ', '.join(missing))
             return 66
-        return cmd_send(repo, args.text, args.file, args.caption)
+        return cmd_send(repo, args.text, args.files)
     return cmd_inbox(repo)
 
 

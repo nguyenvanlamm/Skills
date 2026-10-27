@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.16.1 — 2026-10-27
+
+`send` delivered only the last of several files. Its `--file` kept one value, so a call with
+`--file a --file b --file c` sent c alone and still exited 0. At G2 the phone showed three
+direction descriptions but one screenshot, in snowpack-hop, chiselturn, slipchute and ochrecut;
+chiselturn's human picked direction A without ever seeing it. G1 and G4 evidence and S4/S5
+screenshots lost files the same way.
+
+- `--file` repeats, and each `--caption` labels the `--file` right before it. Files go in order,
+  one message each; a failed upload no longer stops the rest (exit 70 names it).
+- Every file is checked before anything is sent (exit 66 names the missing ones).
+- `send` prints `sent: text, a.png, …`, so a session sees what reached the phone.
+- SKILL.md: the evidence bullet shows several captioned files; at S4 the phone gets all three
+  direction screenshots, captioned, before G2 is asked.
+
 ## 1.16.0 — 2026-10-27
 
 Telegram messages read better on a phone. Before, they were plain text: an agent's question or

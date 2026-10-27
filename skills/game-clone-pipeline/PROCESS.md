@@ -1,4 +1,4 @@
-# Quy trình clone game (bản 1.16.0)
+# Quy trình clone game (bản 1.16.1)
 
 Biến một game casual/puzzle đang thành công, hoặc một ý tưởng game (đặt cạnh các game thành công gần nhất), thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
 
@@ -87,6 +87,8 @@ Bot cũng nhắn **một lần** khi phiên của game đã dừng hẳn (từ 1
 Bot nhận ra cả những phiên đang làm trong worktree của game (`.claude/worktrees/…`). Repo do pipeline tạo từ điện thoại chưa được Claude trust, nên `/open` sẽ mở phiên từ thư mục cha (`GAMES_DIR`) và báo cho bạn. Muốn sửa hẳn, ở máy chạy `claude` một lần trong repo đó và chấp nhận.
 
 Mọi tin trên Telegram có dạng thẻ gọn để đọc trên điện thoại. Dòng đầu in đậm, gồm biểu tượng, tên game và tên bước (ví dụ "❓ Moss Lantern · Duyệt gói App Store (G4)"). Sau đó mỗi ý một dòng ngắn. Dòng 👉 ở cuối nói bạn cần bấm hay gõ gì. Lệnh hiện bằng chữ đơn cách, chạm vào là copy.
+
+Ảnh và file đi kèm được gửi mỗi file một tin, theo đúng thứ tự, có chú thích riêng. Ở bước chọn giao diện (G2), agent gửi đủ 3 ảnh A, B, C, mỗi ảnh ghi tên hướng của nó, rồi mới hỏi bạn chọn.
 
 **Lưu ý:**
 - Máy đang ngủ hay ngủ đông thì không chạy gì cả, Telegram cũng không đánh thức được máy. Lúc bật `/away`, máy được chặn ngủ tự động. Nếu máy vẫn ngủ (bạn tự cho ngủ, mất điện), bot cố nhắn trước "máy sắp ngủ". Khi máy thức dậy, bot báo và chạy các lệnh đã gửi trong vòng 24 giờ.

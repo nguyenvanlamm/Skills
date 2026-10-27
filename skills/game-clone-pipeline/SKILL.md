@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.16.0
+  version: 1.16.1
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -264,9 +264,11 @@ it, `watch` serves from inside the session. The agent talks to it through these 
   blocks. Use the words the human sees on screen, not stage codes or files they will not open;
   commands in backticks (the phone copies them on a tap), `**…**` for the one thing that
   matters. Buttons of 1–3 words. Keep it near 600 characters; send the rest as a file.
-- **Evidence for a gate** while away: `<tb> send <repo> "<summary>" --file <path>` with what the
-  human would look at (SPEC excerpt, S4 direction screenshots, simulator numbers, the review
-  report). Up to 50 MB per file.
+- **Evidence for a gate** while away: `<tb> send <repo> "<summary>" --file <path> --caption "<what
+  it shows>"` with what the human would look at (SPEC excerpt, S4 direction screenshots, simulator
+  numbers, the review report). Repeat `--file`, each followed by its own `--caption`, to send
+  several in one call: they arrive in order, one message each. The command prints `sent: …`, and
+  every file must be in that line. Up to 50 MB per file.
 - **Inbox.** `<tb> inbox <repo>` prints unread JSON lines; run it at every stage and numbered
   step boundary and before each human stop. `/pause` → stop after the current step with
   `Waiting on: resume` (ask for it as a human stop); `/resume` → continue; `/skip <step>`,
@@ -372,7 +374,9 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
 
 1. `huashu-design` (default; `lam-design` if the user prefers): three real HTML directions for
    the game screen + home, using our DESIGN.md theme, not the original's. The skill stops for
-   the choice: **G2**. Run the differentiation check (fresh-eyes comparison) on the chosen one.
+   the choice: **G2**. While away, the phone gets all three screenshots before G2 is asked (one
+   `send`, each `--file` followed by `--caption "A · <name>"`, then B and C). Run the
+   differentiation check (fresh-eyes comparison) on the chosen one.
 2. `flutter-ui-revamp`: give it the chosen direction so Step 2 only records it in
    `.revamp/design-direction.md`; it sources licence-verified assets, builds the design system,
    applies it to the real screens and verifies. It works on `ui-revamp/<date>`: close that branch
