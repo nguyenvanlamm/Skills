@@ -66,7 +66,13 @@ TEAM_ID=ABCDE12345 BUILD_NUMBER=2 scripts/build-ios.sh upload   # archive + uplo
 1. `asc builds list --app APP_ID` then `asc builds wait …` until the build is VALID (5–30 min).
 2. Install from TestFlight; with the Sandbox account: buy every product, cancel one purchase,
    delete and reinstall, **Restore purchases**. Screenshot the purchase sheet for IAP review.
-3. Anything wrong → fix on main, commit, rebuild with a new build number.
+3. Until this build the store code has met only fakes, so check that a bought pack arrives once
+   and is still there after the app is closed and reopened. Granted again on every launch: the
+   purchase is never completed. Never granted ("could not be confirmed"): StoreKit 2
+   verification refused it. Either one is a bug to fix before submitting.
+4. Optional, from Xcode with a StoreKit configuration file: Ask to Buy, approved and declined
+   (the rest of the shop stays usable while it waits), and an interrupted purchase.
+5. Anything wrong → fix on main, commit, rebuild with a new build number.
 
 ## 4. Store listing (agent, en-US only)
 

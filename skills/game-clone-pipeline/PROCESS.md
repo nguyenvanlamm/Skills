@@ -1,4 +1,4 @@
-# Quy trình clone game (bản 1.16.3)
+# Quy trình clone game (bản 1.17.0)
 
 Biến một game casual/puzzle đang thành công, hoặc một ý tưởng game (đặt cạnh các game thành công gần nhất), thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
 
@@ -8,13 +8,23 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 2. **Tạo khác biệt trước khi vẽ.** Chủ đề, bảng màu, tên gọi và một cơ chế riêng được chốt ở bước S2. Core làm bằng hình tạm; giao diện thật áp vào ở S4.
 3. **Thiết kế kinh tế game cùng vòng chơi.** Phải có điều kiện thua thì booster và IAP mới có giá trị.
 4. **Game chỉ làm tiếng Anh**: chữ trong game, store listing (en-US), gói IAP, landing page, privacy, support. Tài liệu nội bộ được viết tiếng Việt.
-5. **Chỉ dùng main + tag `vX.Y.Z`.** Không mở nhánh `ios` sống lâu. Nhánh tạm chỉ do skill con tạo (nhánh test ở S3, nhánh giao diện ở S4, mỗi issue một nhánh ở S6) và phải được merge vào `main` rồi xóa (cả trên máy lẫn GitHub) ngay cuối bước tạo ra nó. Trước S8 chỉ còn `main` và không còn PR nào mở.
+5. **Chỉ dùng main + tag `vX.Y.Z`.** Không mở nhánh `ios` sống lâu. Nhánh tạm chỉ do skill con tạo (nhánh test ở S3, nhánh giao diện ở S4, mỗi issue một nhánh ở S6) và phải được merge vào `main` rồi xóa (cả trên máy lẫn GitHub) ngay cuối bước tạo ra nó. Phiên chạy nền thì làm trong worktree của bước, và skill con commit thẳng lên nhánh của worktree đó. Trước S8 chỉ còn `main` và không còn PR nào mở.
 6. **Cổng chỉ qua khi có bằng chứng**: lệnh thật chạy xong và exit 0, hoặc câu trả lời của người được ghi vào `.clone/status.md`.
 7. **Chỉ phát hành App Store.** Không có bước Google Play.
 8. **Commit ngay sau mỗi bước** bằng skill `commit`: message tiếng Anh, kèm push. Tag và release để `/ship` làm.
 9. **Đặt tên repo theo tên game.** Repo game (thư mục và GitHub) mang đúng tên game viết thường, nối bằng gạch ngang (Moss Lantern → `moss-lantern`); repo landing là `<tên-game>-site`. Không bao giờ có đuôi `-clone`. Trước G1 dùng tên tạm theo ý tưởng (cũng không có `-clone`); duyệt tên ở G1 xong thì đổi tên repo và thư mục.
 10. **Telegram chỉ là cổng thêm.** Ngồi ở máy thì vẫn quyết trong chat; chỉ khi bạn bật chế độ vắng mặt (`/away`) agent mới hỏi qua Telegram. Từ điện thoại bạn cũng mở được phiên Claude (`/open`, `/new`). Không gửi mật khẩu hay tài khoản Apple qua Telegram.
-11. **Agent ở yên trong repo game.** Muốn xem code của game khác (ví dụ phần shop của game trước), agent đọc bằng đường dẫn đầy đủ chứ không `cd` sang đó. Repo landing (S7, S9) cũng vậy: agent tạo cho nó một worktree riêng bằng `git -C` rồi sửa trong đó. Phiên chạy nền làm mỗi bước trong một worktree riêng và chỉ ra khi xong bước, merge vào `main`. Cổng nằm giữa bước (ví dụ G4) thì chờ ngay trong worktree đó, không sang bước sau trước. Không bao giờ quay lại một worktree đã rời: từ repo khác, việc đó bật một hộp xin quyền chỉ bấm được ở máy, và phiên đứng chờ ở đó.
+11. **Agent ở yên trong repo game.** Muốn xem repo khác (ví dụ `DESIGN.md` của game trước), agent đọc bằng đường dẫn đầy đủ chứ không `cd` sang đó. Repo landing (S7, S9) cũng vậy: agent tạo cho nó một worktree riêng bằng `git -C` rồi sửa trong đó. Phiên chạy nền làm mỗi bước trong một worktree riêng và chỉ ra khi xong bước, merge vào `main`. Cổng nằm giữa bước (ví dụ G4) thì chờ ngay trong worktree đó, không sang bước sau trước. Không bao giờ quay lại một worktree đã rời: từ repo khác, việc đó bật một hộp xin quyền chỉ bấm được ở máy, và phiên đứng chờ ở đó.
+12. **Code mua hàng lấy từ mẫu, không chép game trước.** S5 bắt đầu từ `templates/store/`. Mẫu này có sẵn test cho các điểm sau:
+    - chỉ báo App Store "giao dịch xong" sau khi đã lưu;
+    - chỉ nhận giao dịch StoreKit 2 đã xác minh;
+    - shop không bao giờ kẹt (Ask to Buy, lỗi kết nối);
+    - máy không lưu được thì game vẫn chạy và tạm ngừng bán gói;
+    - gói đã mua không bị cắt bởi mức trần.
+
+    Chép code của game trước từng làm cùng một lỗi lan ra 11 game.
+13. **`Waiting on:` chỉ ghi khi agent thật sự dừng chờ bạn.** Việc hoãn cho bạn (các bước Apple) nằm ở mục `## Deferred (human)` trong status.md, còn agent vẫn làm tiếp phần khác. Khi `Waiting on:` có chữ, bot không báo lúc phiên chết giữa chừng. Khi chỉ còn chờ bước Apple, status.md ghi đúng một dạng: `Now: S8 · 6 waiting for the Apple steps` và `Waiting on: S8-apple: build VALID + Apple ID`.
+14. **Phiên chạy nền gọi Bash từng lệnh đơn.** Cơ chế cô lập worktree từ chối những lệnh nó không kiểm được (lệnh ghép, `cd`, biến, heredoc); những lần bị từ chối này chiếm 54% số lỗi của các lần chạy trước. Agent sửa file bằng công cụ Edit/Write. Repo mới phải có commit đầu tiên trước khi vào worktree.
 
 ## Các bước
 
@@ -23,13 +33,13 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 | S0 | Agent → Người | Chọn game (hoặc ý tưởng) và game tham chiếu: đang lên, hợp Flutter 2D, còn chỗ cho twist, chưa quá bão hoà | `idea-validator` | **G0** duyệt game + tham chiếu |
 | S1 | Agent + Người | Dùng những gì bạn có (APK, data game, video vài phút, mô tả); agent lấy thêm trang store rồi viết `SPEC.md` | `reverse-engineer-anything`, `scripts/contact-sheet.sh` | **G0b** duyệt SPEC |
 | S2 | Agent → Người | `DESIGN.md`: bảng khác biệt, kinh tế game, mục tiêu độ khó, tên game | `brand-name-checker` | **G1** duyệt thiết kế |
-| S3 | Agent | Tạo project ngay trong repo game đã có (use in place, không `git init` lại, gộp `.gitignore`); core Flutter với hình tạm: luật bằng Dart thuần, test, bot, `tool/simulate.dart` | `flutter-init`, `test-coverage` | analyze + test exit 0 |
+| S3 | Agent | Tạo project ngay trong repo game đã có (use in place, không `git init` lại, gộp `.gitignore`); core Flutter với hình tạm: luật bằng Dart thuần, test, bot, `tool/simulate.dart`; cài hook kiểm tra trước mỗi commit (`tool/check.sh` từ `templates/tool/`) | `flutter-init`, `test-coverage` | analyze + test exit 0 |
 | S4 | Agent → Người | 3 hướng UI → chọn 1 → áp vào Flutter → làm icon | `huashu-design` (hoặc `lam-design`), `flutter-ui-revamp`, `logo-designer` | **G2** chọn hướng |
-| S5 | Agent + Người | IAP + Restore, booster chống farm, analytics (nếu chọn), người thật chơi thử, chỉnh lại độ khó. Chưa chơi thử thì ghi vào mục hoãn, không chặn G3 | | **G3** duyệt gói và giá |
+| S5 | Agent + Người | IAP + Restore từ `templates/store/`, booster chống farm, analytics (nếu chọn), người thật chơi thử, chỉnh lại độ khó. Chưa chơi thử thì ghi vào mục hoãn, không chặn G3 | | **G3** duyệt gói và giá |
 | S6 | Agent | Soát codebase → issue → sửa, merge từng PR rồi xóa nhánh | `codebase-modernizer`, `plan-to-issues`, `issue-work-loop` | test xanh, chỉ còn `main` |
 | S7 | Agent | Repo landing tối thiểu có privacy + support, GitHub Pages deploy thẳng từ nhánh `main` (không dùng Actions) | `landing-page-generator` | 2 URL sống |
 | S8 | Agent + Người | iOS: chuẩn bị trên Ubuntu, **build và upload trên Mac**, TestFlight, ảnh store, ASO, soát, ship, nộp | `flutter-ios-release`, `appstore-assets`, `aso-marketing`, `appstore-review-checker`, `/ship` (không `asc`, luật 12) | **G4** duyệt nộp |
-| S9 | Agent | Hoàn thiện landing (chạy thật cả hai skill trên site của game này) rồi tick S9; badge App Store chờ app lên store, ghi ở mục hoãn. Sau khi ra mắt, bạn đọc review và số liệu trên App Store Connect rồi chuyển lại | `search-optimizer`, `design-optimizer` | |
+| S9 | Agent | Hoàn thiện landing (chạy thật cả hai skill trên site của game này) và khai báo site trong `robots.txt` và `llms.txt` của repo Pages gốc, rồi tick S9; badge App Store chờ app lên store, ghi ở mục hoãn. Sau khi ra mắt, bạn đọc review và số liệu trên App Store Connect rồi chuyển lại | `search-optimizer`, `design-optimizer` | |
 
 ## Ô các bước
 
@@ -126,10 +136,12 @@ Không dùng GitHub Actions (luật 11). Agent chuẩn bị file trên Ubuntu, b
    - viết `docs/IOS-BUILD-ON-MAC.md` và `docs/APP-STORE-CONNECT.md` (bundle id, gói IAP, giá, URL, ghi chú review, checklist);
    - commit.
 2. Bạn làm trên web App Store Connect theo `docs/APP-STORE-CONNECT.md`: bundle id, app, gói IAP. Trên Mac: `TEAM_ID=… scripts/build-ios.sh upload`. Khi build VALID trên TestFlight, bạn gõ số build và Apple ID của app (mục App Information, một dãy số).
-3. Bạn thử trên TestFlight bằng tài khoản Sandbox: mua, huỷ, cài lại, Restore.
+3. Bạn thử trên TestFlight bằng tài khoản Sandbox: mua, huỷ, cài lại, Restore. Đến lúc này code mua hàng mới chỉ được test với bản giả lập, nên cần xem kỹ gói đã mua: nó phải vào đúng một lần và vẫn còn sau khi tắt rồi mở lại app.
+   - Lần nào mở app gói cũng vào lại: giao dịch chưa bao giờ được báo "xong".
+   - Gói không vào: bước xác minh StoreKit 2 đã từ chối.
 4. Agent:
    - làm ảnh store bằng `appstore-assets`, viết tên và từ khoá bằng `aso-marketing` (chỉ en-US), lưu vào `store/`;
-   - soát bằng `appstore-review-checker` → **G4**. Bạn dán nội dung `store/` lên web. Agent chờ G4 ngay trong worktree của S8; duyệt xong mới merge và sang S9.
+   - soát bằng `appstore-review-checker` → **G4**. Câu hỏi G4 gộp luôn phần duyệt kế hoạch của `aso-marketing`, và hỏi một lần xem S9 có được quét site bằng isitagentready.com (dịch vụ bên ngoài) không. Bạn dán nội dung `store/` lên web. Agent chờ G4 ngay trong worktree của S8; duyệt xong mới merge và sang S9.
 5. Agent chạy `/ship --no-auto` (version, tag). Bạn build bản chính thức trên Mac và bấm nộp trên web.
 
 **Hoãn việc cần tài khoản Apple (luật 13):** bước 2–3 (làm trên web App Store Connect, build/upload trên Mac, thử TestFlight) mặc định để sau, ghi vào `## Deferred (human)` trong status.md. Agent không dừng chờ mà làm tiếp bước 4 (ảnh store, ASO) và soát; chỉ bước 5 (ship, nộp) chờ bạn làm xong phần hoãn. Câu hỏi về phần hoãn chỉ có một nút "Để sau". Muốn báo xong thì bạn gõ số build và Apple ID của app; bấm nút hay gõ "xong" không được tính. Từng có game bị gắn tag và ghi "đã nộp" chỉ nhờ vài cú bấm nút, trong khi chưa có bản build nào. Bot tự kiểm tra việc này: tin bạn gõ mà thiếu số build hoặc Apple ID thì không được tính là câu trả lời, câu hỏi vẫn mở, tin đó chỉ chuyển cho agent như một ghi chú. Trước khi ghi nhận, agent xem trên GitHub repo game có được clone lần nào trong 14 ngày qua không (build trên Mac phải clone repo về trước). Nếu chưa có lượt nào, agent hỏi lại bạn một lần.
@@ -175,13 +187,15 @@ Phải khác rõ ở tất cả các mục sau:
 - chữ khen, âm thanh, hiệu ứng đặc trưng;
 - phong cách ảnh store.
 
+Phải khác cả các game trước của bạn: thao tác chính, chủ đề, bảng màu, icon. Bộ gói IAP không chép y nguyên của game trước; 8/12 game đầu bán cùng một bộ "mở khoá + gói nhỏ + gói lớn". Apple 4.3 tính cả các app na ná nhau của cùng một nhà phát triển.
+
 Ngoài ra phải có **ít nhất một cơ chế riêng**. Lý do: Apple 4.1 (Copycats), 4.3 (Spam), và rủi ro trade dress. Bài học từ một game clone trước: tự vẽ toàn bộ bằng code nhưng vẫn giống gần hết bản gốc.
 
 ## Checklist trước khi nộp App Store (cổng G4)
 
 - [ ] URL privacy và support đều sống, nội dung khớp với những gì app thực sự thu thập
 - [ ] Icon không có kênh alpha; `ITSAppUsesNonExemptEncryption = false`; có privacy manifest
-- [ ] Gói IAP đã tạo; Restore chạy được; đã thử Sandbox; có ảnh chụp để nộp review
+- [ ] Gói IAP đã tạo; Restore chạy được; đã thử Sandbox (gói mua vào đúng một lần, còn sau khi mở lại app); có ảnh chụp để nộp review
 - [ ] Ảnh iPhone 6.9" (thêm iPad 13" nếu app hỗ trợ iPad), tất cả bằng tiếng Anh
 - [ ] Tên, subtitle, từ khoá, mô tả không nhắc tới game gốc hay nhà phát hành của nó
 - [ ] `appstore-review-checker` không còn lỗi chặn; checklist `docs/APP-STORE-CONNECT.md` đã điền đủ trên web

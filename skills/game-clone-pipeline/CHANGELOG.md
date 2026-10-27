@@ -1,5 +1,74 @@
 # Changelog
 
+## 1.17.0 — 2026-10-28
+
+A review of the 12 games run so far and 14 background-session transcripts found three problems:
+- Each game had copied the previous game's store code, so the same purchase bugs reached 11 of
+  them (all fixed and merged on 2026-10-28).
+- 223 of 412 failed tool calls were the worktree guard refusing a Bash command.
+- Lessons kept only in the project memory never reached a session opened inside a game repo.
+
+Changes:
+- **`templates/store/`**: the store every game starts from at S5, with 35 tests and a README.
+  - `shop.dart` imports no game code; the game plugs in through two seams, `StoreCatalog` and
+    `StoreGrants`.
+  - Each update is verified, granted and saved before it is completed, in its own try/catch.
+    The save happens even when the purchase was delivered before.
+  - StoreKit 2 purchases are verified against `SK2Transaction.unfinishedTransactions()`, because
+    the plugin passes an unverified one on as `purchased`.
+  - Ask to Buy, a stream error or a pack without a transaction id never leaves the shop stuck.
+  - A failed save says the App Store will deliver the purchase again, never "Try again" (a
+    second tap pays twice). A restore whose save failed says to restore again.
+  - `save_store.dart`: a refused write throws, and unreadable text is kept aside. When storage
+    fails at launch the game plays from memory and never writes over the device save.
+    `Saved.persist` is for the shop and `Saved.save` for gameplay.
+- **`templates/tool/check.sh` and `install_hooks.sh`, installed at S3:** the pre-commit gate
+  (format, analyze, test) clears git's hook variables. Left set, a commit from a worktree made
+  Flutter report SDK `0.0.0-unknown` and rebuild its tool, in nightwall, lowtide-locks,
+  hadal-relay and brinestack. The hook goes into the shared hooks directory the global
+  hooksPath dispatcher chains to, because `pre-commit install` refuses there.
+- **Background sessions:**
+  - one plain command per Bash call, and Edit/Write for files;
+  - an empty first commit, pushed, before `EnterWorktree`, which branches from `origin/main`;
+  - no `sleep`;
+  - zsh quoting, and `<tb>` spelled out each time;
+  - sibling skills commit on the stage worktree's branch, and `ExitWorktree` keeps the worktree
+    for the merge.
+- **Closing a branch** is always a local `--no-ff` merge, then `git worktree remove` and
+  `git branch -d`. `gh pr merge` is refused in auto mode, and a PR closes itself as merged.
+- **`Waiting on:`** is filled only at a real stop; deferred human steps sit under
+  `## Deferred (human)`. A filled `Waiting on:` kept the bot from reporting that chiselturn's S9
+  session had stopped with work left. Every parked game had worded its state differently; now
+  there is one form: `Now: S8 · 6 waiting for the Apple steps` and
+  `Waiting on: S8-apple: build VALID + Apple ID`.
+- **Standard routes** are written at their stage instead of being logged as a fallback every
+  run:
+  - idea-validator ends PARTIAL (8 games);
+  - only flutter-init's create step runs (8);
+  - logo-designer runs inline with Chrome + Pillow (7);
+  - issue-work-loop runs without herdr (8);
+  - sibling skills commit on the worktree's branch (6);
+  - aso-marketing's plan approval is folded into G4;
+  - the agent-readiness scan is asked once, at G4 (6).
+- **S2:** the differentiation gate gains own-portfolio rows: core verb, theme/palette/icon, IAP
+  lineup, screenshot template, name. 8 of 12 games sold the same unlock + small pack + large
+  pack, and slipchute was judged close to three earlier games.
+- **S4:** a "close" fresh-eyes finding goes to the human as a question; the build matches the
+  chosen mockup (chiselturn, 2026-10-25).
+- **S8:** the Sandbox test checks that a bought pack arrives once and survives a relaunch,
+  because the store code has met only fakes until then.
+- **S9:** the site is listed in the root Pages repo's `robots.txt` and `llms.txt`, since crawlers
+  read robots.txt only at the host root.
+- **"This machine" notes:**
+  - a local run is a web build in Chrome;
+  - screenshots come from `tool/screenshot_main.dart`;
+  - animations are checked with flutter_test filmstrips;
+  - `page_width: 120`.
+- **economy reference:** it no longer promises taking back refunded purchases (the plugin passes
+  no revocation data), and caps apply to earned items only.
+- **Telegram details** moved to `references/telegram-remote.md`; SKILL.md keeps the protocol for
+  human stops.
+
 ## 1.16.3 — 2026-10-27
 
 A phone answer could sit unread after a late button tap, a decision a session had read could be

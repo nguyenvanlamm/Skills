@@ -24,13 +24,16 @@ Write in `DESIGN.md`:
 - **Anti-farm rules** (check them in tests):
   - gifts tied to progress that cannot be repeated by restarting (level first-clear, all-time
     best), never to events a new game reproduces in seconds;
-  - stock caps (e.g. 9 per booster) and no gift for undo-then-redo;
+  - stock caps on earned boosters (e.g. 9 per booster; a bought pack is still credited in full)
+    and no gift for undo-then-redo;
   - restarting a level does not refund a used booster.
 - Booster stock and purchases persist across games and app restarts.
 
 ## 3. In-app purchases
 
-Pick from these shapes; record product IDs in `DESIGN.md` and keep them stable forever.
+Pick from these shapes to fit this game's own economy (a lineup copied from the last game counts
+against the own-portfolio rows of `references/differentiation-gate.md`); record product IDs in
+`DESIGN.md` and keep them stable forever.
 
 | Type (App Store) | Typical use | Notes |
 |---|---|---|
@@ -38,18 +41,30 @@ Pick from these shapes; record product IDs in `DESIGN.md` and keep them stable f
 | Consumable | coin packs, booster packs | price points like $0.99 / $1.99 / $4.99 / $9.99 |
 | Auto-renewable subscription | avoid for small puzzle games | extra review requirements |
 
-Implementation checklist (Flutter `in_app_purchase` + `in_app_purchase_storekit`):
+Implementation (Flutter `in_app_purchase` + `in_app_purchase_storekit`): start from
+`templates/store/` and its README, never from an earlier game's store code. Checklist:
 
+- [ ] A grant is saved before the purchase is completed with the store, per update and for a
+      re-delivered purchase too; a failed save leaves it uncompleted, so the store delivers it
+      again.
+- [ ] Only StoreKit 2-verified purchases are granted (the plugin passes an unverified one on as
+      `purchased`).
+- [ ] Pending (Ask to Buy), cancel, failure and a purchase-stream error all leave the shop usable;
+      a pack without a transaction id is neither granted nor completed.
+- [ ] Without device storage the game still starts, plays from memory, never writes over the
+      save on the device, and pauses the packs.
+- [ ] A bought pack is credited in full; caps apply to earned items only.
 - [ ] Restore purchases button in Settings; restore runs on reinstall.
-- [ ] Purchase, cancel, pending, failed and refunded paths tested: acknowledge every purchase,
-      restore and cancel reliably, take back a refunded unlock.
 - [ ] When the store is unavailable, say "store unavailable" without naming another platform
       (Guideline 2.3.1).
 - [ ] No debug "unlock all" path reachable in release builds.
 - [ ] Prices shown come from the store (`ProductDetails.price`), never hard-coded.
 - [ ] First IAP is submitted together with the first app version (select it on the version page).
-- [ ] Sandbox purchase + restore tested on a TestFlight build; review screenshot of the purchase
-      sheet captured.
+- [ ] Sandbox purchase + restore tested on a TestFlight build (runbook §3); review screenshot of
+      the purchase sheet captured.
+
+Accepted limits, recorded in DESIGN.md: entitlements live on the device (no server receipt
+check), and a refund does not take a purchase back (the plugin passes no revocation data).
 
 ## 4. Ads (optional, decide at S2)
 

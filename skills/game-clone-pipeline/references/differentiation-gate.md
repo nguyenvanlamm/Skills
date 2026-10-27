@@ -26,6 +26,25 @@ Write `DESIGN.md` §Differentiation as this table, against every reference game 
 | 11 | Economy (boosters, currencies) | should | | | |
 | 12 | Onboarding / tips | should | | | |
 
+## Own portfolio (the developer's earlier games)
+
+Guideline 4.3 also covers a developer's own look-alike apps. Add these rows to the table,
+checked against the DESIGN.md of every earlier game in the parent folder (read in place); the
+**must** rows count for G1 like the others.
+
+| # | Aspect | Must? | Closest earlier game(s) | Ours | Verdict |
+|---|---|---|---|---|---|
+| P1 | Core verb (what the thumb does every few seconds) | must | | | different / close / same |
+| P2 | Theme, palette and icon subject | must | | | |
+| P3 | IAP lineup (products and price ladder) | should | | | |
+| P4 | Store screenshot template and caption voice | should | | | |
+| P5 | Name pattern and wordmark style | should | | | |
+
+8 of the first 12 games sold the same lineup (a full unlock plus a small and a large pack of
+one item), and one was judged "close" to three earlier games at once. Take the IAP shapes from
+this game's own economy (`references/economy-and-monetization.md`), not from the last game's
+DESIGN.md, and give each game its own screenshot template.
+
 ## Hard "no" list (fails the gate on sight)
 
 - Any file, frame, sound, font or string taken from the original, its APK, data files, ads or
@@ -38,8 +57,10 @@ Write `DESIGN.md` §Differentiation as this table, against every reference game 
 ## How to check
 
 1. Put a screenshot of our build (or the chosen HTML direction at S4) next to each reference
-   game's store screenshot. Ask a fresh subagent that has seen neither design discussion: "Would a
-   player think these are the same game or the same brand?" Record its answer in DESIGN.md.
+   game's store screenshot, and next to the closest earlier game of our own. Ask a fresh subagent
+   that has seen neither design discussion: "Would a player think these are the same game or the
+   same brand?" Record its answer in DESIGN.md. At S4 a "close" answer goes to the human as a
+   question before the build changes (SKILL.md S4).
 2. Run `brand-name-checker` on the chosen name; act on its Proceed/Modify/Abandon verdict.
 3. At S8, `appstore-review-checker` re-checks 4.1/4.3 on the real build and listing.
 
