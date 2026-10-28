@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.17.0
+  version: 1.17.1
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -56,18 +56,20 @@ version for people; this file is the operating manual.
 5. **main + tags.** Work on `main`; releases are tags `vX.Y.Z`. No long-lived `ios` branch.
    Temporary branches come only from sibling skills (`test-coverage` at S3, `flutter-ui-revamp`
    at S4, one per issue at S6). A stage that creates a branch ends with it merged into `main`
-   and deleted locally and on GitHub ("Closing a branch"); the stage is not done while one of
-   its branches or PRs is open. Before S8, `git branch -a` lists only `main` and `origin/main`
-   and `gh pr list --state open` is empty. A background session (`claude --bg`) must isolate its
-   changes, so it works each stage in one worktree ("Background sessions"): from the game repo's
-   root (check `pwd`), `EnterWorktree` with `name: s<N>-<stage>`; sibling skills commit on that
-   worktree's branch instead of making their own; at the stage end `ExitWorktree` with
-   `action: "keep"`, then close `worktree-s<N>-…` like any other branch. It leaves that worktree
-   only at the stage end: a gate inside the stage is asked and waited for there (start `ask`, end
-   the turn, carry on in the same worktree when it returns), and the next stage starts after the
-   merge. A worktree is never re-entered (`path:`): from another repo that raises a permission
-   prompt only the computer can answer, and a session once sat on one with a whole stage
-   unmerged. Merge a worktree left early from the repo root with git.
+   and deleted ("Closing a branch"); only `main`, tags and a PR's branch are pushed. The stage
+   is not done while one of its branches or PRs is open. Before S8, `git branch -a` lists only
+   `main` and `origin/main` (and remote branches whose delete waits under
+   `## Deferred (human)`) and `gh pr list --state open` is empty. A background session
+   (`claude --bg`) must isolate its changes, so it works each stage in one worktree
+   ("Background sessions"): from the game repo's root (check `pwd`), `EnterWorktree` with
+   `name: s<N>-<stage>`; sibling skills commit on that worktree's branch instead of making their
+   own; at the stage end `ExitWorktree` with `action: "keep"`, then close `worktree-s<N>-…` like
+   any other branch. It leaves that worktree only at the stage end: a gate inside the stage is
+   asked and waited for there (start `ask`, end the turn, carry on in the same worktree when it
+   returns), and the next stage starts after the merge. A worktree is never re-entered (`path:`):
+   from another repo that raises a permission prompt only the computer can answer, and a session
+   once sat on one with a whole stage unmerged. Merge a worktree left early from the repo root
+   with git.
 6. **Gates advance on evidence.** A command that ran in this session and exited 0, or a human
    answer recorded in `.clone/status.md`. Never on a claim.
 7. **Commit after every stage** with the `commit` skill (English conventional commit, secret
@@ -169,11 +171,13 @@ without `-clone`) and is renamed right after G1 (see S2).
 
 **Closing a branch** (rule 5), once analyze + test exit 0 on it, from the repo root on `main`:
 `git merge --no-ff <branch>`, `git push`; for a worktree's branch `git worktree remove <path>`;
-then `git branch -d <branch>` (it refuses unmerged work: never force it) and
-`git push origin --delete <branch>` if it exists on GitHub. A PR closes as merged by itself once
-its commits reach `main` on GitHub (`gh pr merge` is refused in auto mode). Then re-run
-`flutter analyze` and `flutter test` on `main`. Never force-push; delete unmerged work
-(`git branch -D`, closing a PR unmerged) only on the human's answer, logged in status.md.
+then `git branch -d <branch>` (it refuses unmerged work: never force it). A stage branch is
+never pushed, so it ends there. A PR's branch (S6) also needs `git push origin --delete <branch>`,
+which auto mode may refuse as destructive: then list that command under `## Deferred (human)`
+and go on. A PR closes as merged by itself once its commits reach `main` on GitHub
+(`gh pr merge` is refused in auto mode). Then re-run `flutter analyze` and `flutter test` on
+`main`. Never force-push; delete unmerged work (`git branch -D`, closing a PR unmerged) only on
+the human's answer, logged in status.md.
 
 **Site repo** (`<game>-site`, S7 and S9), worked from the game repo's root (rule 15). A
 background session refuses Edit and Write in a checkout outside a worktree, so the site gets a
@@ -199,6 +203,8 @@ runs. So:
   as one command (`python3 tool/fix_links.py`);
 - Edit and Write wait for `EnterWorktree`, which branches from `origin/main`: a new repo first
   gets an empty commit, pushed, from Bash (`git commit --allow-empty -m "chore: start <slug>"`);
+- a new worktree has no `.dart_tool/`: run `flutter pub get` in it before its first commit, or a
+  gate that passes `--no-pub` crashes (`Bad state: No element` in native assets);
 - no `sleep` to wait (it is blocked): a background `ask` or command reports when it ends;
 - the shell is zsh: spell `<tb>` out each time (`TB="python3 …"; $TB ask` fails, zsh does not
   split it) and quote URLs and globs (`'https://youtu.be/…?si=…'`).
@@ -441,7 +447,8 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
 ### S8 — iOS: prepare on Ubuntu, build and upload on a Mac → gate G4
 
 Follow `references/ios-release-runbook.md`, skipping every `asc` step (hard rule 12). In short:
-0. Branch check (rule 5): only `main` / `origin/main`, no open PR; otherwise finish S6 first.
+0. Branch check (rule 5): only `main` / `origin/main` (remote deletes waiting under Deferred
+   (human) aside), no open PR; otherwise finish S6 first.
 1. `flutter-ios-release` (prep-report exit 0); copy `templates/build-ios.sh` →
    `scripts/build-ios.sh`, `templates/ExportOptions.plist` → `ios/ExportOptions.plist`; write
    `docs/IOS-BUILD-ON-MAC.md` (ending with what to send back: the VALID build number and the

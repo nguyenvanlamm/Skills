@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.17.1 — 2026-10-28
+
+Cleaning up the games after 1.17.0 hit two snags:
+- Auto mode refused `git push origin --delete` for merged branches as destructive, so a session
+  cannot finish "Closing a branch" for a branch on GitHub. Stage branches pushed by earlier
+  sessions (slipchute, nightwall) are left there for the human to delete.
+- A commit from a new worktree crashed the pre-commit gate of beamfork, tiptoe-tabby and
+  haboob-run: with no `.dart_tool/`, `flutter test --no-pub` fails with `Bad state: No element`
+  in native assets.
+
+Changes:
+- **Closing a branch, rule 5:** only `main`, tags and a PR's branch are pushed, so a stage branch
+  ends with `git branch -d`. A merged PR branch (S6) that auto mode will not delete on GitHub
+  goes under `## Deferred (human)` as a command for the human, and it does not fail the S8
+  branch check.
+- **Background sessions:** run `flutter pub get` in a new worktree before its first commit.
+
 ## 1.17.0 — 2026-10-28
 
 A review of the 12 games run so far and 14 background-session transcripts found three problems:
