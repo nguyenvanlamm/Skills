@@ -18,7 +18,7 @@ Waiting on: —
 - [ ] S1 Evidence from what the human has (APK via REA, data files, video, store pages, description) → `SPEC.md` → **G0b**
 - [ ] S2 Differentiation + economy in `DESIGN.md`, name cleared by brand-name-checker → **G1**
 - [ ] S3 Core in Flutter: pure-Dart rules, tests, bot, `tool/simulate.dart`, pre-commit gate (`tool/check.sh`); analyze + test exit 0
-- [ ] S4 UI: 3 directions (huashu-design) → chosen → flutter-ui-revamp → icon (logo-designer) → **G2**
+- [ ] S4 UI: 3 directions (huashu-design) → chosen → built in Flutter (mockup-to-flutter) → icon (logo-designer) → **G2**
 - [ ] S5 IAP + Restore from `templates/store/`, booster rules, analytics decision, human playtest, re-tune → **G3**
 - [ ] S6 codebase-modernizer → plan-to-issues → issues fixed, PRs merged, branches deleted; analyze + test exit 0
 - [ ] S7 Landing repo with privacy + support pages live on Pages

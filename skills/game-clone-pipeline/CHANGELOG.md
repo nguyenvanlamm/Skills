@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.19.0 — 2026-10-29
+
+S4 builds the chosen `huashu-design` mockup in Flutter itself, by the new
+`references/mockup-to-flutter.md`, instead of handing it to `flutter-ui-revamp`. In the pipeline
+that skill had shrunk to a port: its own design step was skipped because G2 had already chosen,
+and its asset-pack catalogue went unused. The credits of 13 pipeline games list only Google
+Fonts, the SDK's Material Icons, and their own sounds and logos; everything else was painted in
+code. Its packs for main objects now fail differentiation row 13 and `appstore-spam-guard`. Its
+verify missed nightwall's font block that was never written to `pubspec.yaml` (the game ran on
+the fallback font until S6).
+
+Changes:
+- **S4 step 2**: port the mockup in the S4 session — tokens from its CSS, its fonts with
+  licences, art painted in code, one screen at a time — then shoot the real screens beside the
+  mockup. `design-demos/build-report.md` keeps the before and after and the rollback.
+- **Rule 5**: S4 no longer creates a branch; only `test-coverage` (S3) and the S6 issue branches
+  do.
+- **New test at S4**: every font family the theme names is declared in `pubspec.yaml` with its
+  files present, and its licence reaches the Licenses page.
+- `flutter-ui-revamp` itself is unchanged: `flutter-factory` and `flutter-all-platform` still
+  use it, and it remains the tool for revamping an existing app.
+
 ## 1.18.0 — 2026-10-29
 
 App Review rejected Fruit Mischief 1.0.0 (3) under Guideline 4.3(a) and put its account on

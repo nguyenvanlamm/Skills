@@ -6,7 +6,7 @@ description: >-
   stages: pick target and reference games → evidence from whatever the human has (APK via REA,
   game data, a short video, a description) → SPEC → differentiation and economy design →
   Flutter core with tests, bot and simulator → 3 UI directions (huashu-design) →
-  flutter-ui-revamp + icon → IAP and playtest → codebase-modernizer, plan-to-issues, fixes →
+  mockup in Flutter + icon → IAP and playtest → codebase-modernizer, plan-to-issues, fixes →
   privacy/support pages → iOS built on a Mac → appstore-assets, aso-marketing,
   appstore-review-checker → ship and submit → search-optimizer, design-optimizer.
   Pauses at human gates, commits each stage, resumes from `.clone/status.md`. Use when
@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.18.0
+  version: 1.19.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -54,8 +54,8 @@ version for people; this file is the operating manual.
    landing page, privacy and support pages. Internal docs (SPEC, DESIGN, status) may be
    Vietnamese.
 5. **main + tags.** Work on `main`; releases are tags `vX.Y.Z`. No long-lived `ios` branch.
-   Temporary branches come only from sibling skills (`test-coverage` at S3, `flutter-ui-revamp`
-   at S4, one per issue at S6). A stage that creates a branch ends with it merged into `main`
+   Temporary branches come only from sibling skills (`test-coverage` at S3, one per issue at
+   S6). A stage that creates a branch ends with it merged into `main`
    and deleted ("Closing a branch"); only `main`, tags and a PR's branch are pushed. The stage
    is not done while one of its branches or PRs is open. Before S8, `git branch -a` lists only
    `main` and `origin/main` (and remote branches whose delete waits under
@@ -392,12 +392,12 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
    them) before building; record the answer. The build then matches the chosen mockup exactly:
    a layout, palette or copy change made on the side is a design decision taken without the
    human (rule 9).
-2. `flutter-ui-revamp`: give it the chosen direction so Step 2 only records it in
-   `.revamp/design-direction.md`; it sources licence-verified assets, builds the design system,
-   applies it to the real screens and verifies. At the computer it works on `ui-revamp/<date>`:
-   close that branch once it verifies ("Closing a branch"); in a stage worktree it commits on the
-   worktree's branch (rule 5). A revamp the human rejects is deleted only on their answer (its
-   own rollback).
+2. Build the chosen mockup in Flutter in this session, by `references/mockup-to-flutter.md`:
+   tokens from its CSS, its Google Fonts with their licences, main objects, glyphs and
+   backgrounds painted in code, one screen at a time with analyze and test, then the real
+   screens shot beside the mockup. It works on `main` or the stage worktree (rule 5), with no
+   branch of its own; `design-demos/build-report.md` records the before and after and the
+   rollback (revert the S4 commits).
 3. `logo-designer` for the app icon, run inline: its subagents and SVG rasterisers (rsvg,
    cairosvg, inkscape) are missing here, so one script draws every variant from one geometry,
    headless Chrome renders the PNGs and Pillow drops the alpha. Generate platform icons (no
@@ -407,7 +407,7 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
    art for main objects, an icon reproducing a bundled sprite, a hit's progression in the code,
    or a name or icon matching a game on the App Store charts is a FAIL to fix in this stage.
 - Verify: analyze + test exit 0 on `main`, no branch but `main`, screenshots of home and game
-  captured, `appstore-spam-guard` without FAIL. Commit.
+  captured beside the mockup's, `appstore-spam-guard` without FAIL. Commit.
 
 ### S5 — IAP, boosters, telemetry, playtest → gate G3
 

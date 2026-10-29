@@ -8,7 +8,7 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 2. **Tạo khác biệt trước khi vẽ.** Chủ đề, bảng màu, tên gọi và một cơ chế riêng được chốt ở bước S2. Core làm bằng hình tạm; giao diện thật áp vào ở S4.
 3. **Thiết kế kinh tế game cùng vòng chơi.** Phải có điều kiện thua thì booster và IAP mới có giá trị.
 4. **Game chỉ làm tiếng Anh**: chữ trong game, store listing (en-US), gói IAP, landing page, privacy, support. Tài liệu nội bộ được viết tiếng Việt.
-5. **Chỉ dùng main + tag `vX.Y.Z`.** Không mở nhánh `ios` sống lâu. Nhánh tạm chỉ do skill con tạo (nhánh test ở S3, nhánh giao diện ở S4, mỗi issue một nhánh ở S6) và phải được merge vào `main` rồi xóa ngay cuối bước tạo ra nó. Chỉ push `main`, tag và nhánh của PR. Nhánh PR (S6) đã merge mà auto mode không cho xoá trên GitHub thì agent ghi lệnh xoá vào `## Deferred (human)` để bạn chạy. Phiên chạy nền thì làm trong worktree của bước, và skill con commit thẳng lên nhánh của worktree đó. Trước S8 chỉ còn `main` (trừ các nhánh đang chờ bạn xoá) và không còn PR nào mở.
+5. **Chỉ dùng main + tag `vX.Y.Z`.** Không mở nhánh `ios` sống lâu. Nhánh tạm chỉ do skill con tạo (nhánh test ở S3, mỗi issue một nhánh ở S6) và phải được merge vào `main` rồi xóa ngay cuối bước tạo ra nó. Chỉ push `main`, tag và nhánh của PR. Nhánh PR (S6) đã merge mà auto mode không cho xoá trên GitHub thì agent ghi lệnh xoá vào `## Deferred (human)` để bạn chạy. Phiên chạy nền thì làm trong worktree của bước, và skill con commit thẳng lên nhánh của worktree đó. Trước S8 chỉ còn `main` (trừ các nhánh đang chờ bạn xoá) và không còn PR nào mở.
 6. **Cổng chỉ qua khi có bằng chứng**: lệnh thật chạy xong và exit 0, hoặc câu trả lời của người được ghi vào `.clone/status.md`.
 7. **Chỉ phát hành App Store.** Không có bước Google Play.
 8. **Commit ngay sau mỗi bước** bằng skill `commit`: message tiếng Anh, kèm push. Tag và release để `/ship` làm.
@@ -34,7 +34,7 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 | S1 | Agent + Người | Dùng những gì bạn có (APK, data game, video vài phút, mô tả); agent lấy thêm trang store rồi viết `SPEC.md` | `reverse-engineer-anything`, `scripts/contact-sheet.sh` | **G0b** duyệt SPEC |
 | S2 | Agent → Người | `DESIGN.md`: bảng khác biệt, kinh tế game, mục tiêu độ khó, tên game | `brand-name-checker`, `appstore-spam-guard` (`design`) | **G1** duyệt thiết kế |
 | S3 | Agent | Tạo project ngay trong repo game đã có (use in place, không `git init` lại, gộp `.gitignore`); core Flutter với hình tạm: luật bằng Dart thuần, test, bot, `tool/simulate.dart`; cài hook kiểm tra trước mỗi commit (`tool/check.sh` từ `templates/tool/`) | `flutter-init`, `test-coverage` | analyze + test exit 0 |
-| S4 | Agent → Người | 3 hướng UI → chọn 1 → áp vào Flutter → làm icon (nhân vật/cơ chế của chính game, không emoji, không sprite có sẵn) | `huashu-design` (hoặc `lam-design`), `flutter-ui-revamp`, `logo-designer`, `appstore-spam-guard` (`build`) | **G2** chọn hướng |
+| S4 | Agent → Người | 3 hướng UI → chọn 1 → áp vào Flutter → làm icon (nhân vật/cơ chế của chính game, không emoji, không sprite có sẵn) | `huashu-design` (hoặc `lam-design`), dựng mockup bằng Flutter theo `references/mockup-to-flutter.md`, `logo-designer`, `appstore-spam-guard` (`build`) | **G2** chọn hướng |
 | S5 | Agent + Người | IAP + Restore từ `templates/store/`, booster chống farm, analytics (nếu chọn), người thật chơi thử, chỉnh lại độ khó. Chưa chơi thử thì ghi vào mục hoãn, không chặn G3 | | **G3** duyệt gói và giá |
 | S6 | Agent | Soát codebase → issue → sửa, merge từng PR rồi xóa nhánh | `codebase-modernizer`, `plan-to-issues`, `issue-work-loop` | test xanh, chỉ còn `main` |
 | S7 | Agent | Repo landing tối thiểu có privacy + support, GitHub Pages deploy thẳng từ nhánh `main` (không dùng Actions) | `landing-page-generator` | 2 URL sống |
@@ -160,7 +160,7 @@ Chi tiết lệnh ở `references/ios-release-runbook.md`.
 | Flutter clone game tương tự | S3 |
 | Đổi một ít cho hay hơn, đỡ giống | S2, có cổng khác biệt chặt hơn (`references/differentiation-gate.md`) |
 | `huashu-design` ra 3 bản UI/UX | S4 |
-| Chọn 1 bản, hoàn thiện UI/UX | S4: `flutter-ui-revamp` + `logo-designer` |
+| Chọn 1 bản, hoàn thiện UI/UX | S4: dựng đúng mockup đã chọn bằng Flutter (`references/mockup-to-flutter.md`) + `logo-designer` |
 | Thêm IAP giá hợp lý vào cốt game | Thiết kế ở S2, làm ở S5, duyệt giá ở G3 |
 | Check sang nhánh mới `ios` | **Thay** bằng main + tag |
 | Chuẩn bị iOS để upload | S8: `flutter-ios-release` + bộ build trên Mac |
