@@ -46,7 +46,7 @@ import ledger  # noqa: E402  (sibling modules, path set above)
 import market  # noqa: E402
 from market import dhash  # noqa: E402
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 GROUPS_BY_MODE = {
     "design": ["design"],
@@ -84,6 +84,33 @@ URL_HINT = re.compile(r"privacy|support|marketing|website|landing|homepage", re.
 URL_SKIP_HOSTS = ("apple.com", "github.com", "githubusercontent.com", "flutter.dev",
                   "pub.dev", "google.com", "googleapis.com", "w3.org", "example.com",
                   "kenney.nl", "game-icons.net", "conventionalcommits.org")
+# Folders that hold a game's art when the pubspec does not say (it adds its own).
+ART_DIRS = ("assets", "images", "img", "graphics", "art", "sprites")
+
+# What the emoji font draws: pictographs, and the symbols shown as emoji on their own (⭐)
+# or with VS16 (❤️). Card suits, chess men, arrows and mahjong tiles stay type.
+EMOJI_BMP = "⌚⌛⏩⏪⏫⏬⏰⏳◽◾☔☕♈♉♊♋♌♍♎♏♐♑♒♓♿⚓⚡⚪⚫⚽⚾⛄⛅⛎⛔⛪⛲⛳⛵⛺⛽✅✊✋✨❌❎❓❔❕❗➕➖➗➰➿⬛⬜⭐⭕"
+EMOJI_RE = re.compile(
+    "[\U0001F300-\U0001F3FA\U0001F400-\U0001F64F\U0001F680-\U0001F6FF\U0001F7E0-\U0001F7EB"
+    "\U0001F90C-\U0001F9FF\U0001FA70-\U0001FAFF\U0001F004\U0001F0CF" + EMOJI_BMP + "]"
+    "|[\u2000-\u32ff]\ufe0f|[\U0001F1E6-\U0001F1FF]{2}")
+# Joiners, selectors, skin tones and tags: parts of one emoji, never one of their own.
+EMOJI_GLUE = re.compile("[\\s\ufe0e\ufe0f\u200d\u20e3\U0001F3FB-\U0001F3FF\U000E0020-\U000E007F]")
+EMOJI_MIN = 3  # distinct emoji drawn as text before it is a style, not a toast
+STR_LIT = re.compile(r"'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\"|`(?:\\.|[^`\\\n])*`")
+# A line that opens the list, call or type an emoji sits in: `const pieces = [`, `Fruit(`.
+OPENER = re.compile(r"[(\[{]\s*$|\b(?:enum|class)\b|=\s*(?:const\s*)?[\[{(]|=>\s*[\[{]")
+
+APP_PRODUCT = "com.apple.product-type.application"
+# Bundle IDs of builds that never reach the App Store: environments and tests …
+ENV_WORDS = {"dev", "develop", "development", "debug", "staging", "stage", "stg", "qa", "test",
+             "tests", "testing", "uat", "beta", "alpha", "internal", "local", "sandbox",
+             "preview", "nightly", "canary", "profile"}
+# … and, when the Xcode project's targets cannot be read, extensions that ride along.
+EXT_WORDS = {"widget", "widgets", "extension", "extensions", "notification", "notifications",
+             "service", "share", "intent", "intents", "keyboard", "watch", "watchkitapp",
+             "watchkitextension", "clip", "appclip", "stickers", "imessage", "today", "siri",
+             "liveactivity", "broadcast"}
 
 
 # --------------------------------------------------------------------------- report
@@ -143,8 +170,15 @@ def words(text: str) -> list[str]:
     return re.findall(r"[^\W_]+", text.lower())
 
 
+def spell_emoji(text: str) -> str:
+    """Emoji as their Unicode names ('🍉' → ' watermelon '), so a progression drawn in emoji
+    reads like one spelled out. Flags drop out; line numbers stay as they were."""
+    return EMOJI_RE.sub(lambda m: " " if len(m.group()) == 2 and m.group()[1] != "\ufe0f"
+                        else f" {unicodedata.name(m.group()[0], '').lower()} ", text)
+
+
 def wtext(text: str) -> str:
-    return " " + " ".join(words(text)) + " "
+    return " " + " ".join(words(spell_emoji(text))) + " "
 
 
 def has_phrase(haystack_wtext: str, phrase: str) -> bool:
@@ -223,6 +257,108 @@ def bundle_id(project: Path) -> str:
     return sorted(set(ids), key=len)[0] if ids else ""
 
 
+def pbx_objects(text: str, isa: str) -> list[tuple[str, str]]:
+    """(id, body) of every object of one isa in a project.pbxproj, in Xcode's own layout."""
+    return re.findall(r"^\t\t(\w+) (?:/\*[^\n]*?\*/ )?= \{\s*isa = " + re.escape(isa)
+                      + r";(.*?)^\t\t\};", text, re.S | re.M)
+
+
+def app_bundle_ids(project: Path) -> dict[str, list[str]]:
+    """Bundle ID → the build configurations that set it, for the application targets of
+    the iOS project. Test, extension, watch and App Clip targets ride along with their app."""
+    ids: dict[str, list[str]] = {}
+    bid_re = re.compile(r'PRODUCT_BUNDLE_IDENTIFIER = "?([^";]+)"?;')
+    for pbx in project.glob("ios/*.xcodeproj/project.pbxproj"):
+        text = read(pbx)
+        targets = pbx_objects(text, "PBXNativeTarget")
+        if not targets:  # not Xcode's layout: every bundle ID but a test's or an extension's
+            for v in bid_re.findall(text):
+                if "$(" not in v and not set(words(v.rsplit(".", 1)[-1])) & (ENV_WORDS | EXT_WORDS):
+                    ids.setdefault(v.strip(), []).append(pbx.parent.name)
+            continue
+        configs = dict(pbx_objects(text, "XCBuildConfiguration"))
+        lists = {}
+        for lid, body in pbx_objects(text, "XCConfigurationList"):
+            m = re.search(r"buildConfigurations = \((.*?)\);", body, re.S)
+            lists[lid] = re.findall(r"^\s*(\w+)", m.group(1), re.M) if m else []
+        for _, body in targets:
+            ptype = re.search(r'productType = "([^"]+)"', body)
+            clist = re.search(r"buildConfigurationList = (\w+)", body)
+            if not ptype or ptype.group(1) != APP_PRODUCT or not clist:
+                continue
+            for cid in lists.get(clist.group(1), []):
+                cfg = configs.get(cid, "")
+                bid = bid_re.search(cfg)
+                name = re.search(r'^\t\t\tname = "?([^";]+)"?;', cfg, re.M)
+                if bid and "$(" not in bid.group(1):
+                    ids.setdefault(bid.group(1).strip(), []).append(name.group(1) if name else cid)
+    for xc in walk(project / "ios", {".xcconfig"}):  # flavors kept in .xcconfig files
+        for v in re.findall(r"^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=\s*([^\s;]+)", read(xc), re.M):
+            if "$(" not in v:
+                ids.setdefault(v, []).append(xc.name)
+    return ids
+
+
+def store_apps(ids: dict[str, list[str]]) -> dict[str, list[str]]:
+    """The bundle IDs that would each go to the App Store as an app of their own: not an
+    environment (.dev, appstaging, set only in Debug-dev and Profile-dev) or a test."""
+    def env(bid: str, cfgs: list[str]) -> bool:
+        if set(words(bid.rsplit(".", 1)[-1])) & ENV_WORDS:
+            return True
+        if cfgs and all(set(words(c)) & ENV_WORDS for c in cfgs):
+            return True
+        return any(bid != o and bid.startswith(o) and words(bid[len(o):])
+                   and set(words(bid[len(o):])) <= ENV_WORDS for o in ids)
+    kept = {b: c for b, c in ids.items() if not env(b, c)}
+    return kept or dict(sorted(ids.items(), key=lambda x: len(x[0]))[:1])
+
+
+def pubspec_assets(project: Path) -> list[str]:
+    """The asset paths a Flutter pubspec bundles (`flutter: assets:`, plain or `- path:`)."""
+    out: list[str] = []
+    in_flutter = in_assets = False
+    indent = 0
+    for line in read(project / "pubspec.yaml").splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        lead = len(line) - len(line.lstrip())
+        if lead == 0:
+            in_flutter, in_assets = line.startswith("flutter:"), False
+        elif in_flutter and re.match(r"\s*assets:\s*$", line):
+            in_assets, indent = True, lead
+        elif in_assets and lead <= indent and not line.lstrip().startswith("-"):
+            in_assets = False
+        elif in_assets:
+            m = re.match(r"\s*-\s*(?:path:\s*)?[\"']?([^\"'#\s]+)", line)
+            if m:
+                out.append(m.group(1))
+    return out
+
+
+def art_roots(project: Path) -> list[Path]:
+    """Where the bundled images are. A Flutter app bundles assets/ and what its pubspec lists
+    (an art/ folder it does not list never reaches the binary); other projects, the usual art
+    folders. A path inside another one is left to it."""
+    base = project.resolve()
+    if (project / "pubspec.yaml").exists():
+        names = ["assets", *pubspec_assets(project)]
+    else:
+        names = list(ART_DIRS)
+    found = [p for p in dict.fromkeys((project / n).resolve() for n in names)
+             if p.exists() and p.is_relative_to(base)]
+    return [p for p in found if not any(o != p and p.is_relative_to(o) for o in found)]
+
+
+def art_images(project: Path):
+    """Every image file under the art roots, once."""
+    seen: set[Path] = set()
+    for root in art_roots(project):
+        for p in walk(root, IMAGE_EXTS):
+            if p.resolve() not in seen:
+                seen.add(p.resolve())
+                yield p
+
+
 def app_name(project: Path, override: str | None) -> str:
     if override:
         return override
@@ -297,6 +433,7 @@ def scan_signature_texts(texts: list[tuple[str, str]], sigs: list[dict], group: 
     hit = False
     prepared = []
     for label, text in texts:
+        text = spell_emoji(text)
         wl = words(text)
         prepared.append((label, text, wl, " " + " ".join(wl) + " "))
     for sig in sigs:
@@ -465,11 +602,94 @@ def credit_sources(project: Path):
             yield p
 
 
+def emoji_only(token: str) -> str | None:
+    """The emoji of a string that holds nothing else ('🍒', '❤️', '👍🏽'), at most four."""
+    found = EMOJI_RE.findall(token)
+    if not found or len(found) > 4 or EMOJI_GLUE.sub("", EMOJI_RE.sub("", token)):
+        return None
+    return "".join(found).replace("\ufe0f", "")
+
+
+def emoji_tokens(p: Path, text: str):
+    """(line, emoji) for every string literal — or YAML/CSV value — that is only emoji."""
+    if p.suffix.lower() in (".yaml", ".yml", ".csv"):
+        for n, line in enumerate(text.splitlines(), 1):
+            for v in re.split(r"[,:\t]", line):
+                e = emoji_only(v.strip().lstrip("-").strip().strip("'\""))
+                if e:
+                    yield n, e
+        return
+    line, pos = 1, 0
+    for m in STR_LIT.finditer(text):
+        e = emoji_only(m.group()[1:-1])
+        if e:
+            line, pos = line + text.count("\n", pos, m.start()), m.start()
+            yield line, e
+
+
+def emoji_role(lines: list[str], n: int, core: set[str], ui: set[str]) -> str:
+    """core, ui or unknown, from the words on the emoji's line and on the two lines above
+    that open the list, call or type it sits in (`const pieces = [`, `Badge(`)."""
+    ctx = set(words(lines[n - 1]))
+    opened = 0
+    for k in range(n - 2, max(-1, n - 42), -1):
+        if OPENER.search(lines[k]):
+            ctx |= set(words(lines[k]))
+            opened += 1
+            if opened == 2:
+                break
+    return "core" if ctx & core else "ui" if ctx & ui else "unknown"
+
+
+def check_emoji(project: Path, packs: dict) -> dict | None:
+    """Emoji drawn as text in code or game data — the system emoji font as the art. No file
+    and no credit line to find, so the pack check alone misses it."""
+    core = set(packs.get("core_code_words") or packs["core_path_words"])
+    ui = set(packs.get("ui_code_words") or packs["ui_path_words"])
+    rank = {"core": 2, "unknown": 1, "ui": 0}
+    glyphs: dict[str, tuple[str, str, int]] = {}  # emoji → (role, file, line)
+    for p in code_files(project):
+        text = read(p)
+        if not EMOJI_RE.search(text):
+            continue
+        lines = text.splitlines()
+        for n, e in emoji_tokens(p, text):
+            role = emoji_role(lines, n, core, ui)
+            if e not in glyphs or rank[role] > rank[glyphs[e][0]]:
+                glyphs[e] = (role, rel(p, project), n)
+    if len(glyphs) < EMOJI_MIN:
+        return None
+    by_role = {r: [g for g, v in glyphs.items() if v[0] == r] for r in rank}
+    places: dict[tuple[str, str], list] = {}  # (file, role) → [first line, emoji …]
+    for g, (role, f, n) in sorted(glyphs.items(), key=lambda x: (x[1][1], x[1][2])):
+        places.setdefault((f, role), [n]).append(g)
+    evidence = "; ".join(f"{f}:{v[0]} [{role}] {' '.join(v[1:9])}{' …' if len(v) > 9 else ''}"
+                         for (f, role), v in sorted(places.items(),
+                                                    key=lambda x: -rank[x[0][1]])[:5])
+    if len(by_role["core"]) >= EMOJI_MIN:
+        return {"id": "assets.emoji-glyphs", "verdict": "FAIL",
+                "summary": f"{len(by_role['core'])} emoji drawn as text are the game's main objects",
+                "evidence": evidence,
+                "fix": "draw the main objects as original art (vector in code or your own "
+                       "sprites): an emoji is the same picture on every iPhone and in every "
+                       "other emoji game, so the binary and the screenshots match them"}
+    split = ", ".join(f"{len(v)} {r}" for r, v in by_role.items() if v)
+    return {"id": "assets.emoji-glyphs", "verdict": "WARN",
+            "summary": f"{len(glyphs)} emoji drawn as text in the code ({split})",
+            "evidence": evidence,
+            "fix": "confirm none draws a main object or the icon; emoji UI next to original "
+                   "art reads as low effort, so draw the ones a player sees most"}
+
+
 def check_assets(project: Path, packs: dict, rep: Report) -> None:
     core = set(packs["core_path_words"])
     ui = set(packs["ui_path_words"])
     path_re = re.compile(r"`([^`]*[/*.][^`]*)`|((?:assets|lib|ios|images|img)/[\w./*{},\-]+)")
     found: dict[str, list[tuple[str, str, str]]] = {}  # pack id → (role, evidence, path)
+    emoji = check_emoji(project, packs)
+    if emoji:
+        rep.add(emoji["id"], "assets", emoji["verdict"], emoji["summary"], emoji["evidence"],
+                emoji["fix"])
 
     for src in credit_sources(project):
         text = read(src)
@@ -494,8 +714,10 @@ def check_assets(project: Path, packs: dict, rep: Report) -> None:
                 found.setdefault(pack["id"], []).append((role, rel(p, project), ""))
 
     if not found:
-        rep.add("assets.none", "assets", "PASS",
-                "no stock art pack credited or found by file name")
+        if not emoji:
+            rep.add("assets.none", "assets", "PASS",
+                    "no stock art pack credited or found by file name, and no emoji drawn "
+                    "as text")
         return
 
     by_id = {p["id"]: p for p in packs["packs"]}
@@ -544,7 +766,7 @@ def icon_sources(project: Path) -> set[Path]:
                          read(project / "pubspec.yaml"), re.M):
         if not m.group(1).startswith("#"):
             srcs.add((project / m.group(1)).resolve())
-    for p in walk(project / "assets", IMAGE_EXTS):
+    for p in art_images(project):
         stem = p.stem.lower()
         if (re.search(r"app[_-]?icon|launcher[_-]?icon|icon[_-]?(1024|master|source)", stem)
                 or (p.parent.name.lower() in ("icon", "app_icon", "launcher")
@@ -586,7 +808,7 @@ def check_icon(project: Path, rep: Report) -> None:
     best = (65, "")
     checked = 0
     skipped = icon_sources(project)
-    for p in walk(project / "assets", IMAGE_EXTS):
+    for p in art_images(project):
         if "launch" in str(p).lower() or p.resolve() in skipped:
             continue
         try:
@@ -614,9 +836,14 @@ def check_icon(project: Path, rep: Report) -> None:
     note = (f"; icon sources skipped: {', '.join(sorted(rel(s, project) for s in skipped))}"
             if skipped else "")
     if checked == 0:
-        rep.add("icon.bundled", "icon", "PASS",
-                "no bundled images to compare the icon with", rel(icon, project),
-                "still judge the icon's subject by eye (references/checks.md J3)")
+        looked = ", ".join(rel(r, project) + ("/" if r.is_dir() else "")
+                           for r in art_roots(project))
+        rep.add("icon.bundled", "icon", "SKIP",
+                "no bundled images to compare the icon with (looked in "
+                f"{looked or 'assets/, the usual art folders and the pubspec asset paths'})",
+                rel(icon, project),
+                "judge the icon's subject by eye (references/checks.md J3); if the art lives "
+                "elsewhere, list it under flutter: assets: in pubspec.yaml")
     elif d <= 10:
         rep.add("icon.bundled", "icon", "FAIL",
                 f"the icon reproduces a bundled image ({where})",
@@ -768,6 +995,38 @@ def check_metadata(project: Path, sigs: dict, listing: list[Path], name: str,
                         f"the {field} still says the old name \"{o}\"", src,
                         "replace every old name in the listing")
                 break
+    # 4.3(b): a new game in a crowded category is taken only when it is meaningfully
+    # different — which no scan can tell, so the row hands it to J1 and J2.
+    crowded: dict[str, set[str]] = {}
+    headline_only = set(sigs.get("generic_names_headline_only", []))
+    for field, src, text in fields:
+        if field in ("whatsnew", "reviewnotes"):
+            continue
+        if field == "listing":
+            # Listing docs keep ASO notes beside the copy: a table row or a quoted word
+            # talks about a word ("'sudoku' would target other games") rather than using it.
+            text = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("|"))
+            text = re.sub(r'"[^"\n]*"|“[^”\n]*”', " ", text)
+        # A label never spans a comma or a sentence: "block, puzzle" is two keywords.
+        for part in re.split(r'[,;!?"“”()\[\]\n]|\.\s', text):
+            wt = wtext(part)
+            for g in sigs.get("generic_names", []):
+                if g in headline_only and field not in ("name", "subtitle", "keywords"):
+                    continue  # "two free slots" in a sentence is no casino
+                if has_phrase(wt, g):
+                    crowded.setdefault(g, set()).add(f"{src} [{field}]")
+    crowded = {g: s for g, s in crowded.items()
+               if not any(g != o and has_phrase(f" {o} ", g) for o in crowded)}
+    if crowded:
+        hit = True
+        labels = sorted(crowded, key=lambda g: (-len(crowded[g]), g))
+        rep.add("metadata.saturated-genre", "metadata", "WARN",
+                f"the listing places the game in a crowded category: {', '.join(labels[:4])}",
+                "; ".join(f"\"{g}\" in {', '.join(sorted(crowded[g])[:3])}" for g in labels[:4]),
+                "4.3(b) turns away 'variants of existing app categories': name the own mechanic "
+                "in one sentence, show it on the first screen (J2) and lead the subtitle and "
+                "the first sentence with it (J4). The classic game with levels, hints and "
+                "themes is the variant; J1 and J2 decide, and fail it")
     if not hit:
         rep.add("metadata.clean", "metadata", "PASS",
                 f"{len(fields)} listing fields name no famous game, signature wording, "
@@ -875,8 +1134,8 @@ def shingles(code: str, k: int = 5) -> set[int]:
 
 def repo_fingerprint(root: Path, core: set[str]) -> dict:
     files: dict[str, tuple[str, str]] = {}  # sha → (relpath, kind)
-    for d in ("assets", "ios/Runner/Assets.xcassets/AppIcon.appiconset"):
-        for p in walk(root / d):
+    for d in (*art_roots(root), root / "ios/Runner/Assets.xcassets/AppIcon.appiconset"):
+        for p in walk(d):
             ext = p.suffix.lower()
             if ext in (".json", ".txt", ".md") or TEXT_LICENSE.search(p.stem):
                 continue
@@ -904,7 +1163,29 @@ def repo_fingerprint(root: Path, core: set[str]) -> dict:
     return {"files": files, "code": code}
 
 
+def check_bundles(project: Path, rep: Report) -> None:
+    """4.3(a) to the letter: one game shipped under several bundle IDs."""
+    apps = store_apps(app_bundle_ids(project))
+    if not apps:
+        rep.add("portfolio.bundle-ids", "portfolio", "SKIP",
+                "no bundle ID in ios/*.xcodeproj or its .xcconfig files")
+        return
+    evidence = "; ".join(f"{b} ({', '.join(sorted(set(c))[:4])})" for b, c in sorted(apps.items()))
+    if len(apps) == 1:
+        rep.add("portfolio.bundle-ids", "portfolio", "PASS",
+                f"one App Store bundle ID: {next(iter(apps))}", evidence)
+        return
+    rep.add("portfolio.bundle-ids", "portfolio", "FAIL",
+            f"this project builds {len(apps)} App Store apps: one game under several bundle "
+            "IDs is what 4.3(a) forbids",
+            evidence,
+            "ship one app and offer the variants (seasons, themes, level packs) inside it, as "
+            "in-app purchases if they cost money; if an ID is only a test or internal build, "
+            "name it so (.dev, .staging, .beta) or drop its target")
+
+
 def check_portfolio(project: Path, portfolio: Path, packs: dict, rep: Report) -> None:
+    check_bundles(project, rep)
     core = set(packs["core_path_words"])
     me = project.resolve()
     siblings = [d for d in sorted(portfolio.iterdir()) if d.is_dir() and d.resolve() != me
@@ -1277,7 +1558,7 @@ def main(argv: list[str] | None = None) -> int:
                     "ledger can be checked")
         else:
             data = ledger.load(args.ledger or ledger.default_path())
-            rep.extend(ledger.check_rows(data, team, bundle_id(project) or None))
+            rep.extend(ledger.check_rows(data, team, bundle_id(project) or None, app=name))
 
     result = {"tool": "appstore-spam-guard", "version": VERSION, "mode": args.mode,
               "groups": groups, "project": str(project), "app": name,

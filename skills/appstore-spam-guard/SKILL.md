@@ -3,22 +3,23 @@ name: appstore-spam-guard
 description: >-
   Catch App Store Guideline 4.3 (spam) and 4.1 (copycat) risks before an iOS game is submitted
   or resubmitted: a hit game's progression, name or wording in the code or listing; a name,
-  icon or description matching one of ~7,000 charting App Store games; stock or emoji art for
-  main objects; an icon made from a bundled sprite; a twist hidden past the first 30 seconds;
-  look-alike code and art across your own games; stale public pages and repos; an IP owner
-  who is not the publisher; a team that already has an open 4.3. Scripted scans
-  (PASS/WARN/FAIL with evidence and fixes), six judgement checks and a per-team submission
-  ledger. Use before every App Store submission of a game, at a clone pipeline's design, art
-  and submit gates, after a 4.3 rejection, or when asked "check 4.3", "spam check", "kiểm tra
-  4.3", "có bị reject spam không". Don't use for the other guidelines (appstore-review-checker),
-  Google Play (flutter-store-compliance), or name and trademark checks (brand-name-checker).
+  icon or description matching one of ~7,000 charting games; stock or emoji art for main
+  objects; an icon made from a bundled sprite; a plain variant of a crowded genre; a twist
+  hidden past the first 30 seconds; one game under several bundle IDs; look-alike code and art
+  across your games; stale public pages and repos; an IP owner who is not the publisher; a team
+  with an open 4.3. Scripted scans (PASS/WARN/FAIL with evidence and fixes), six judgement
+  checks and a per-team submission ledger. Use before every App Store submission, at a clone
+  pipeline's design, art and submit gates, after a 4.3 rejection, or when asked "check 4.3",
+  "spam check", "kiểm tra 4.3", "có bị reject spam không". Don't use for other guidelines
+  (appstore-review-checker), Google Play (flutter-store-compliance), or name and trademark
+  checks (brand-name-checker).
 license: MIT
 effort: medium
 capabilities:
   - app-store
   - audit
 metadata:
-  version: 1.1.0
+  version: 1.2.0
 ---
 
 # appstore-spam-guard
@@ -57,15 +58,15 @@ the network) is WARN, never PASS.
 
 | Group | Looks at | FAIL when |
 |---|---|---|
-| `signature` | code, localisation, game data vs `references/signatures.json`: 72 entries, about 150 hit and trademarked games | a hit's progression in order (Suika: ≥6 of 11 steps), or its characters, items or level names (`markers`) |
-| `assets` | credits, README, strings, file names vs `references/stock-assets.json` | an emoji/art pack draws the main objects |
-| `icon` | the 1024 icon vs every bundled image (dHash; needs Pillow) | the icon reproduces a bundled sprite (distance ≤ 10/64) |
-| `metadata` | name, subtitle, keywords, description, promo text, listing docs | the listing names the hit or uses its signature wording or names |
+| `signature` | code, localisation, game data (emoji read by their Unicode names: 🍉 is watermelon) vs `references/signatures.json`: 72 entries, about 150 hit and trademarked games | a hit's progression in order (Suika: ≥6 of 11 steps), or its characters, items or level names (`markers`) |
+| `assets` | credits, README, strings, file names vs `references/stock-assets.json`; emoji drawn as text in code and game data | an emoji/art pack, or ≥ 3 emoji drawn as text, draws the main objects (WARN: emoji only in UI) |
+| `icon` | the 1024 icon vs every bundled image: `assets/` and the pubspec's asset paths (dHash; needs Pillow; SKIP when there is none) | the icon reproduces a bundled sprite (distance ≤ 10/64) |
+| `metadata` | name, subtitle, keywords, description, promo text, listing docs | the listing names the hit or uses its signature wording or names (WARN: a crowded category under 4.3(b), for J1 and J2 to judge) |
 | `market` | the live App Store: top 100 free, paid and grossing of all 19 game charts in us, gb, jp, vn (about 7,000 games, every storefront's name) plus App Store search for our name, subtitle and keywords | the name is a charting game's; the subtitle, keywords or promo text use one's name; the icon is near-identical to one (≤ 6/64 bits, colour ≤ 12); the description repeats one's (≥ 30 words in a row or ≥ 20 %) |
-| `portfolio` | sibling app repos in the parent folder | ≥ 50 % of our Dart code, or the icon or main art, shared with one |
+| `portfolio` | the bundle IDs of the Xcode project's app targets; sibling app repos in the parent folder | the project builds ≥ 2 App Store apps (4.3(a); environment flavors, tests and extensions aside); ≥ 50 % of our Dart code, or the icon or main art, shared with a sibling |
 | `footprint` | privacy/support/marketing pages; GitHub repos they link | — (WARN: page down, old name, public source) |
 | `ownership` | copyright vs account holder (or bundle-id owner) | — (WARN: 5.2.1, state the authorization) |
-| `account` | the ledger for the Apple team | the team has an open 4.3 on another app |
+| `account` | the ledger for the Apple team | the team has an open 4.3 on another app (WARN: the same game already on the team under another bundle ID) |
 
 ## Workflow
 
@@ -119,7 +120,8 @@ python3 <skill-dir>/scripts/ledger.py record --team <T> --app "<App>" --bundle <
   --guideline "4.3(a)" --extended-review --note "<what the message named>"
 ```
 
-`ledger.py check --team <T>` shows what the `account` group sees; `show` prints the ledger.
+`ledger.py check --team <T> --bundle <id> --app "<App>"` shows what the `account` group sees;
+`show` prints the ledger.
 
 ## After a 4.3 rejection
 
@@ -139,7 +141,10 @@ python3 <skill-dir>/scripts/ledger.py record --team <T> --app "<App>" --bundle <
   search needs no entry for its name, icon or description: `market` already compares them.
 - More storefronts: `--countries us,gb,jp,vn,kr,de,br` (each adds 57 charts to the index).
 - A new asset pack: add its credit and file-name markers to `references/stock-assets.json`.
-- Then `python3 scripts/selftest.py` — it builds a clone and an original and must still pass.
+- A crowded category: add its label to `generic_names` in `references/signatures.json`; a label
+  that is also an everyday word in a sentence ('slots') goes in `generic_names_headline_only` too.
+- Then `python3 scripts/selftest.py` — it builds a clone, an original and five blind-spot
+  projects, and must still pass.
 
 ## Limits
 
@@ -153,6 +158,10 @@ python3 <skill-dir>/scripts/ledger.py record --team <T> --app "<App>" --bundle <
   copied text; a similar style is J1's job. Names that are plain English or genre words
   ('Boss Fight', 'Pixel Art', 'Block Blast') do not count as brands there; the curated list
   covers the famous ones.
+- Emoji count when a string (or a YAML/CSV value) holds only emoji; emoji painted into image
+  files are the pack and icon checks' job. A crowded category stays WARN: only J1 and J2 can
+  tell a meaningfully different game from a variant. Bundle IDs come from the Xcode project's
+  app targets and its `.xcconfig` files; one set by a script at archive time is not seen.
 
 ## Files
 
@@ -161,7 +170,7 @@ python3 <skill-dir>/scripts/ledger.py record --team <T> --app "<App>" --bundle <
 | `scripts/scan.py` | the nine scripted groups and `design`; JSON rows `{id, group, verdict, summary, evidence, fix}` |
 | `scripts/market.py` | the App Store index behind `market` (charts, search, icon prints) and its comparisons; `refresh`, `search`, `stats` |
 | `scripts/ledger.py` | per-team submission ledger: `record`, `check`, `show` |
-| `scripts/selftest.py` | builds a Suika-like clone and an original with a fixture App Store index; checks every verdict offline |
+| `scripts/selftest.py` | builds a Suika-like clone, an original and five blind-spot projects with a fixture App Store index; checks every verdict offline |
 | `references/signatures.json` | fingerprints of 72 hits and trademarked games: names, wording, characters, progressions |
 | `references/stock-assets.json` | stock packs, their markers, and path words for main objects vs UI |
 | `references/checks.md` | judgement checks J1–J6 |

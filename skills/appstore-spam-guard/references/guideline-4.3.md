@@ -53,8 +53,8 @@ template; treat every named variant as live anyway.
 
 | Variant | What Apple compared | What usually triggers it | Checks here |
 |---|---|---|---|
-| apps from **other developers** | your app vs the store | a hit's progression and rules, stock art many clones ship, a listing in the hit's words | `signature`, `assets`, `icon`, `metadata`, J1–J4 |
-| **other apps you submitted** | your app vs your own catalogue | shared code and art across your games, one screenshot template, one IAP lineup, many submissions in a short window | `portfolio`, `account`, J6 |
+| apps from **other developers** | your app vs the store | a hit's progression and rules, stock or emoji art many clones ship, a listing in the hit's words, a plain variant of a crowded category (4.3(b)) | `signature`, `assets`, `icon`, `metadata`, `market`, J1–J4 |
+| **other apps you submitted** | your app vs your own catalogue | one game under several bundle IDs (4.3(a) itself), shared code and art across your games, one screenshot template, one IAP lineup, many submissions in a short window | `portfolio`, `account`, J6 |
 | a **terminated developer account** | your app vs apps from accounts Apple closed | a binary or assets matching something a closed account shipped — public source or a public web build is easy to republish; stock packs are everywhere | `assets`, `footprint`, J5 |
 
 "Binary" is not only code: the asset catalogue, the bundled images and sounds, and the strings
@@ -71,18 +71,20 @@ not one app — every other app on that team (`account` group, J6) waits on this
 
 Resubmit **once**, and only after changes a reviewer can see in the first minute:
 
-1. **Art**: the main objects and the icon are original — not a stock pack, not emoji, not a
-   redraw of the hit's objects. Remove the old files from the bundle; credits say the art is
-   original.
+1. **Art**: the main objects and the icon are original — not a stock pack, not emoji (as files
+   or as text), not a redraw of the hit's objects. Remove the old files from the bundle;
+   credits say the art is original.
 2. **Concept**: the hit's progression and signature rules are gone (for Suika: the fruit chain
-   and "two of the largest vanish").
+   and "two of the largest vanish"). In a crowded category, the own mechanic is what the game
+   is about, not an extra.
 3. **First 30 seconds**: the own mechanic is on the first screen or in the first interaction —
    not unlocked after N merges, levels or minutes.
 4. **Listing**: name, subtitle, keywords and the first paragraph lead with the own mechanic; no
    word of the hit's name, progression or signature phrases; new screenshots led by the twist.
 5. **Footprint**: privacy, support and marketing pages show the current name only; public repos
    and old web builds of the game are made private or taken down.
-6. **Account**: no other submission to the same team while this one is open (`ledger.py check`).
+6. **Account**: no other submission to the same team while this one is open (`ledger.py check`),
+   and the rejected game goes back as itself — never under a new bundle ID.
 7. **Reply** in the Resolution Center (template below), then submit the new build with any IAPs
    attached.
 

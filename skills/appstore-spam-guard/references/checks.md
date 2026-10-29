@@ -7,18 +7,23 @@ Record every answer in the report with the evidence you used; "looks fine" is no
 
 **Evidence**: a screenshot of the game screen (or the chosen mockup before the build exists),
 the store screenshots of each reference game, a screenshot of the developer's closest
-earlier game (the `portfolio` group names it), and the store pages of the games the `market`
-rows name (the closest icon, any name or wording match).
+earlier game (the `portfolio` group names it), the store pages of the games the `market`
+rows name (the closest icon, any name or wording match), and — when `metadata.saturated-genre`
+names a crowded category — the screenshots of that category's top three games on the store.
 
 **How**: give the images to a fresh subagent that has seen no design discussion and ask only:
 
 > Here are screenshots of several mobile games. For each pair (A with B, A with C, …): would a
 > player think these are the same game, the same brand, or different games in the same genre?
 > Answer per pair: same game / same brand / same genre / unrelated, with one sentence of why.
+> Then: what can a player do in A that they cannot do in any of the others? One sentence, or
+> "nothing".
 
 **Verdict**: "same game" with any reference → FAIL; "same brand" with an earlier own game →
 FAIL; "same game" or "same brand" disputed by what the scan found → WARN and show the human.
-"Same genre" is fine — 4.3 is about indistinguishable apps, not genres.
+"Same genre" passes only with an answer to the last question: "nothing" in a crowded category
+(`metadata.saturated-genre`) → FAIL, elsewhere → WARN. 4.3(b) turns away "variants of existing
+app categories", not only copies of one app.
 
 **Fix**: change what the subagent named (object theme, palette, board, HUD), then ask again.
 
@@ -32,6 +37,9 @@ for thresholds such as `firstDraftAt`, `unlockAtLevel`, `tutorialAfter`), the on
 first two store screenshots, the subtitle and the description's first sentence.
 
 **Verdict**:
+- There is no own mechanic: the game is its genre's standard (the classic rules plus levels,
+  hints, themes or daily puzzles) → **FAIL** in a crowded category (`metadata.saturated-genre`),
+  WARN elsewhere. Polish is not a mechanic.
 - The own mechanic is not on the first screen and not reachable in the first interaction
   (e.g. offered only after merge 6, level 3, or a minute of play) → **FAIL**.
 - It is reachable early but the first two screenshots or the first sentence lead with the

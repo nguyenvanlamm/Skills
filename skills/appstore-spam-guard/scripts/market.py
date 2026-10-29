@@ -36,7 +36,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 UA = f"appstore-spam-guard/{VERSION}"
 GAME_GENRES = {
     6014: "Games", 7001: "Action", 7002: "Adventure", 7003: "Casual", 7004: "Board",

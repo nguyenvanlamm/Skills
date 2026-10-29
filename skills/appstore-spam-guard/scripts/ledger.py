@@ -4,7 +4,7 @@
     python3 ledger.py record --team T --app NAME --bundle ID \\
         --event submitted|approved|rejected|withdrawn \\
         [--guideline "4.3(a)"] [--extended-review] [--date YYYY-MM-DD] [--note TEXT]
-    python3 ledger.py check --team T [--bundle ID] [--days 14]
+    python3 ledger.py check --team T [--bundle ID] [--app NAME] [--days 14]
     python3 ledger.py show [--team T]
 
 Guideline 4.3 judges the developer account, not one game, so the ledger lives
@@ -20,6 +20,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -84,13 +85,27 @@ def open_43(events: list[dict]) -> dict[str, dict]:
     return pending
 
 
+def same_game(a: str, b: str) -> bool:
+    """One game's name inside another's ('Merge Seasons', 'Merge Seasons: Halloween'). A
+    short one-word name must match whole: 'Pop' is not 'Pop Star'."""
+    wa, wb = (re.findall(r"[^\W_]+", s.casefold()) for s in (a, b))
+    if not wa or not wb:
+        return False
+    short, long_ = sorted((wa, wb), key=len)
+    if short == long_:
+        return True
+    if len(short) == 1 and len(short[0]) < 6:
+        return False
+    return f" {' '.join(short)} " in f" {' '.join(long_)} "
+
+
 def _row(id_: str, verdict: str, summary: str, evidence: str = "", fix: str = "") -> dict:
     return {"id": id_, "group": "account", "verdict": verdict,
             "summary": summary, "evidence": evidence, "fix": fix}
 
 
 def check_rows(data: dict, team: str, bundle: str | None = None, days: int = 14,
-               today: dt.date | None = None) -> list[dict]:
+               today: dt.date | None = None, app: str | None = None) -> list[dict]:
     today = today or dt.date.today()
     events = data.get("teams", {}).get(team, {}).get("events", [])
     if not events:
@@ -118,6 +133,20 @@ def check_rows(data: dict, team: str, bundle: str | None = None, days: int = 14,
                 evidence,
                 f"hold every new submission to team {team} until {e['app']} clears review "
                 "or is withdrawn; record the outcome with `ledger.py record`"))
+
+    # 4.3(a): the same game already on this team under another bundle ID.
+    if app and bundle:
+        latest = {e["bundle"]: e for e in sorted(events, key=lambda e: e["date"])
+                  if e["bundle"] != bundle and same_game(app, e["app"])}
+        for b, e in latest.items():
+            rows.append(_row(
+                "account.same-app", "WARN",
+                f"team {team} already has {e['app']} ({b}): the same game under a second "
+                "bundle ID",
+                f"{e['date']}: {e['app']} ({b}) {e['event']}",
+                "4.3(a): ship it as an update of the app the team already has, or make it a "
+                "different game (art, concept, name); a rejected or withdrawn app resubmitted "
+                "under a new bundle ID reads as dodging review"))
 
     window_start = today - dt.timedelta(days=days)
     recent = [e for e in events
@@ -156,6 +185,7 @@ def main(argv: list[str] | None = None) -> int:
     chk = sub.add_parser("check", help="rows for scan.py's account group")
     chk.add_argument("--team", required=True)
     chk.add_argument("--bundle", default=None)
+    chk.add_argument("--app", default=None, help="the app's name, to find it under other bundles")
     chk.add_argument("--days", type=int, default=14)
 
     show = sub.add_parser("show", help="print the ledger")
@@ -177,7 +207,7 @@ def main(argv: list[str] | None = None) -> int:
         save(path, data)
         print(json.dumps({"recorded": entry, "ledger": str(path)}, ensure_ascii=False))
     elif args.cmd == "check":
-        print(json.dumps(check_rows(data, args.team, args.bundle, args.days),
+        print(json.dumps(check_rows(data, args.team, args.bundle, args.days, app=args.app),
                          indent=2, ensure_ascii=False))
     else:
         teams = data["teams"]

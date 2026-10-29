@@ -9,9 +9,13 @@ progression, Fluent Emoji fruit, an icon made from a bundled sprite, a listing
 that names Suika, a sibling repo with the same code and art, a publisher who is
 not the copyright holder, and a team with an open 4.3 — and against a small
 fixture App Store index, a charting game's name, its icon and its description.
-`original` has none of them. The PNGs are drawn here with the stdlib and the
-index is written here too, so the repo carries no fixture binaries and the test
-never touches the network. Exit 0 when every expectation holds, 1 otherwise.
+`original` has none of them. Five small projects cover the blind spots of
+v1.1.0: a progression drawn as emoji text, emoji on badges only, an icon cut
+from a sprite kept outside assets/, one game under several bundle IDs (and on
+the ledger under another one), and a plain sudoku. The PNGs are drawn here with
+the stdlib and the index is written here too, so the repo carries no fixture
+binaries and the test never touches the network. Exit 0 when every expectation
+holds, 1 otherwise.
 """
 from __future__ import annotations
 
@@ -132,6 +136,38 @@ HIT_DESC = ("Drop juicy fruit into the jar and watch matching pairs merge into b
             "weekly leaderboard with friends. Fruit Drop Saga is free to play with daily "
             "challenges, cute themes and new fruit every season.")
 
+EMOJI_DART = """// Juicy Stack: drop pieces into the jar; two alike join into the next one.
+const pieces = ['🍒', '🍓', '🍇', '🍊', '🍎', '🍐', '🍑', '🍍', '🍈', '🍉'];
+
+Widget piece(int tier) => Text(pieces[tier], style: TextStyle(fontSize: 24.0 + tier * 8));
+"""
+
+BADGES_DART = """// Achievement cards: the only emoji in the game.
+class Badge {
+  const Badge(this.title, this.icon);
+  final String title;
+  final String icon;
+}
+
+const badges = [
+  Badge('First stack', '🏅'),
+  Badge('Ten stacks', '🏆'),
+  Badge('Mountain wakes', '⭐'),
+];
+"""
+
+SUDOKU_LISTING = {
+    "name": "Grid Calm",
+    "subtitle": "Relaxing number puzzles",
+    "keywords": "sudoku,numbers,logic,classic",
+    "description": "Classic 9x9 sudoku with four difficulty levels, notes, hints and daily "
+                   "challenges. Fill every row, column and box with the numbers 1 to 9 before "
+                   "your two free slots run out.",
+}
+ASO_NOTES = ("# Listing\n\nRelaxing number puzzles for short breaks.\n\n## ASO notes\n\n"
+             "| Keyword | Why |\n|---|---|\n| nonogram | kept out: another puzzle type |\n\n"
+             "We leave \"minesweeper\" out on purpose.\n")
+
 PBX = "DEVELOPMENT_TEAM = {team};\nPRODUCT_BUNDLE_IDENTIFIER = {bundle};\n"
 PLIST = ("<plist><dict><key>CFBundleDisplayName</key><string>{name}</string>"
          "</dict></plist>\n")
@@ -141,6 +177,34 @@ def write(root: Path, rel: str, text: str) -> None:
     p = root / rel
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(text, encoding="utf-8")
+
+
+def pbxproj(team: str, targets: list[tuple[str, str, list[tuple[str, str]]]]) -> str:
+    """A project.pbxproj in Xcode's own layout: (target, product type, [(config, bundle)])."""
+    nums = iter(range(1, 1000))
+    natives, configs, lists = [], [], []
+    for name, ptype, builds in targets:
+        tid, lid = f"{next(nums):024X}", f"{next(nums):024X}"
+        cids = []
+        for config, bundle in builds:
+            cids.append(f"{next(nums):024X}")
+            configs.append(f"\t\t{cids[-1]} /* {config} */ = {{\n\t\t\tisa = XCBuildConfiguration;\n"
+                           f"\t\t\tbuildSettings = {{\n\t\t\t\tDEVELOPMENT_TEAM = {team};\n"
+                           f"\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = {bundle};\n\t\t\t}};\n"
+                           f"\t\t\tname = \"{config}\";\n\t\t}};\n")
+        lists.append(f"\t\t{lid} /* Build configuration list for PBXNativeTarget \"{name}\" */ = {{\n"
+                     "\t\t\tisa = XCConfigurationList;\n\t\t\tbuildConfigurations = (\n"
+                     + "".join(f"\t\t\t\t{c} /* config */,\n" for c in cids)
+                     + "\t\t\t);\n\t\t\tdefaultConfigurationName = Release;\n\t\t};\n")
+        natives.append(f"\t\t{tid} /* {name} */ = {{\n\t\t\tisa = PBXNativeTarget;\n"
+                       f"\t\t\tbuildConfigurationList = {lid};\n\t\t\tname = {name};\n"
+                       f"\t\t\tproductType = \"{ptype}\";\n\t\t}};\n")
+    return ("// !$*UTF8*$!\n{\n\tobjects = {\n\n"
+            "/* Begin PBXNativeTarget section */\n" + "".join(natives)
+            + "/* End PBXNativeTarget section */\n\n/* Begin XCBuildConfiguration section */\n"
+            + "".join(configs) + "/* End XCBuildConfiguration section */\n\n"
+            "/* Begin XCConfigurationList section */\n" + "".join(lists)
+            + "/* End XCConfigurationList section */\n\t};\n}\n")
 
 
 def build_clone(parent: Path) -> Path:
@@ -213,6 +277,41 @@ def build_original(parent: Path) -> Path:
           "| 1 | Chain | cherry, strawberry, grape, orange, persimmon, apple, pear, "
           "peach, pineapple, melon, watermelon | pebble to crag | different |\n")
     return root
+
+
+def build_blind_spots(parent: Path) -> dict[str, Path]:
+    """One small project per blind spot of v1.1.0, each in a folder of its own."""
+    icon = "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png"
+    roots = {k: parent / k / k for k in ("emoji", "badges", "art", "flavors", "sudoku")}
+    for k, root in roots.items():
+        write(root, "pubspec.yaml", f"name: {k}\n")
+    write(roots["emoji"], "lib/main.dart", EMOJI_DART)
+    write(roots["badges"], "lib/badges.dart", BADGES_DART)
+    # The icon is the main sprite, which lives in images/ — listed in the pubspec.
+    write(roots["art"], "pubspec.yaml", "name: art\nflutter:\n  assets:\n    - images/pieces/\n")
+    write_png(roots["art"] / "images/pieces/melon.png", 256, 256, melon)
+    write_png(roots["art"] / icon, 512, 512, clone_icon)
+    # One game as three App Store apps; a .dev flavor, tests and a widget ride along. Its
+    # icon is the sprite in art/, which the pubspec does not list: not in the binary.
+    seasons = "com.example.mergeseasons"
+    write(roots["flavors"], "ios/Runner.xcodeproj/project.pbxproj", pbxproj("TEAMTEST03", [
+        ("Runner", "com.apple.product-type.application",
+         [("Debug", seasons), ("Release", seasons), ("Profile", seasons),
+          ("Debug-dev", f"{seasons}.dev"), ("Release-dev", f"{seasons}.dev"),
+          ("Release-halloween", f"{seasons}.halloween"),
+          ("Release-christmas", f"{seasons}.christmas")]),
+        ("RunnerTests", "com.apple.product-type.bundle.unit-test",
+         [("Debug", f"{seasons}.RunnerTests")]),
+        ("SeasonWidget", "com.apple.product-type.app-extension",
+         [("Release", f"{seasons}.SeasonWidget")]),
+    ]))
+    write(roots["flavors"], "ios/Runner/Info.plist", PLIST.format(name="Merge Seasons"))
+    write_png(roots["flavors"] / "art/melon.png", 256, 256, melon)
+    write_png(roots["flavors"] / icon, 512, 512, clone_icon)
+    write(roots["sudoku"], "ios/Runner/Info.plist", PLIST.format(name="Grid Calm"))
+    write(roots["sudoku"], "store/listing.json", json.dumps(SUDOKU_LISTING))
+    write(roots["sudoku"], "store/aso-listing.md", ASO_NOTES)
+    return roots
 
 
 def build_store(cache: Path, clone_icon_png: Path) -> None:
@@ -295,6 +394,8 @@ def main() -> int:
             "metadata.suika.term": "WARN",
             "metadata.generic-name": "WARN",
             "metadata.copycat-wording": "WARN",
+            "metadata.saturated-genre": "WARN",
+            "portfolio.bundle-ids": "PASS",
             "portfolio.sibling": "FAIL",
             "footprint.none": "SKIP",
             "ownership.publisher": "WARN",
@@ -323,6 +424,7 @@ def main() -> int:
             "signature.none": "PASS",
             "assets.stock.kenney": "PASS",
             "metadata.clean": "PASS",
+            "portfolio.bundle-ids": "PASS",
             "portfolio.none": "SKIP",
             "footprint.none": "SKIP",
             "ownership.consistent": "PASS",
@@ -336,13 +438,46 @@ def main() -> int:
         wanted["icon.bundled" if HAVE_PIL else "icon.unverified"] = \
             "PASS" if HAVE_PIL else "WARN"
         errors += expect(r, wanted, "original")
-        if any(c["id"] == "market.crowded-name" for c in r["checks"]):
-            errors.append("original: market.crowded-name should not appear")
+        for id_ in ("market.crowded-name", "assets.emoji-glyphs", "metadata.saturated-genre"):
+            if any(c["id"] == id_ for c in r["checks"]):
+                errors.append(f"original: {id_} should not appear")
         if r["overall"] != ("PASS" if HAVE_PIL else "WARN"):
             errors.append(f"original: overall expected PASS, got {r['overall']}")
 
         d = scan(orig, ledger_path, "--mode", "design")
         errors += expect(d, {"design.clean": "PASS"}, "original design")
+
+        # The blind spots of v1.1.0, each of which passed it.
+        spots = build_blind_spots(tmp / "spots")
+        r = scan(spots["emoji"], ledger_path, "--groups", "signature,assets")
+        errors += expect(r, {"signature.suika.chain": "FAIL", "assets.emoji-glyphs": "FAIL"},
+                         "emoji")
+        r = scan(spots["badges"], ledger_path, "--groups", "signature,assets")
+        errors += expect(r, {"signature.none": "PASS", "assets.emoji-glyphs": "WARN"}, "badges")
+        r = scan(spots["art"], ledger_path, "--groups", "icon")
+        errors += expect(r, {"icon.bundled": "FAIL"} if HAVE_PIL
+                         else {"icon.unverified": "WARN"}, "art outside assets/")
+        rec = subprocess.run(
+            [sys.executable, str(LEDGER), "--ledger", str(ledger_path), "record",
+             "--team", "TEAMTEST03", "--app", "Merge Seasons", "--bundle",
+             "com.example.seasons.merge", "--event", "approved", "--date", "2026-09-01"],
+            capture_output=True, text=True)
+        if rec.returncode != 0:
+            errors.append(f"ledger record failed: {rec.stderr}")
+        r = scan(spots["flavors"], ledger_path, "--groups", "icon,portfolio,account")
+        wanted = {"portfolio.bundle-ids": "FAIL", "account.same-app": "WARN"}
+        wanted["icon.bundled" if HAVE_PIL else "icon.unverified"] = \
+            "SKIP" if HAVE_PIL else "WARN"
+        errors += expect(r, wanted, "flavors")
+        ev = next((c["evidence"] for c in r["checks"] if c["id"] == "portfolio.bundle-ids"), "")
+        if not ("halloween" in ev and "christmas" in ev) or any(
+                x in ev for x in (".dev", "RunnerTests", "SeasonWidget")):
+            errors.append(f"flavors: bundle-ids evidence should be the three store apps: {ev}")
+        r = scan(spots["sudoku"], ledger_path, "--groups", "metadata")
+        errors += expect(r, {"metadata.saturated-genre": "WARN"}, "sudoku")
+        ev = next((c["evidence"] for c in r["checks"] if c["id"] == "metadata.saturated-genre"), "")
+        if any(x in ev for x in ("slots", "nonogram", "minesweeper")):
+            errors.append(f"sudoku: a description's 'slots' or an ASO note counted: {ev}")
     finally:
         if args.keep:
             print(f"fixtures kept in {tmp}")

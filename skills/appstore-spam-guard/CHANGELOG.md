@@ -1,5 +1,54 @@
 # Changelog
 
+## v1.2.0 — 2026-10-29
+
+Four throwaway games built to probe v1.1.0 passed it with real 4.3 problems: a Suika-like
+whose fruits are emoji drawn with `Text('🍉')`, an icon cut from the main sprite kept in
+`images/`, one game under four bundle IDs, and a plain sudoku. Each now fails or warns, and
+the selftest builds all of them (its new expectations fail 12 times on v1.1.0).
+
+### Added
+- `assets.emoji-glyphs`: strings that hold only emoji (`'🍒'`) in code and game data — the
+  system emoji font as the art, with no file or credit line for the pack check to find. The
+  role comes from the words on the emoji's line and on the lines that open its list or call
+  (`core_code_words`, `ui_code_words` in `stock-assets.json`): ≥ 3 core FAIL, else ≥ 3 WARN.
+- `signature` and `metadata` read emoji by their Unicode names (`🍉` → watermelon), so a
+  progression drawn in emoji counts like one spelled out: the probe matched 10 of Suika's 11
+  steps in order.
+- `portfolio.bundle-ids`, 4.3(a) to the letter: the bundle IDs of the Xcode project's
+  application targets and its `.xcconfig` files; tests, extensions, watch apps and environment
+  flavors (`.dev`, `appstaging`, IDs set only in `Debug-dev`) aside. Two or more FAIL.
+- `account.same-app`: the ledger holds the same game (same name, or one inside the other) under
+  another bundle ID on the team → WARN. `ledger.py check --app`.
+- `metadata.saturated-genre` (4.3(b) "variants of existing app categories"): a crowded-category
+  label from `generic_names` anywhere in the listing → WARN. J1 now asks what a player can do in
+  the game that they cannot do in the others; J1 and J2 FAIL a plain variant of a crowded
+  category. 20 labels added (hangman, reversi, trivia, sliding puzzle …);
+  `generic_names_headline_only` keeps everyday words ('slots', 'pop it') to the name, subtitle
+  and keywords.
+
+### Fixed
+- `icon` compared the icon only with `assets/`, and said PASS when it had compared nothing. A
+  Flutter app's images are now `assets/` plus the pubspec's asset paths (other projects: the
+  usual art folders), and nothing to compare is SKIP. `portfolio` fingerprints the same folders.
+
+### Calibration (35 Flutter games in the projects folder, 2026-10-29)
+- Emoji: only `gold_miner` draws emoji as text — 16, on achievements, upgrades and buttons
+  (15 ui, 1 unknown) → WARN; its main objects are sprites. Reading emoji by name changed no
+  `signature` row on any game.
+- Bundle IDs: 32 games build one App Store app and 3 have no iOS bundle ID; the target parse
+  drops `RunnerTests` on every one.
+- Crowded category: no game's listing names one. Unfiltered, four matched, all wrongly: ASO-note
+  tables and quoted words in `skepfield` and `slipchute` (one note keeps "sudoku", "nonogram"
+  and "minesweeper" out on purpose), "two free slots" in `yarn_unravel`'s description and
+  "Three slots." in Fruit Mischief's promotional text. Listing docs now skip table rows and
+  quoted words.
+- Fruit Mischief before the rework: the same four FAIL rows, plus `metadata.saturated-genre`
+  WARN for "merge fruit" in its subtitle — the crowd it was rejected in. After: unchanged.
+- `icon.bundled` goes from PASS to SKIP on 27 games that draw their art in code. `yarn_unravel`'s
+  `art/levels/`, which its pubspec does not list (so the binary does not hold it), is no longer
+  compared; it would have warned at 14/64.
+
 ## v1.1.0 — 2026-10-29
 
 `signature` knew 17 games. It now knows 72 entries covering about 150 hit and trademarked

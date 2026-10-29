@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Free asset packs that thousands of store apps ship. Licensed use is legal, but when the same pack draws a game's main objects or its icon, the binary and the screenshots match every other app built from it, which is what 4.3(a) 'similar binary' means in practice. kind decides the verdict by role: emoji and art for main objects or the icon FAIL; for UI chrome they WARN (emoji) or pass with a note (art, icons); audio and fonts pass with a note. markers are lowercase substrings matched in credit files, README, localisation and code (credits), and in file and folder names (files).",
+  "about": "Free asset packs that thousands of store apps ship. Licensed use is legal, but when the same pack draws a game's main objects or its icon, the binary and the screenshots match every other app built from it, which is what 4.3(a) 'similar binary' means in practice. kind decides the verdict by role: emoji and art for main objects or the icon FAIL; for UI chrome they WARN (emoji) or pass with a note (art, icons); audio and fonts pass with a note. markers are lowercase substrings matched in credit files, README, localisation and code (credits), and in file and folder names (files). Emoji drawn as text (a string holding only emoji, such as '🍒') use the system emoji font as their art and need no pack: core_code_words and ui_code_words read their role from the words on the emoji's line and on the lines that open its list or call (`const pieces = [`, `Badge(`). Three or more emoji whose role is core FAIL; otherwise three or more WARN.",
   "core_path_words": [
     "fruit", "fruits", "character", "characters", "hero", "heroes", "enemy", "enemies",
     "tile", "tiles", "piece", "pieces", "block", "blocks", "gem", "gems", "ball", "balls",
@@ -12,6 +12,19 @@
   "ui_path_words": [
     "ui", "button", "buttons", "icon", "icons", "hud", "panel", "panels", "menu", "frame",
     "frames", "badge", "badges", "font", "fonts", "audio", "sfx", "sound", "sounds", "music"
+  ],
+  "core_code_words": [
+    "fruit", "fruits", "character", "characters", "hero", "heroes", "enemy", "enemies",
+    "tile", "tiles", "piece", "pieces", "block", "blocks", "gem", "gems", "ball", "balls",
+    "card", "cards", "creature", "creatures", "animal", "animals", "food", "foods", "pet",
+    "pets", "vehicle", "vehicles", "car", "cars", "monster", "monsters", "candy", "candies",
+    "jewel", "jewels", "tier", "tiers", "token", "tokens", "sprite", "sprites", "species"
+  ],
+  "ui_code_words": [
+    "ui", "button", "buttons", "icon", "icons", "hud", "panel", "panels", "menu", "badge",
+    "badges", "label", "title", "toast", "dialog", "snackbar", "achievement", "achievements",
+    "reward", "rewards", "mission", "missions", "medal", "medals", "trophy", "trophies", "tab",
+    "tabs", "settings", "sound", "music", "share", "rate"
   ],
   "packs": [
     {

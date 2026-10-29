@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Fingerprints of hit games with many clones on the App Store, and of trademarked games App Review knows by name. A match is not proof of copying: it is what an App Review reviewer recognises at a glance. aliases = the original's own names (FAIL in the listing, WARN in code). phrases = wording that only makes sense for that game (FAIL in the listing). terms = genre words that pull the listing toward the clone pile (WARN in name, subtitle, keywords and promotional text). markers = the original's characters, items and level names; each item is a list of spellings counted once (FAIL in the listing; in code FAIL from markers_fail distinct ones, default 3, else WARN). chain = an ordered progression; each position lists accepted synonyms; counted per file. icon_subjects = what the original's icon shows (judgement check J3). Add a game by appending an entry; keep aliases to names you are sure of and that are not everyday phrases ('two dots', 'roll the ball', 'brain test' stay out). For everything else that sells, the market group compares with the live App Store charts (scripts/market.py).",
+  "about": "Fingerprints of hit games with many clones on the App Store, and of trademarked games App Review knows by name. A match is not proof of copying: it is what an App Review reviewer recognises at a glance. aliases = the original's own names (FAIL in the listing, WARN in code). phrases = wording that only makes sense for that game (FAIL in the listing). terms = genre words that pull the listing toward the clone pile (WARN in name, subtitle, keywords and promotional text). markers = the original's characters, items and level names; each item is a list of spellings counted once (FAIL in the listing; in code FAIL from markers_fail distinct ones, default 3, else WARN). chain = an ordered progression; each position lists accepted synonyms; counted per file. icon_subjects = what the original's icon shows (judgement check J3). generic_names = labels of crowded categories: WARN in the name or subtitle (a generic name) and, anywhere in the listing, a crowded category under 4.3(b), which J1 and J2 then judge; generic_names_headline_only are everyday words in a sentence ('three slots', 'pop it') and count only in the name, subtitle and keywords. Emoji in code and listings are read by their Unicode names ('🍉' as 'watermelon'), so chains, markers and phrases match them too. Add a game by appending an entry; keep aliases to names you are sure of and that are not everyday phrases ('two dots', 'roll the ball', 'brain test' stay out). For everything else that sells, the market group compares with the live App Store charts (scripts/market.py).",
   "generic_names": [
     "fruit drop", "fruit merge", "merge fruit", "fruit game", "watermelon game", "drop merge",
     "number merge", "merge numbers", "block puzzle", "block blast", "sort puzzle", "color sort",
@@ -12,7 +12,14 @@
     "nonogram", "number match", "color by number", "coloring book", "bubble shooter", "bubble pop",
     "brain test", "idle tycoon", "car parking", "pin pull", "find the difference",
     "spot the difference", "hidden objects", "tic tac toe", "snake game", "ludo", "merge game",
-    "merge puzzle", "match 3d", "goods sort", "wool sort", "yarn sort", "hexa puzzle", "nuts sort"
+    "merge puzzle", "match 3d", "goods sort", "wool sort", "yarn sort", "hexa puzzle", "nuts sort",
+    "word connect", "hangman", "memory match", "memory game", "reversi", "gomoku",
+    "dots and boxes", "sliding puzzle", "15 puzzle", "air hockey", "pop it", "idle clicker",
+    "clicker game", "trivia", "quiz game", "riddles", "paint by number", "dino run",
+    "stack tower"
+  ],
+  "generic_names_headline_only": [
+    "slots", "bingo", "trivia", "riddles", "pop it", "15 puzzle"
   ],
   "copycat_wording": [
     "clone", "knock-off", "knockoff", "copy of", "like the famous", "just like the",
