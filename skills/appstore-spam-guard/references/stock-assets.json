@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "about": "Free asset packs that thousands of store apps ship. Licensed use is legal, but when the same pack draws a game's main objects or its icon, the binary and the screenshots match every other app built from it, which is what 4.3(a) 'similar binary' means in practice. kind decides the verdict by role: emoji and art for main objects or the icon FAIL; for UI chrome they WARN (emoji) or pass with a note (art, icons); audio and fonts pass with a note. markers are lowercase substrings matched in credit files, README, localisation and code (credits), and in file and folder names (files).",
+  "core_path_words": [
+    "fruit", "fruits", "character", "characters", "hero", "heroes", "enemy", "enemies",
+    "tile", "tiles", "piece", "pieces", "block", "blocks", "gem", "gems", "ball", "balls",
+    "card", "cards", "creature", "creatures", "animal", "animals", "food", "foods",
+    "item", "items", "object", "objects", "pet", "pets", "vehicle", "vehicles", "car", "cars",
+    "bus", "buses", "board", "level", "levels", "world", "player", "monster", "monsters",
+    "candy", "candies", "jewel", "jewels"
+  ],
+  "ui_path_words": [
+    "ui", "button", "buttons", "icon", "icons", "hud", "panel", "panels", "menu", "frame",
+    "frames", "badge", "badges", "font", "fonts", "audio", "sfx", "sound", "sounds", "music"
+  ],
+  "packs": [
+    {
+      "id": "fluent-emoji",
+      "name": "Microsoft Fluent Emoji",
+      "kind": "emoji",
+      "markers": {
+        "credits": ["fluent emoji", "fluentui-emoji", "fluent-emoji"],
+        "files": ["fluent_emoji", "fluent-emoji", "fluentui"]
+      }
+    },
+    {
+      "id": "twemoji",
+      "name": "Twemoji",
+      "kind": "emoji",
+      "markers": {"credits": ["twemoji"], "files": ["twemoji"]}
+    },
+    {
+      "id": "noto-emoji",
+      "name": "Google Noto Emoji",
+      "kind": "emoji",
+      "markers": {"credits": ["noto emoji", "noto-emoji", "noto color emoji"], "files": ["noto-emoji", "noto_emoji", "emoji_u"]}
+    },
+    {
+      "id": "openmoji",
+      "name": "OpenMoji",
+      "kind": "emoji",
+      "markers": {"credits": ["openmoji"], "files": ["openmoji"]}
+    },
+    {
+      "id": "joypixels",
+      "name": "JoyPixels / EmojiOne",
+      "kind": "emoji",
+      "markers": {"credits": ["joypixels", "emojione"], "files": ["joypixels", "emojione"]}
+    },
+    {
+      "id": "kenney",
+      "name": "Kenney asset packs",
+      "kind": "art",
+      "markers": {"credits": ["kenney"], "files": ["kenney"]}
+    },
+    {
+      "id": "game-icons",
+      "name": "game-icons.net",
+      "kind": "icons",
+      "markers": {"credits": ["game-icons.net", "game-icons"], "files": []}
+    },
+    {
+      "id": "opengameart",
+      "name": "OpenGameArt",
+      "kind": "art",
+      "markers": {"credits": ["opengameart"], "files": []}
+    },
+    {
+      "id": "itch-io",
+      "name": "itch.io asset packs",
+      "kind": "art",
+      "markers": {"credits": ["itch.io"], "files": []}
+    },
+    {
+      "id": "craftpix",
+      "name": "CraftPix",
+      "kind": "art",
+      "markers": {"credits": ["craftpix"], "files": ["craftpix"]}
+    },
+    {
+      "id": "freepik",
+      "name": "Freepik / Flaticon",
+      "kind": "art",
+      "markers": {"credits": ["freepik", "flaticon"], "files": ["freepik", "flaticon"]}
+    },
+    {
+      "id": "lottiefiles",
+      "name": "LottieFiles free animations",
+      "kind": "art",
+      "markers": {"credits": ["lottiefiles"], "files": []}
+    }
+  ]
+}

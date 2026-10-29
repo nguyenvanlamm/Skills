@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.17.1
+  version: 1.18.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -136,6 +136,12 @@ version for people; this file is the operating manual.
     nothing prompts it again. One stopped at the start of S7 this way: it printed the
     landing-page-generator copy with `Decision: No approval needed.` and ended, before the
     site repo existed.
+17. **Guard against 4.3 at three gates.** `appstore-spam-guard` runs in `design` mode at S2, in
+    `build` mode at S4 and in `submit` mode at S8; a FAIL row blocks that gate like a failing
+    test. Its ledger holds the account: while a team has an open 4.3 rejection, no other game
+    is submitted to it. Fruit Mischief (a Suika-like with stock emoji fruit, an emoji icon and
+    its twist hidden until merge 6) was rejected under 4.3(a) and put its account on Extended
+    Review; run on that build, the guard fails on all four signs.
 
 ## Roles
 
@@ -333,6 +339,8 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
   portfolio" rows too, against the DESIGN.md of every earlier game in the parent folder (read
   in place, rule 15): Guideline 4.3 also counts the developer's own look-alike apps.
 - `brand-name-checker` on the name; act on Proceed/Modify/Abandon.
+- `appstore-spam-guard` in `design` mode on DESIGN.md (rule 17): a hit's progression or a stock
+  art pack in the "Ours" column is a FAIL to fix before G1; its rows go into the G1 question.
 - **G1**: human approves DESIGN.md. Commit.
 - Rename the repo to the approved name (see Names), unless it already has it:
   `gh repo rename <game>`, move the folder to `<parent>/<game>`, then
@@ -393,9 +401,13 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
 3. `logo-designer` for the app icon, run inline: its subagents and SVG rasterisers (rsvg,
    cairosvg, inkscape) are missing here, so one script draws every variant from one geometry,
    headless Chrome renders the PNGs and Pillow drops the alpha. Generate platform icons (no
-   alpha for iOS).
+   alpha for iOS). The icon shows the game's own character or mechanic: never an emoji, a stock
+   sprite or the reference game's signature object.
+4. `appstore-spam-guard` in `build` mode (rule 17), plus its J1 and J3 checks: stock or emoji
+   art for main objects, an icon reproducing a bundled sprite, a hit's progression in the code,
+   or a name or icon matching a game on the App Store charts is a FAIL to fix in this stage.
 - Verify: analyze + test exit 0 on `main`, no branch but `main`, screenshots of home and game
-  captured. Commit.
+  captured, `appstore-spam-guard` without FAIL. Commit.
 
 ### S5 — IAP, boosters, telemetry, playtest → gate G3
 
@@ -468,14 +480,18 @@ Follow `references/ios-release-runbook.md`, skipping every `asc` step (hard rule
    into the web UI, plus age rating and category from the checklist. aso-marketing's plan
    approval goes into the G4 question, not a stop of its own.
 5. `appstore-review-checker` on the source, the iOS project and `store/` (the build too, once
-   steps 2–3 are done). **G4**: human reads the report and approves the package, and answers
+   steps 2–3 are done), and `appstore-spam-guard` in `submit` mode with the team the human
+   uploads from (`--team`, or `TEAM_ID`) and its J1–J6 checks (rule 17). A spam-guard FAIL
+   blocks G4. **G4**: human reads both reports and approves the package, and answers
    once whether S9 may scan the site with isitagentready.com (an outside service); with steps
    2–3 still deferred, G4 approves everything except the build and is noted as partial. G4 is
    waited for in the S8 worktree (rule 5); with steps 2–3 deferred, that worktree ends there:
    merge it, then start S9.
 6. Waits for the deferred steps 2–3. `/ship --no-auto` (version bump, changelog, tag, push; asks per step) → human uploads the
    release build from the Mac and submits in the web UI ("Add for Review" with the first IAP).
-   Record in status.md, commit.
+   Record in status.md and in the spam-guard ledger (`ledger.py record --event submitted`),
+   commit. When App Review answers, record that too (`approved`, or `rejected` with the
+   guideline); a 4.3 rejection follows `appstore-spam-guard`'s "After a 4.3 rejection".
 
 ### S9 — Landing polish and follow-up
 

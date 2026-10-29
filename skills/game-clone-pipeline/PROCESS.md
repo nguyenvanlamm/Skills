@@ -32,13 +32,13 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 |---|---|---|---|---|
 | S0 | Agent → Người | Chọn game (hoặc ý tưởng) và game tham chiếu: đang lên, hợp Flutter 2D, còn chỗ cho twist, chưa quá bão hoà | `idea-validator` | **G0** duyệt game + tham chiếu |
 | S1 | Agent + Người | Dùng những gì bạn có (APK, data game, video vài phút, mô tả); agent lấy thêm trang store rồi viết `SPEC.md` | `reverse-engineer-anything`, `scripts/contact-sheet.sh` | **G0b** duyệt SPEC |
-| S2 | Agent → Người | `DESIGN.md`: bảng khác biệt, kinh tế game, mục tiêu độ khó, tên game | `brand-name-checker` | **G1** duyệt thiết kế |
+| S2 | Agent → Người | `DESIGN.md`: bảng khác biệt, kinh tế game, mục tiêu độ khó, tên game | `brand-name-checker`, `appstore-spam-guard` (`design`) | **G1** duyệt thiết kế |
 | S3 | Agent | Tạo project ngay trong repo game đã có (use in place, không `git init` lại, gộp `.gitignore`); core Flutter với hình tạm: luật bằng Dart thuần, test, bot, `tool/simulate.dart`; cài hook kiểm tra trước mỗi commit (`tool/check.sh` từ `templates/tool/`) | `flutter-init`, `test-coverage` | analyze + test exit 0 |
-| S4 | Agent → Người | 3 hướng UI → chọn 1 → áp vào Flutter → làm icon | `huashu-design` (hoặc `lam-design`), `flutter-ui-revamp`, `logo-designer` | **G2** chọn hướng |
+| S4 | Agent → Người | 3 hướng UI → chọn 1 → áp vào Flutter → làm icon (nhân vật/cơ chế của chính game, không emoji, không sprite có sẵn) | `huashu-design` (hoặc `lam-design`), `flutter-ui-revamp`, `logo-designer`, `appstore-spam-guard` (`build`) | **G2** chọn hướng |
 | S5 | Agent + Người | IAP + Restore từ `templates/store/`, booster chống farm, analytics (nếu chọn), người thật chơi thử, chỉnh lại độ khó. Chưa chơi thử thì ghi vào mục hoãn, không chặn G3 | | **G3** duyệt gói và giá |
 | S6 | Agent | Soát codebase → issue → sửa, merge từng PR rồi xóa nhánh | `codebase-modernizer`, `plan-to-issues`, `issue-work-loop` | test xanh, chỉ còn `main` |
 | S7 | Agent | Repo landing tối thiểu có privacy + support, GitHub Pages deploy thẳng từ nhánh `main` (không dùng Actions) | `landing-page-generator` | 2 URL sống |
-| S8 | Agent + Người | iOS: chuẩn bị trên Ubuntu, **build và upload trên Mac**, TestFlight, ảnh store, ASO, soát, ship, nộp | `flutter-ios-release`, `appstore-assets`, `aso-marketing`, `appstore-review-checker`, `/ship` (không `asc`, luật 12) | **G4** duyệt nộp |
+| S8 | Agent + Người | iOS: chuẩn bị trên Ubuntu, **build và upload trên Mac**, TestFlight, ảnh store, ASO, soát, ship, nộp, ghi sổ nộp | `flutter-ios-release`, `appstore-assets`, `aso-marketing`, `appstore-review-checker`, `appstore-spam-guard` (`submit`), `/ship` (không `asc`, luật 12) | **G4** duyệt nộp |
 | S9 | Agent | Hoàn thiện landing (chạy thật cả hai skill trên site của game này) và khai báo site trong `robots.txt` và `llms.txt` của repo Pages gốc, rồi tick S9; badge App Store chờ app lên store, ghi ở mục hoãn. Sau khi ra mắt, bạn đọc review và số liệu trên App Store Connect rồi chuyển lại | `search-optimizer`, `design-optimizer` | |
 
 ## Ô các bước
@@ -191,6 +191,8 @@ Phải khác cả các game trước của bạn: thao tác chính, chủ đề,
 
 Ngoài ra phải có **ít nhất một cơ chế riêng**. Lý do: Apple 4.1 (Copycats), 4.3 (Spam), và rủi ro trade dress. Bài học từ một game clone trước: tự vẽ toàn bộ bằng code nhưng vẫn giống gần hết bản gốc.
 
+Hai dòng bắt buộc thêm từ vụ Fruit Mischief (bị reject 4.3(a) ngày 2026-10-23, tài khoản bị Extended Review): hình vật thể chính và icon phải tự vẽ, không lấy từ pack stock hay emoji; cơ chế riêng phải hiện ra trong 30 giây đầu của một bản cài mới. `appstore-spam-guard` đo những điều này ở S2, S4, S8 (luật 17), và so tên, icon, mô tả với khoảng 7.000 game trên bảng xếp hạng App Store (us, gb, jp, vn); có FAIL là chặn cổng. Sổ nộp của nó giữ cả tài khoản: team đang có vụ 4.3 chưa xong thì không nộp game khác lên team đó.
+
 ## Checklist trước khi nộp App Store (cổng G4)
 
 - [ ] URL privacy và support đều sống, nội dung khớp với những gì app thực sự thu thập
@@ -199,6 +201,7 @@ Ngoài ra phải có **ít nhất một cơ chế riêng**. Lý do: Apple 4.1 (C
 - [ ] Ảnh iPhone 6.9" (thêm iPad 13" nếu app hỗ trợ iPad), tất cả bằng tiếng Anh
 - [ ] Tên, subtitle, từ khoá, mô tả không nhắc tới game gốc hay nhà phát hành của nó
 - [ ] `appstore-review-checker` không còn lỗi chặn; checklist `docs/APP-STORE-CONNECT.md` đã điền đủ trên web
+- [ ] `appstore-spam-guard --mode submit` không còn FAIL (kể cả J1–J6); team nộp lên không có vụ 4.3 nào đang mở; sau khi nộp đã ghi `ledger.py record`
 - [ ] Build mới nhất đã VALID trên TestFlight; tag `vX.Y.Z` đã push
 
 ## Ghi chú công cụ

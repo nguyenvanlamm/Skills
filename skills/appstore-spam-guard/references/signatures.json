@@ -1,0 +1,669 @@
+{
+  "version": 1,
+  "about": "Fingerprints of hit games with many clones on the App Store, and of trademarked games App Review knows by name. A match is not proof of copying: it is what an App Review reviewer recognises at a glance. aliases = the original's own names (FAIL in the listing, WARN in code). phrases = wording that only makes sense for that game (FAIL in the listing). terms = genre words that pull the listing toward the clone pile (WARN in name, subtitle, keywords and promotional text). markers = the original's characters, items and level names; each item is a list of spellings counted once (FAIL in the listing; in code FAIL from markers_fail distinct ones, default 3, else WARN). chain = an ordered progression; each position lists accepted synonyms; counted per file. icon_subjects = what the original's icon shows (judgement check J3). Add a game by appending an entry; keep aliases to names you are sure of and that are not everyday phrases ('two dots', 'roll the ball', 'brain test' stay out). For everything else that sells, the market group compares with the live App Store charts (scripts/market.py).",
+  "generic_names": [
+    "fruit drop", "fruit merge", "merge fruit", "fruit game", "watermelon game", "drop merge",
+    "number merge", "merge numbers", "block puzzle", "block blast", "sort puzzle", "color sort",
+    "ball sort", "water sort", "screw puzzle", "bus jam", "parking jam", "car jam", "tile match",
+    "triple match", "match 3", "match three", "brick breaker", "word puzzle", "word game",
+    "solitaire", "spider solitaire", "klondike", "freecell", "tripeaks", "sudoku", "killer sudoku",
+    "mahjong", "mahjong solitaire", "tile connect", "onet", "minesweeper", "chess", "checkers",
+    "backgammon", "dominoes", "bingo", "slots", "jigsaw puzzle", "word search", "crossword",
+    "nonogram", "number match", "color by number", "coloring book", "bubble shooter", "bubble pop",
+    "brain test", "idle tycoon", "car parking", "pin pull", "find the difference",
+    "spot the difference", "hidden objects", "tic tac toe", "snake game", "ludo", "merge game",
+    "merge puzzle", "match 3d", "goods sort", "wool sort", "yarn sort", "hexa puzzle", "nuts sort"
+  ],
+  "copycat_wording": [
+    "clone", "knock-off", "knockoff", "copy of", "like the famous", "just like the",
+    "inspired by the hit", "inspired by the game", "remake of", "a take on the hit"
+  ],
+  "signatures": [
+    {
+      "id": "suika",
+      "title": "Suika Game (Watermelon Game)",
+      "aliases": ["suika", "suika game", "watermelon game", "スイカゲーム"],
+      "phrases": [
+        "cherry to watermelon", "make a watermelon", "make the watermelon",
+        "merge into a watermelon", "grow a watermelon", "two watermelons"
+      ],
+      "terms": [
+        "watermelon", "fruit drop", "drop fruit", "fruit merge", "merge fruit", "merge fruits"
+      ],
+      "chain": [
+        ["cherry", "cherries"],
+        ["strawberry", "strawberries"],
+        ["grape", "grapes"],
+        ["dekopon", "orange", "oranges", "tangerine", "tangerines", "mandarin"],
+        ["persimmon", "persimmons"],
+        ["apple", "apples"],
+        ["pear", "pears"],
+        ["peach", "peaches"],
+        ["pineapple", "pineapples"],
+        ["melon", "melons"],
+        ["watermelon", "watermelons"]
+      ],
+      "chain_fail": 6,
+      "chain_warn": 4,
+      "icon_subjects": ["watermelon", "a single fruit on a plain background"],
+      "rules": "fruit dropped into a box, matching pairs merge up an 11-step chain, two of the largest vanish"
+    },
+    {
+      "id": "2048",
+      "title": "2048",
+      "aliases": ["2048"],
+      "phrases": ["get to the 2048 tile", "join the numbers", "reach 2048"],
+      "terms": ["merge numbers", "number tiles", "number merge"],
+      "icon_subjects": ["a numbered tile"],
+      "rules": "swipe a 4x4 grid, equal number tiles merge and double"
+    },
+    {
+      "id": "tetris",
+      "title": "Tetris",
+      "aliases": ["tetris", "tetromino", "tetrominoes", "tetrimino"],
+      "phrases": ["falling tetrominoes"],
+      "terms": ["falling blocks", "line clear", "clear lines"],
+      "icon_subjects": ["four-square falling pieces"],
+      "rules": "falling four-square pieces fill rows; full rows clear"
+    },
+    {
+      "id": "flappy",
+      "title": "Flappy Bird",
+      "aliases": ["flappy bird", "flappy"],
+      "phrases": ["tap to flap"],
+      "terms": ["pipes", "flap"],
+      "icon_subjects": ["a round bird"],
+      "rules": "tap to flap a bird through gaps between pipes"
+    },
+    {
+      "id": "candy-crush",
+      "title": "Candy Crush Saga",
+      "aliases": [
+        "candy crush", "candy crush saga", "candy crush soda", "candy crush jelly", "sugar crush"
+      ],
+      "phrases": ["sweet!", "tasty!", "delicious!", "divine!", "sugar rush"],
+      "terms": ["candy", "candies", "match 3", "match-3", "match three"],
+      "icon_subjects": ["a wrapped candy"],
+      "rules": "swap neighbouring candies to line up three; praise words on cascades",
+      "markers": [["tiffi"], ["mr. toffee", "mr toffee"], ["odus"]],
+      "markers_fail": 2
+    },
+    {
+      "id": "block-blast",
+      "title": "Block Blast / 1010! / Woodoku",
+      "aliases": ["block blast", "1010!", "woodoku", "blockudoku"],
+      "phrases": ["fit the blocks on the 8x8 board"],
+      "terms": ["block puzzle", "wood block", "8x8"],
+      "icon_subjects": ["coloured or wooden blocks on a grid"],
+      "rules": "place three offered block shapes on an 8x8 or 9x9 grid; full rows and columns clear"
+    },
+    {
+      "id": "sort-puzzle",
+      "title": "Water Sort / Ball Sort",
+      "aliases": ["water sort", "ball sort", "sort it 3d", "water sort puzzle", "ball sort puzzle"],
+      "phrases": ["pour the water", "sort the colored water", "sort the coloured water"],
+      "terms": ["sort puzzle", "color sort", "colour sort", "tubes", "pour"],
+      "icon_subjects": ["test tubes with coloured layers"],
+      "rules": "pour or move coloured layers between tubes until each tube holds one colour"
+    },
+    {
+      "id": "screw-puzzle",
+      "title": "Wood Nuts & Bolts / Screw puzzles",
+      "aliases": [
+        "nuts & bolts", "nuts and bolts", "wood nuts & bolts", "screw jam", "screw puzzle"
+      ],
+      "phrases": ["unscrew the bolts", "remove the screws"],
+      "terms": ["screw", "screws", "bolt", "bolts", "nuts"],
+      "icon_subjects": ["a screw or bolt in a wooden plank"],
+      "rules": "unscrew pins in the right order so planks fall"
+    },
+    {
+      "id": "jam-puzzle",
+      "title": "Parking Jam / Bus Jam",
+      "aliases": ["parking jam", "car parking jam", "bus jam", "bus out", "traffic escape"],
+      "phrases": ["get the passengers on the bus", "board the passengers", "clear the parking lot"],
+      "terms": ["parking lot", "passengers", "traffic jam", "car jam"],
+      "icon_subjects": ["a bus or cars in a car park"],
+      "rules": "tap vehicles or passengers out of a jam in the right order, matched by colour"
+    },
+    {
+      "id": "tile-match",
+      "title": "Tile Master / Triple Tile / Match Factory",
+      "aliases": ["tile master", "triple tile", "match factory", "zen match", "tile busters"],
+      "phrases": ["match three identical tiles", "collect three of a kind"],
+      "terms": ["tile match", "triple match", "match 3d", "match tiles"],
+      "icon_subjects": ["stacked tiles with fruit or object pictures"],
+      "rules": "tap tiles into a 7-slot tray; three of a kind clear"
+    },
+    {
+      "id": "wordle",
+      "title": "Wordle",
+      "aliases": ["wordle"],
+      "phrases": ["guess the word in six tries", "guess the word in 6 tries", "six tries"],
+      "terms": ["5-letter", "five-letter", "word of the day"],
+      "icon_subjects": ["green and yellow letter squares"],
+      "rules": "guess a five-letter word in six tries with green/yellow feedback"
+    },
+    {
+      "id": "helix-stack",
+      "title": "Helix Jump / Stack Ball",
+      "aliases": ["helix jump", "stack ball", "stack ball 3d"],
+      "phrases": ["smash through the platforms"],
+      "terms": ["helix", "falling ball"],
+      "icon_subjects": ["a ball bouncing on a helix tower"],
+      "rules": "drop a ball through rotating platform rings"
+    },
+    {
+      "id": "hole-io",
+      "title": "Hole.io",
+      "aliases": ["hole.io", "hole io"],
+      "phrases": ["swallow the city"],
+      "terms": ["black hole", "swallow"],
+      "icon_subjects": ["a black hole swallowing objects"],
+      "rules": "steer a growing hole that swallows objects"
+    },
+    {
+      "id": "knife-hit",
+      "title": "Knife Hit",
+      "aliases": ["knife hit"],
+      "phrases": ["throw knives into the log"],
+      "terms": ["throw knives", "spinning log"],
+      "icon_subjects": ["knives in a wooden target"],
+      "rules": "throw knives into a spinning log without hitting other knives"
+    },
+    {
+      "id": "brick-breaker",
+      "title": "Ballz / BBTAN / Bricks n Balls",
+      "aliases": ["ballz", "bbtan", "bricks n balls"],
+      "phrases": ["aim and shoot the balls"],
+      "terms": ["brick breaker", "break the bricks"],
+      "icon_subjects": ["numbered bricks and a stream of balls"],
+      "rules": "shoot a stream of balls at numbered bricks that step down each turn"
+    },
+    {
+      "id": "gold-miner",
+      "title": "Gold Miner",
+      "aliases": ["gold miner"],
+      "phrases": ["grab the gold with your claw"],
+      "terms": ["gold nugget", "claw"],
+      "icon_subjects": ["a miner with a swinging claw"],
+      "rules": "time a swinging claw to grab gold before the timer runs out"
+    },
+    {
+      "id": "hexa-sort",
+      "title": "Hexa Sort",
+      "aliases": ["hexa sort", "hex sort"],
+      "phrases": ["stack the hexagons by colour", "stack the hexagons by color"],
+      "terms": ["hexagon stack", "hex stack"],
+      "icon_subjects": ["stacks of coloured hexagon tiles"],
+      "rules": "place hexagon stacks so same-colour tops slide together and clear at ten"
+    },
+    {
+      "id": "royal-match",
+      "title": "Royal Match",
+      "aliases": ["royal match"],
+      "markers": [["king robert"]],
+      "markers_fail": 2,
+      "icon_subjects": ["a king's face with a crown"],
+      "rules": "swap match-3 levels with goals; stars restore a castle room by room"
+    },
+    {
+      "id": "toon-blast",
+      "title": "Toon Blast / Toy Blast",
+      "aliases": ["toon blast", "toy blast"],
+      "icon_subjects": ["cartoon animals over coloured cubes"],
+      "rules": "tap groups of two or more same-colour cubes; big groups make rockets, bombs and balls"
+    },
+    {
+      "id": "playrix",
+      "title": "Homescapes / Gardenscapes / Fishdom",
+      "aliases": ["homescapes", "gardenscapes", "fishdom", "wildscapes"],
+      "icon_subjects": ["a butler or a character's face"],
+      "rules": "match-3 levels earn stars that renovate a house, garden or aquarium, with a story"
+    },
+    {
+      "id": "bejeweled",
+      "title": "Bejeweled",
+      "aliases": ["bejeweled", "bejeweled blitz"],
+      "icon_subjects": ["a cut gem"],
+      "rules": "swap neighbouring gems to line up three or more"
+    },
+    {
+      "id": "king-saga",
+      "title": "King's Saga games (Farm Heroes, Pet Rescue, Bubble Witch)",
+      "aliases": [
+        "farm heroes saga", "pet rescue saga", "bubble witch saga", "bubble witch 3 saga",
+        "papa pear saga"
+      ],
+      "icon_subjects": ["a cartoon mascot"],
+      "rules": "match-3, collapse and bubble-shooter level maps with a saga path"
+    },
+    {
+      "id": "bubble-hits",
+      "title": "Panda Pop / Bubble Witch",
+      "aliases": ["panda pop", "bubble witch"],
+      "terms": ["bubble shooter", "bubble pop"],
+      "icon_subjects": ["a cartoon animal with coloured bubbles"],
+      "rules": "aim and shoot coloured bubbles; three of a colour pop and the rest drop"
+    },
+    {
+      "id": "zuma",
+      "title": "Zuma",
+      "aliases": ["zuma", "zuma deluxe", "zuma's revenge"],
+      "icon_subjects": ["a stone frog idol"],
+      "rules": "a frog idol shoots coloured balls into a rolling chain; three of a colour pop before the chain reaches the skull"
+    },
+    {
+      "id": "puyo",
+      "title": "Puyo Puyo",
+      "aliases": ["puyo puyo", "puyo"],
+      "icon_subjects": ["round coloured blobs with eyes"],
+      "rules": "pairs of blobs fall; four of a colour touching pop and chain"
+    },
+    {
+      "id": "merge-hits",
+      "title": "Merge Dragons / Merge Mansion / Travel Town / EverMerge",
+      "aliases": ["merge dragons", "merge mansion", "travel town", "evermerge", "gossip harbor"],
+      "icon_subjects": ["a character's face over merge items"],
+      "rules": "merge two or three equal items on a board into the next tier; generators and orders"
+    },
+    {
+      "id": "color-block-jam",
+      "title": "Color Block Jam",
+      "aliases": ["color block jam", "colour block jam"],
+      "icon_subjects": ["coloured blocks sliding to doors"],
+      "rules": "slide coloured blocks out through doors of their colour"
+    },
+    {
+      "id": "flow-free",
+      "title": "Flow Free",
+      "aliases": ["flow free"],
+      "phrases": ["connect matching colors with pipe", "connect matching colours with pipe"],
+      "icon_subjects": ["coloured pipes on a dark grid"],
+      "rules": "connect pairs of coloured dots with pipes that fill the whole grid"
+    },
+    {
+      "id": "unblock-me",
+      "title": "Unblock Me",
+      "aliases": ["unblock me"],
+      "phrases": ["free the red block", "get the red block out"],
+      "icon_subjects": ["wooden blocks with one red block"],
+      "rules": "slide blocks on a 6x6 board until the red block can leave"
+    },
+    {
+      "id": "pull-the-pin",
+      "title": "Pull the Pin",
+      "aliases": ["pull the pin"],
+      "icon_subjects": ["pins holding coloured balls in a glass"],
+      "rules": "pull pins in the right order so balls, water or lava fall where they should"
+    },
+    {
+      "id": "brain-teasers",
+      "title": "Brain Out / Brain It On / DOP / Save the Doge",
+      "aliases": ["brain out", "brain it on", "draw one part", "dop draw one part", "save the doge"],
+      "icon_subjects": ["a cartoon brain or a doge"],
+      "rules": "trick puzzles whose answer hides in the screen itself, or drawing a line to protect a character"
+    },
+    {
+      "id": "happy-glass",
+      "title": "Happy Glass",
+      "aliases": ["happy glass"],
+      "icon_subjects": ["a smiling glass"],
+      "rules": "draw lines so falling water fills a glass"
+    },
+    {
+      "id": "tomb-of-the-mask",
+      "title": "Tomb of the Mask",
+      "aliases": ["tomb of the mask"],
+      "icon_subjects": ["a yellow mask"],
+      "rules": "a character slides through a maze until it hits a wall"
+    },
+    {
+      "id": "picross",
+      "title": "Picross (Nintendo)",
+      "aliases": ["picross"],
+      "icon_subjects": ["a pixel picture on a grid"],
+      "rules": "nonogram logic grids; the rules are free, the name is a trademark"
+    },
+    {
+      "id": "word-hits",
+      "title": "Wordscapes / Word Cookies / Words of Wonders / CodyCross",
+      "aliases": ["wordscapes", "word cookies", "words of wonders", "codycross", "wordament"],
+      "icon_subjects": ["a letter wheel over a landscape"],
+      "rules": "swipe letters on a wheel to fill a crossword grid"
+    },
+    {
+      "id": "4-pics",
+      "title": "4 Pics 1 Word",
+      "aliases": ["4 pics 1 word", "four pics one word"],
+      "icon_subjects": ["four photos in a grid"],
+      "rules": "four pictures share one word; spell it from the offered letters"
+    },
+    {
+      "id": "trivia-crack",
+      "title": "Trivia Crack",
+      "aliases": ["trivia crack"],
+      "icon_subjects": ["a spinning category wheel"],
+      "rules": "spin a wheel of categories and answer to win characters"
+    },
+    {
+      "id": "board-trademarks",
+      "title": "Trademarked board, card and table games",
+      "aliases": [
+        "uno", "monopoly", "monopoly go", "yahtzee", "scrabble", "jenga", "rummikub", "skip-bo",
+        "skip bo", "words with friends", "ludo king", "carrom pool", "8 ball pool", "golf clash"
+      ],
+      "phrases": ["phase 10"],
+      "markers": [["mr. monopoly", "mr monopoly"], ["rich uncle pennybags"]],
+      "markers_fail": 1,
+      "icon_subjects": ["the brand's logo or box art"],
+      "rules": "the rules of board and card games are free to use; their brand names are trademarks"
+    },
+    {
+      "id": "coin-master",
+      "title": "Coin Master / Dice Dreams",
+      "aliases": ["coin master", "dice dreams"],
+      "icon_subjects": ["a character with a pile of coins"],
+      "rules": "spin a slot machine for coins, raids and attacks; spend coins to build villages"
+    },
+    {
+      "id": "pac-man",
+      "title": "Pac-Man",
+      "aliases": ["pac-man", "pacman", "pac man", "ms. pac-man"],
+      "markers": [["blinky"], ["pinky"], ["inky"], ["clyde"], ["power pellet", "power pellets"]],
+      "markers_fail": 3,
+      "icon_subjects": ["a yellow circle with a wedge mouth", "four ghosts"],
+      "rules": "eat dots in a maze while four ghosts chase; a power pellet turns the chase around"
+    },
+    {
+      "id": "space-invaders",
+      "title": "Space Invaders",
+      "aliases": ["space invaders"],
+      "icon_subjects": ["pixel aliens in rows"],
+      "rules": "rows of aliens march down; a cannon shoots up from behind shields"
+    },
+    {
+      "id": "arcade-classics",
+      "title": "Frogger / Galaga / Arkanoid / Bomberman",
+      "aliases": ["frogger", "galaga", "galaxian", "arkanoid", "bomberman"],
+      "icon_subjects": ["the original's hero sprite"],
+      "rules": "arcade classics whose names and sprites are still owned trademarks"
+    },
+    {
+      "id": "mario",
+      "title": "Super Mario (Nintendo)",
+      "aliases": ["super mario", "mario bros", "mario kart", "dr. mario", "dr mario"],
+      "markers": [
+        ["luigi"], ["goomba", "goombas"], ["koopa", "koopas"], ["bowser"], ["yoshi"],
+        ["mushroom kingdom"]
+      ],
+      "markers_fail": 2,
+      "icon_subjects": ["a plumber in a red cap"],
+      "rules": "Nintendo's characters and names; any of them in a store app is a 4.1 and 5.2 problem"
+    },
+    {
+      "id": "sonic",
+      "title": "Sonic the Hedgehog (SEGA)",
+      "aliases": ["sonic the hedgehog"],
+      "markers": [["eggman", "robotnik"], ["chaos emerald", "chaos emeralds"], ["green hill zone"]],
+      "markers_fail": 2,
+      "icon_subjects": ["a blue hedgehog"],
+      "rules": "SEGA's characters and zone names"
+    },
+    {
+      "id": "pokemon",
+      "title": "Pokémon",
+      "aliases": ["pokemon", "pokémon", "pokemon go", "pokémon go"],
+      "markers": [
+        ["pikachu"], ["pokeball", "poke ball", "poké ball", "pokéball"], ["bulbasaur"],
+        ["charmander"], ["squirtle"], ["jigglypuff"], ["eevee"], ["snorlax"], ["mewtwo"]
+      ],
+      "markers_fail": 2,
+      "icon_subjects": ["a red-and-white ball", "a yellow electric mouse"],
+      "rules": "The Pokémon Company's creatures and items"
+    },
+    {
+      "id": "minecraft",
+      "title": "Minecraft / Roblox",
+      "aliases": ["minecraft", "roblox"],
+      "markers": [
+        ["robux"], ["enderman", "endermen"], ["ender dragon"], ["redstone"], ["netherite"],
+        ["nether portal"], ["creeper", "creepers"]
+      ],
+      "markers_fail": 2,
+      "icon_subjects": ["a grass block", "a blocky face"],
+      "rules": "Mojang's and Roblox's names, mobs and items"
+    },
+    {
+      "id": "angry-birds",
+      "title": "Angry Birds",
+      "aliases": ["angry birds", "bad piggies"],
+      "markers": [["mighty eagle"], ["king pig"]],
+      "markers_fail": 2,
+      "icon_subjects": ["a round red bird with eyebrows"],
+      "rules": "launch birds from a slingshot into structures that shelter pigs"
+    },
+    {
+      "id": "cut-the-rope",
+      "title": "Cut the Rope",
+      "aliases": ["cut the rope", "om nom"],
+      "icon_subjects": ["a small green monster with a candy"],
+      "rules": "cut ropes so a swinging candy reaches the monster; three stars a level"
+    },
+    {
+      "id": "wheres-my-water",
+      "title": "Where's My Water?",
+      "aliases": ["where's my water"],
+      "icon_subjects": ["an alligator in a bathtub"],
+      "rules": "dig through dirt to guide water to a pipe"
+    },
+    {
+      "id": "fruit-ninja",
+      "title": "Fruit Ninja",
+      "aliases": ["fruit ninja"],
+      "icon_subjects": ["a sliced watermelon and a blade"],
+      "rules": "swipe to slice fruit thrown into the air; slicing a bomb ends the run"
+    },
+    {
+      "id": "doodle-jump",
+      "title": "Doodle Jump",
+      "aliases": ["doodle jump"],
+      "markers": [["doodler"]],
+      "markers_fail": 2,
+      "icon_subjects": ["a four-legged doodle on graph paper"],
+      "rules": "tilt to steer a jumper up endless platforms on graph paper"
+    },
+    {
+      "id": "crossy-road",
+      "title": "Crossy Road",
+      "aliases": ["crossy road"],
+      "icon_subjects": ["a voxel chicken"],
+      "rules": "hop a voxel character across endless roads, rivers and rails"
+    },
+    {
+      "id": "endless-runners",
+      "title": "Subway Surfers / Temple Run / Jetpack Joyride",
+      "aliases": ["subway surfers", "temple run", "jetpack joyride"],
+      "markers": [
+        ["guy dangerous"], ["scarlett fox"], ["barry bones"], ["karma lee"], ["montana smith"],
+        ["barry steakfries"]
+      ],
+      "markers_fail": 2,
+      "icon_subjects": ["the runner's face mid-jump"],
+      "rules": "three-lane or swipe-to-turn endless runners, or a jetpack run past zappers"
+    },
+    {
+      "id": "geometry-dash",
+      "title": "Geometry Dash",
+      "aliases": ["geometry dash"],
+      "markers": [
+        ["stereo madness"], ["polargeist"], ["base after base"], ["clutterfunk"],
+        ["electroman adventures"], ["clubstep"], ["electrodynamix"], ["hexagon force"],
+        ["blast processing"], ["geometrical dominator"], ["fingerdash"]
+      ],
+      "markers_fail": 3,
+      "icon_subjects": ["a square face on a geometric background"],
+      "rules": "an auto-running square jumps spikes in time with the music; its level names are its own"
+    },
+    {
+      "id": "piano-tiles",
+      "title": "Piano Tiles / Magic Tiles",
+      "aliases": ["piano tiles", "magic tiles 3"],
+      "phrases": [
+        "don't tap the white tile", "dont tap the white tile", "don't tap the white tiles"
+      ],
+      "icon_subjects": ["black piano tiles"],
+      "rules": "tap the black tiles in time as they scroll; a miss ends the song"
+    },
+    {
+      "id": "color-switch",
+      "title": "Color Switch",
+      "phrases": ["color switch", "colour switch"],
+      "icon_subjects": ["a ball inside a four-colour ring"],
+      "rules": "tap to bounce a ball up through rotating rings, passing only its own colour"
+    },
+    {
+      "id": "io-games",
+      "title": "Slither.io / Agar.io / Paper.io / Aquapark.io",
+      "aliases": [
+        "slither.io", "agar.io", "paper.io", "snake.io", "aquapark.io", "diep.io", "crowd city"
+      ],
+      "icon_subjects": ["a snake, a blob or a coloured territory"],
+      "rules": "arena games where you grow by eating, claiming land or gathering a crowd"
+    },
+    {
+      "id": "hypercasual-hits",
+      "title": "Hyper-casual hits (Voodoo, SayGames, Supersonic, Lion)",
+      "aliases": [
+        "roller splat", "color bump 3d", "tiles hop", "fun race 3d", "run race 3d", "bridge race",
+        "count masters", "join clash 3d", "mr bullet", "johnny trigger", "hitmasters",
+        "stickman hook", "snake vs block", "rolling sky", "draw climber"
+      ],
+      "icon_subjects": ["the hit's one-touch moment"],
+      "rules": "one-mechanic hyper-casual hits; each has hundreds of clones"
+    },
+    {
+      "id": "survivors",
+      "title": "Archero / Survivor.io / Vampire Survivors",
+      "aliases": ["archero", "survivor.io", "vampire survivors"],
+      "icon_subjects": ["a hero facing a horde"],
+      "rules": "an auto-attacking hero survives waves and picks one of three skills on each level-up"
+    },
+    {
+      "id": "supercell",
+      "title": "Clash of Clans / Clash Royale / Brawl Stars / Hay Day",
+      "aliases": ["clash of clans", "clash royale", "brawl stars", "hay day", "boom beach"],
+      "markers": [
+        ["barbarian king"], ["archer queen"], ["hog rider"], ["grand warden"], ["royal champion"]
+      ],
+      "markers_fail": 2,
+      "icon_subjects": ["a shouting barbarian"],
+      "rules": "Supercell's names and troops"
+    },
+    {
+      "id": "plants-vs-zombies",
+      "title": "Plants vs. Zombies",
+      "aliases": ["plants vs zombies", "plants vs. zombies", "plants versus zombies", "pvz"],
+      "markers": [
+        ["peashooter", "pea shooter"], ["wall-nut", "wallnut"], ["snow pea"], ["chomper"],
+        ["puff-shroom", "puffshroom"], ["sun-shroom", "sunshroom"], ["crazy dave"], ["torchwood"],
+        ["potato mine"]
+      ],
+      "markers_fail": 3,
+      "icon_subjects": ["a peashooter plant", "a cartoon zombie"],
+      "rules": "lane defence: plants bought with sun stop zombie waves; its plants and Crazy Dave are its own"
+    },
+    {
+      "id": "tower-defense",
+      "title": "Kingdom Rush / Bloons TD",
+      "aliases": ["kingdom rush", "bloons td", "bloons tower defense", "bloons"],
+      "icon_subjects": ["a tower or a dart monkey"],
+      "rules": "tower defence hits with their own heroes and towers"
+    },
+    {
+      "id": "idle-hits",
+      "title": "Cookie Clicker / AdVenture Capitalist / Idle Miner Tycoon / Egg, Inc.",
+      "aliases": [
+        "cookie clicker", "adventure capitalist", "adventure communist", "idle miner tycoon",
+        "egg inc"
+      ],
+      "markers": [["grandmapocalypse"]],
+      "markers_fail": 1,
+      "icon_subjects": ["a big cookie", "a tycoon in a top hat"],
+      "rules": "tap or wait to earn, buy producers, prestige to start over faster"
+    },
+    {
+      "id": "virtual-pets",
+      "title": "Talking Tom / Pou / Tamagotchi",
+      "aliases": [
+        "talking tom", "my talking tom", "talking angela", "my talking angela", "pou",
+        "tamagotchi"
+      ],
+      "icon_subjects": ["a pet's face"],
+      "rules": "care for a pet that repeats what you say, or feed and clean a blob"
+    },
+    {
+      "id": "kick-the-buddy",
+      "title": "Kick the Buddy",
+      "aliases": ["kick the buddy"],
+      "icon_subjects": ["a ragdoll buddy"],
+      "rules": "a stress-relief ragdoll you hit with weapons for coins"
+    },
+    {
+      "id": "plague-inc",
+      "title": "Plague Inc.",
+      "aliases": ["plague inc"],
+      "icon_subjects": ["a biohazard over a globe"],
+      "rules": "evolve a pathogen to infect the world before a cure"
+    },
+    {
+      "id": "hill-climb",
+      "title": "Hill Climb Racing",
+      "aliases": ["hill climb racing"],
+      "markers": [["newton bill"]],
+      "markers_fail": 1,
+      "icon_subjects": ["a red jeep on a hill"],
+      "rules": "physics driving over hills while managing fuel"
+    },
+    {
+      "id": "party-royale",
+      "title": "Fall Guys / Stumble Guys",
+      "aliases": ["fall guys", "stumble guys"],
+      "icon_subjects": ["a bean-shaped character"],
+      "rules": "obstacle-course party royale"
+    },
+    {
+      "id": "battle-royale",
+      "title": "Fortnite / PUBG",
+      "aliases": ["fortnite", "pubg"],
+      "icon_subjects": ["a soldier with a pan or a llama"],
+      "rules": "shooter battle royale"
+    },
+    {
+      "id": "cookie-run",
+      "title": "Cookie Run",
+      "aliases": ["cookie run"],
+      "markers": [["gingerbrave"]],
+      "markers_fail": 1,
+      "icon_subjects": ["a gingerbread cookie running"],
+      "rules": "side-scrolling runner of cookie characters"
+    },
+    {
+      "id": "indie-hits",
+      "title": "Monument Valley / Alto's Adventure / Stardew Valley / Terraria / Dumb Ways to Die",
+      "aliases": [
+        "monument valley", "alto's adventure", "alto's odyssey", "stardew valley", "terraria",
+        "dumb ways to die"
+      ],
+      "icon_subjects": ["the original's hero or landmark"],
+      "rules": "well-known indie games; their names, characters and look are their own"
+    },
+    {
+      "id": "sims",
+      "title": "The Sims / SimCity",
+      "aliases": ["the sims", "simcity"],
+      "icon_subjects": ["a green plumbob diamond"],
+      "rules": "EA's life and city simulation brands"
+    }
+  ]
+}

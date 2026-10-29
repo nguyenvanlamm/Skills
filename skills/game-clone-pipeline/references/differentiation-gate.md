@@ -9,7 +9,7 @@ see Tetris Holding v. Xio Interactive, 2012). Rules are free to reuse; the expre
 
 Write `DESIGN.md` §Differentiation as this table, against every reference game chosen at S0
 (for an idea with no original, the closest hits). G1 passes only when every **must** row is
-"different", and at least one **own mechanic** exists.
+"different" (rows 9 and 14: "present"), and at least one **own mechanic** exists.
 
 | # | Aspect | Must? | Reference game(s) (from SPEC §3) | Ours | Verdict |
 |---|---|---|---|---|---|
@@ -25,6 +25,8 @@ Write `DESIGN.md` §Differentiation as this table, against every reference game 
 | 10 | Structure (levels, checkpoints, endless) | should | | | |
 | 11 | Economy (boosters, currencies) | should | | | |
 | 12 | Onboarding / tips | should | | | |
+| 13 | Main-object and icon art original — no stock or emoji pack, not redrawn in a pack's style | must | | | different / close / same |
+| 14 | Own mechanic visible in a fresh install's first 30 seconds (first screen or first interaction) | must | — | | present / missing |
 
 ## Own portfolio (the developer's earlier games)
 
@@ -62,7 +64,22 @@ DESIGN.md, and give each game its own screenshot template.
    same brand?" Record its answer in DESIGN.md. At S4 a "close" answer goes to the human as a
    question before the build changes (SKILL.md S4).
 2. Run `brand-name-checker` on the chosen name; act on its Proceed/Modify/Abandon verdict.
-3. At S8, `appstore-review-checker` re-checks 4.1/4.3 on the real build and listing.
+3. Run `appstore-spam-guard`: `design` mode at S2, `build` at S4, `submit` at S8 (SKILL.md rule
+   17). It measures what this table asks — a hit's progression, stock art, the icon, the
+   listing, your other games, the account — and compares the name, icon and description with
+   the ~7,000 games on the App Store charts; a FAIL row fails the gate. Its judgement checks
+   J1–J6 include the fresh-eyes comparison above and row 14.
+4. At S8, `appstore-review-checker` re-checks the other guidelines on the real build and listing.
+
+## Lesson from Fruit Mischief (4.3(a), 2026-10-23)
+
+A Suika-like with a real roguelike twist was rejected for spam, and its account put on Extended
+Review. Nine of its eleven fruits were Suika's, in order, with Suika's "two of the largest
+vanish" rule; all of them were Microsoft Fluent Emoji; the icon was the emoji watermelon; the
+listing said "from Cherry to Watermelon"; the twist first appeared after merge 6. The audit
+before submission called 4.3 "reviewer judgement" and let it through. Rows 13 and 14 exist for
+it, and `appstore-spam-guard` fails that build on all four signs
+(`appstore-spam-guard/references/case-fruit-mischief.md`).
 
 ## Lesson from an earlier clone
 

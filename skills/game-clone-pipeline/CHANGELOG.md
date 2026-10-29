@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.18.0 — 2026-10-29
+
+App Review rejected Fruit Mischief 1.0.0 (3) under Guideline 4.3(a) and put its account on
+Extended Review. The differentiation gate was a self-assessed table, and the pre-submission
+audit called 4.3 "reviewer judgement", so nothing measured the four signs a reviewer saw first:
+Suika's fruit progression, stock Fluent Emoji fruit, an emoji icon and a twist hidden until
+merge 6.
+
+Changes:
+- **Rule 17 and the new sibling `appstore-spam-guard`**: `design` mode at S2 (before G1),
+  `build` mode at S4 (in Verify), `submit` mode at S8 beside `appstore-review-checker` (before
+  G4). A FAIL row blocks the gate. Its `market` group compares the name, icon and description
+  with the ~7,000 games on the App Store charts. Its ledger records every submission and App
+  Review answer per Apple team; an open 4.3 on a team holds every other game's submission to it.
+- **S4**: the icon shows the game's own character or mechanic — never an emoji, a stock sprite
+  or the reference game's signature object.
+- **S8 step 6**: record the submission and the answer in the ledger; a 4.3 rejection follows
+  the guard's "After a 4.3 rejection".
+- **`references/differentiation-gate.md`**: must rows 13 (original main-object and icon art)
+  and 14 (own mechanic in the first 30 seconds), the guard in "How to check", and the Fruit
+  Mischief lesson.
+
 ## 1.17.1 — 2026-10-28
 
 Cleaning up the games after 1.17.0 hit two snags:
