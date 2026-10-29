@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
+import io
 import itertools
 import json
 import os
@@ -46,7 +47,7 @@ import ledger  # noqa: E402  (sibling modules, path set above)
 import market  # noqa: E402
 from market import dhash  # noqa: E402
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 GROUPS_BY_MODE = {
     "design": ["design"],
@@ -54,7 +55,7 @@ GROUPS_BY_MODE = {
     "submit": ["signature", "assets", "icon", "metadata", "market", "portfolio",
                "footprint", "ownership", "account"],
 }
-ALL_GROUPS = GROUPS_BY_MODE["submit"] + ["design"]
+ALL_GROUPS = GROUPS_BY_MODE["submit"] + ["design", "binary"]
 
 SKIP_DIRS = {"build", "node_modules", "Pods", "DerivedData", "ephemeral",
              "__pycache__", "dist", "coverage"}
@@ -221,10 +222,50 @@ def generated(p: Path) -> bool:
             or n.startswith("app_localizations") or n == "firebase_options.dart")
 
 
+def stack(project: Path) -> str:
+    """flutter, unity, godot, native (an Xcode project of its own) or other."""
+    if (project / "pubspec.yaml").exists():
+        return "flutter"
+    if (project / "ProjectSettings").is_dir() and (project / "Assets").is_dir():
+        return "unity"
+    if (project / "project.godot").exists():
+        return "godot"
+    if xcode_projects(project):
+        return "native"
+    return "other"
+
+
+def xcode_projects(project: Path) -> list[Path]:
+    """project.pbxproj files of the app: ios/ for Flutter, the top two levels otherwise."""
+    found = list(project.glob("ios/*.xcodeproj/project.pbxproj"))
+    found += [p for p in (*project.glob("*.xcodeproj/project.pbxproj"),
+                          *project.glob("*/*.xcodeproj/project.pbxproj"))
+              if "Pods" not in p.parts and p not in found]
+    return found
+
+
+# Code and data of each stack: the folders to read and the file types in them. A root of
+# "." walks the whole project but its docs, store and build folders.
+STACK_CODE = {
+    "flutter": (CODE_ROOTS, CODE_EXTS),
+    "unity": (["Assets"], CODE_EXTS | {".cs"}),
+    "godot": (["."], CODE_EXTS | {".gd", ".tscn", ".tres", ".cfg"}),
+    "native": (["."], CODE_EXTS | {".m", ".mm", ".h"}),
+    "other": (CODE_ROOTS, CODE_EXTS | {".cs", ".gd", ".lua", ".m", ".mm"}),
+}
+NOT_CODE = {"docs", "store", "fastlane", "screenshots", "marketing", "design", "export",
+            "Library", "Temp", "Logs", "obj", "UserSettings", "ios", "android", "macos",
+            "linux", "windows", "web", "test", "tests"}
+PROGRAM_EXTS = {".dart", ".cs", ".gd", ".swift", ".kt", ".m", ".mm", ".ts", ".js"}
+
+
 def code_files(project: Path):
+    roots, exts = STACK_CODE[stack(project)]
     seen = set()
-    for root in CODE_ROOTS:
-        for p in walk(project / root, CODE_EXTS):
+    for root in roots:
+        for p in walk(project / root, exts):
+            if root == "." and set(p.relative_to(project).parts[:-1]) & NOT_CODE:
+                continue
             if generated(p) or "xcassets" in str(p) or p in seen:
                 continue
             seen.add(p)
@@ -233,7 +274,7 @@ def code_files(project: Path):
 
 def pbx_values(project: Path, key: str) -> list[str]:
     vals: list[str] = []
-    for pbx in project.glob("ios/*.xcodeproj/project.pbxproj"):
+    for pbx in xcode_projects(project):
         vals += re.findall(rf"{key} = \"?([^\";]+)\"?;", read(pbx))
     return [v.strip() for v in vals if v.strip() and "$(" not in v]
 
@@ -248,13 +289,32 @@ def team_id(project: Path) -> str:
         m = re.search(r"<key>teamID</key>\s*<string>([^<]+)</string>", read(plist))
         if m and valid.match(m.group(1).strip()):
             return m.group(1).strip()
+    for m in (re.search(r"appleDeveloperTeamID:\s*(\w+)",
+                        read(project / "ProjectSettings/ProjectSettings.asset")),
+              re.search(r'app_store_team_id="(\w+)"', read(project / "export_presets.cfg"))):
+        if m and valid.match(m.group(1)):
+            return m.group(1)
     return ""
 
 
 def bundle_id(project: Path) -> str:
     ids = [v for v in pbx_values(project, "PRODUCT_BUNDLE_IDENTIFIER")
-           if not v.lower().endswith("tests")]
+           if not v.lower().endswith("tests")] or list(engine_bundle_ids(project))
     return sorted(set(ids), key=len)[0] if ids else ""
+
+
+def engine_bundle_ids(project: Path) -> dict[str, list[str]]:
+    """iOS bundle IDs a game engine keeps in its own settings (Unity, Godot)."""
+    ids: dict[str, list[str]] = {}
+    unity = read(project / "ProjectSettings/ProjectSettings.asset")
+    m = re.search(r"applicationIdentifier:\s*\n((?:\s+\S+: .*\n)+)", unity)
+    if m:
+        for v in re.findall(r"^\s+iPhone: (\S+)", m.group(1), re.M):
+            ids.setdefault(v, []).append("ProjectSettings.asset")
+    for v in re.findall(r'application/bundle_identifier="([^"]+)"',
+                        read(project / "export_presets.cfg")):
+        ids.setdefault(v, []).append("export_presets.cfg")
+    return ids
 
 
 def pbx_objects(text: str, isa: str) -> list[tuple[str, str]]:
@@ -268,7 +328,7 @@ def app_bundle_ids(project: Path) -> dict[str, list[str]]:
     the iOS project. Test, extension, watch and App Clip targets ride along with their app."""
     ids: dict[str, list[str]] = {}
     bid_re = re.compile(r'PRODUCT_BUNDLE_IDENTIFIER = "?([^";]+)"?;')
-    for pbx in project.glob("ios/*.xcodeproj/project.pbxproj"):
+    for pbx in xcode_projects(project):
         text = read(pbx)
         targets = pbx_objects(text, "PBXNativeTarget")
         if not targets:  # not Xcode's layout: every bundle ID but a test's or an extension's
@@ -296,6 +356,8 @@ def app_bundle_ids(project: Path) -> dict[str, list[str]]:
         for v in re.findall(r"^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=\s*([^\s;]+)", read(xc), re.M):
             if "$(" not in v:
                 ids.setdefault(v, []).append(xc.name)
+    for b, where in engine_bundle_ids(project).items():
+        ids.setdefault(b, []).extend(where)
     return ids
 
 
@@ -340,8 +402,13 @@ def art_roots(project: Path) -> list[Path]:
     (an art/ folder it does not list never reaches the binary); other projects, the usual art
     folders. A path inside another one is left to it."""
     base = project.resolve()
-    if (project / "pubspec.yaml").exists():
+    kind = stack(project)
+    if kind == "flutter":
         names = ["assets", *pubspec_assets(project)]
+    elif kind == "unity":
+        names = ["Assets"]
+    elif kind in ("godot", "native"):
+        names = ["."]  # art sits beside the code; art_images leaves docs and icons out
     else:
         names = list(ART_DIRS)
     found = [p for p in dict.fromkeys((project / n).resolve() for n in names)
@@ -350,10 +417,14 @@ def art_roots(project: Path) -> list[Path]:
 
 
 def art_images(project: Path):
-    """Every image file under the art roots, once."""
+    """Every image file under the art roots, once: not the app icon set, docs or store art."""
     seen: set[Path] = set()
+    base = project.resolve()
     for root in art_roots(project):
         for p in walk(root, IMAGE_EXTS):
+            parts = p.resolve().relative_to(base).parts[:-1]
+            if ".appiconset" in str(p) or (root == base and set(parts) & NOT_CODE):
+                continue
             if p.resolve() not in seen:
                 seen.add(p.resolve())
                 yield p
@@ -370,6 +441,13 @@ def app_name(project: Path, override: str | None) -> str:
     for strings in sorted(project.glob("ios/Runner/*.lproj/InfoPlist.strings")):
         m = re.search(r'CFBundleDisplayName\s*=\s*"([^"]+)"', read(strings))
         if m:
+            return m.group(1).strip()
+    for m in (re.search(r"^\s*productName: (.+)$",
+                        read(project / "ProjectSettings/ProjectSettings.asset"), re.M),
+              re.search(r'^config/name="([^"]+)"', read(project / "project.godot"), re.M),
+              *(re.search(r'INFOPLIST_KEY_CFBundleDisplayName = "?([^";]+)"?;', read(x))
+                for x in xcode_projects(project))):
+        if m and "$(" not in m.group(1):
             return m.group(1).strip()
     return project.resolve().name
 
@@ -704,17 +782,38 @@ def check_assets(project: Path, packs: dict, rep: Report) -> None:
                     found.setdefault(pack["id"], []).append(
                         (role, f"{rel(src, project)}:{n}", ", ".join(paths[:3])))
 
+    template_files: dict[str, dict[str, str]] = {}  # template id → marker → a path
+    templated = False
     for p in walk(project):
         if "xcassets" in str(p):
             continue
         low = rel(p, project).lower()
         for pack in packs["packs"]:
-            if any(m in low for m in pack["markers"]["files"]):
-                role = path_role(str(p.parent.relative_to(project)), core, ui)
-                found.setdefault(pack["id"], []).append((role, rel(p, project), ""))
+            hit = next((m for m in pack["markers"]["files"] if m in low), None)
+            if not hit:
+                continue
+            if pack["kind"] == "template":
+                template_files.setdefault(pack["id"], {}).setdefault(hit, rel(p, project))
+                continue
+            role = path_role(str(p.parent.relative_to(project)), core, ui)
+            found.setdefault(pack["id"], []).append((role, rel(p, project), ""))
+    for pack in packs["packs"]:
+        if pack["kind"] != "template":
+            continue
+        credits = found.pop(pack["id"], [])
+        files = template_files.get(pack["id"], {})
+        if credits or len(files) >= pack.get("markers_min", 1):
+            templated = True
+            rep.add(f"assets.template.{pack['id']}", "assets", "WARN",
+                    f"the project looks built from {pack['name']}",
+                    "; ".join([h[1] for h in credits[:3]] + list(files.values())[:4]),
+                    "Guideline 4.2.6 turns away apps made from a commercial template unless "
+                    "the content's owner submits them, and every game built from one template "
+                    "shares its binary: keep only plumbing from it, behind your own screens, "
+                    "names and art")
 
     if not found:
-        if not emoji:
+        if not emoji and not templated:
             rep.add("assets.none", "assets", "PASS",
                     "no stock art pack credited or found by file name, and no emoji drawn "
                     "as text")
@@ -748,8 +847,15 @@ def check_assets(project: Path, packs: dict, rep: Report) -> None:
 
 def find_icon(project: Path) -> Path | None:
     cands = [p for p in walk(project / "ios", {".png"}) if "AppIcon.appiconset" in str(p)]
+    if not cands and stack(project) != "flutter":
+        cands = [p for p in walk(project, {".png"}) if "AppIcon.appiconset" in str(p)]
+        m = re.search(r'icons/app_store_1024x1024="res://([^"]+)"',
+                      read(project / "export_presets.cfg"))
+        if m and (project / m.group(1)).exists():
+            return project / m.group(1)
     if not cands:
-        for d in ("assets/icon", "assets/icons/app", "store", "docs/store", "assets"):
+        for d in ("assets/icon", "assets/icons/app", "store", "docs/store", "assets",
+                  "Assets", "Assets/Icons"):
             cands += [p for p in walk(project / d, {".png"})
                       if re.search(r"(app[_-]?icon|icon[_-]?1024|^icon\.png$)", p.name, re.I)]
     if not cands:
@@ -775,26 +881,15 @@ def icon_sources(project: Path) -> set[Path]:
     return srcs
 
 
-def check_icon(project: Path, rep: Report) -> None:
-    icon = find_icon(project)
-    if icon is None:
-        rep.add("icon.missing", "icon", "SKIP", "no app icon found (AppIcon.appiconset)")
-        return
-    try:
-        from PIL import Image
-    except ImportError:
-        rep.add("icon.unverified", "icon", "WARN",
-                "Pillow is not installed, so the icon was not compared with bundled art",
-                rel(icon, project),
-                "pip install pillow and rerun, and judge the icon by eye (references/checks.md J3)")
-        return
-
-    with Image.open(icon) as im:
-        base = im.convert("RGB")
+def icon_match(icon, images) -> tuple[int, str, int]:
+    """(closest dHash distance, its label, images compared) between an icon and images
+    given as (label, path or bytes). Each image is centred on the icon's background and
+    matched against square crops of the icon at several sizes, nudged a little each way:
+    an icon rarely places the sprite dead centre (a drop shadow shifts it too)."""
+    from PIL import Image
+    base = icon.convert("RGB")
     w, h = base.size
     bg = base.getpixel((max(1, w // 64), max(1, h // 64)))
-    # Square crops at several sizes, centred and nudged a little each way: an
-    # icon rarely places the sprite dead centre (a drop shadow shifts it too).
     crops = []
     for frac in (1.0, 0.9, 0.8, 0.7, 0.65, 0.6, 0.55, 0.5):
         side = int(min(w, h) * frac)
@@ -804,15 +899,10 @@ def check_icon(project: Path, rep: Report) -> None:
             if left < 0 or top < 0 or left + side > w or top + side > h:
                 continue
             crops.append(dhash(base.crop((left, top, left + side, top + side))))
-
-    best = (65, "")
-    checked = 0
-    skipped = icon_sources(project)
-    for p in art_images(project):
-        if "launch" in str(p).lower() or p.resolve() in skipped:
-            continue
+    best, where, checked = 65, "", 0
+    for label, src in images:
         try:
-            with Image.open(p) as im:
+            with Image.open(io.BytesIO(src) if isinstance(src, bytes) else src) as im:
                 if min(im.size) < 32:
                     continue
                 img = im.convert("RGBA")
@@ -827,10 +917,34 @@ def check_icon(project: Path, rep: Report) -> None:
         hsh = dhash(canvas)
         checked += 1
         d = min(bin(c ^ hsh).count("1") for c in crops)
-        if d < best[0]:
-            best = (d, rel(p, project))
+        if d < best:
+            best, where = d, label
         if checked >= 600:
             break
+    return best, where, checked
+
+
+def check_icon(project: Path, rep: Report) -> None:
+    icon = find_icon(project)
+    if icon is None:
+        rep.add("icon.missing", "icon", "SKIP", "no app icon found (AppIcon.appiconset)")
+        return
+    try:
+        from PIL import Image
+    except ImportError:
+        rep.add("icon.unverified", "icon", "WARN",
+                "Pillow is not installed, so the icon was not compared with bundled art",
+                rel(icon, project),
+                "pip install pillow and rerun, and judge the icon by eye (references/checks.md J3)")
+        return
+
+    skipped = icon_sources(project)
+    with Image.open(icon) as im:
+        d, where, checked = icon_match(
+            im, ((rel(p, project), p) for p in art_images(project)
+                 if "launch" not in str(p).lower() and p.resolve() not in skipped
+                 and p.resolve() != icon.resolve()))
+    best = (d, where)
 
     d, where = best
     note = (f"; icon sources skipped: {', '.join(sorted(rel(s, project) for s in skipped))}"
@@ -1157,7 +1271,9 @@ def repo_fingerprint(root: Path, core: set[str]) -> dict:
                 continue
             files.setdefault(sha, (rel(p, root), kind))
     code: dict[str, set[int]] = {}
-    for p in walk(root / "lib", {".dart"}):
+    programs = (walk(root / "lib", {".dart"}) if stack(root) == "flutter"
+                else (p for p in code_files(root) if p.suffix.lower() in PROGRAM_EXTS))
+    for p in programs:
         if not generated(p):
             code[rel(p, root)] = shingles(read(p))
     return {"files": files, "code": code}
@@ -1184,13 +1300,186 @@ def check_bundles(project: Path, rep: Report) -> None:
             "name it so (.dev, .staging, .beta) or drop its target")
 
 
+def sibling_repos(project: Path, portfolio: Path) -> list[Path]:
+    me = project.resolve()
+    return [d for d in sorted(portfolio.iterdir()) if d.is_dir() and d.resolve() != me
+            and stack(d) != "other"]
+
+
+# App Store screenshot sizes (portrait; landscape is the same swapped): iPhone 6.9" to 5.5",
+# iPad 13" and 11". A file of one of these sizes is a store screenshot, wherever it is kept.
+SHOT_SIZES = {(1320, 2868), (1290, 2796), (1260, 2736), (1284, 2778), (1242, 2688),
+              (1206, 2622), (1179, 2556), (1170, 2532), (1125, 2436), (1080, 2340),
+              (1242, 2208), (2064, 2752), (2048, 2732), (1668, 2420), (1668, 2388),
+              (1640, 2360), (1488, 2266)}
+SHOT_SIZES |= {(h, w) for w, h in SHOT_SIZES}
+SHOT_SKIP = {"ios", "android", "macos", "linux", "windows", "web", "test", "integration_test"}
+SHOT_SAME, SHOT_ALIKE = 24, 40  # bits of 256: one screenshot reused / nearly
+
+
+def store_shots(root: Path, limit: int = 60) -> list[Path]:
+    """The store screenshots kept in a repo: images of an App Store screenshot size."""
+    from PIL import Image
+    out: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS | SHOT_SKIP
+                       and not d.startswith(".")]
+        for f in sorted(filenames):
+            if Path(f).suffix.lower() not in (".png", ".jpg", ".jpeg"):
+                continue
+            try:
+                with Image.open(Path(dirpath) / f) as im:
+                    if im.size in SHOT_SIZES:
+                        out.append(Path(dirpath) / f)
+            except Exception:  # unreadable image: not a screenshot we can compare
+                continue
+            if len(out) >= limit:
+                return out
+    return out
+
+
+def check_screenshots(project: Path, siblings: list[Path], live: list[dict], offline: bool,
+                      rep: Report) -> None:
+    """Our store screenshots against our other games' — local repos and live apps. A
+    screenshot shipped by two of a team's games is the 'apps you submitted' variant."""
+    try:
+        from PIL import Image
+    except ImportError:
+        rep.add("portfolio.screenshots", "portfolio", "WARN",
+                "Pillow is not installed, so the screenshots were not compared", "",
+                "pip install pillow and rerun")
+        return
+    ours = store_shots(project)
+    if not ours:
+        rep.add("portfolio.screenshots", "portfolio", "SKIP",
+                "no store screenshot (an App Store screenshot size) in the repo", "",
+                "keep the screenshots you upload in the repo so they can be compared")
+        return
+
+    def prints(paths):
+        out = []
+        for p in paths:
+            with Image.open(p) as im:
+                out.append((p, market.shot_print(im)))
+        return out
+
+    mine = prints(ours)
+    theirs: list[tuple[str, str]] = []  # (where, print)
+    for sib in siblings:
+        theirs += [(f"{sib.name}/{rel(p, sib)}", h) for p, h in prints(store_shots(sib, 30))]
+    urls = {u: a for a in live for u in a.get("shots", [])}
+    for u, h in market.shot_prints(list(urls), offline).items():
+        theirs.append((f"{urls[u]['name']} on the App Store ({u.rsplit('/', 1)[-1]})", h))
+    if not theirs:
+        rep.add("portfolio.screenshots", "portfolio", "PASS",
+                f"{len(mine)} store screenshot(s); no other game of yours to compare with",
+                ", ".join(rel(p, project) for p, _ in mine[:4]))
+        return
+    best = min(((market.shot_distance(h, t), rel(p, project), w)
+                for p, h in mine for w, t in theirs), key=lambda x: x[0])
+    d, ours_p, where = best
+    ev = f"{ours_p} vs {where}: {d}/256 bits ({len(mine)} ours, {len(theirs)} theirs)"
+    if d <= SHOT_SAME:
+        rep.add("portfolio.screenshots", "portfolio", "FAIL",
+                "a store screenshot is the same image as one of another of your games", ev,
+                "capture this game's own screens; one screenshot in two apps is what the "
+                "'apps you submitted' variant of 4.3(a) compares")
+    elif d <= SHOT_ALIKE:
+        rep.add("portfolio.screenshots", "portfolio", "WARN",
+                "a store screenshot nearly repeats one of another of your games", ev,
+                "compare the two by eye; recapture it if a player could take one for the other")
+    else:
+        rep.add("portfolio.screenshots", "portfolio", "PASS",
+                "no store screenshot repeats one of your other games'",
+                ev + "; whether the sets share one template is J1's call")
+
+
+def check_store_catalogue(project: Path, name: str, apps: list[dict], artists: list[str],
+                          how: str, fields: list[tuple[str, str, str]], offline: bool,
+                          rep: Report) -> None:
+    """The games the team already sells: the same name, icon or description again is the
+    'apps you submitted' variant, whether or not their repos are on this machine."""
+    own = bundle_id(project)
+    others = [a for a in apps if a.get("bundle") != own and a.get("name")]
+    if not artists:
+        hint = ("pass --artist-id (the number in apps.apple.com/…/developer/…/id<N>) or "
+                "--account-holder with the seller name the App Store shows")
+        if how:
+            rep.add("portfolio.store", "portfolio", "SKIP",
+                    f"no app of this team found on the App Store (looked up by {how})", "",
+                    "if the team does sell apps, " + hint)
+        else:
+            rep.add("portfolio.store", "portfolio", "WARN",
+                    "the team's live apps were not checked (offline, nothing cached)", "",
+                    "rerun online; " + hint)
+        return
+    games = [a for a in others if a.get("game")]
+    summary = (f"{len(others)} other app(s) live on the team ({len(games)} games) from "
+               f"developer id {', '.join(artists)}")
+    rows = 0
+    mine = core_name(name)
+    for a in others:
+        if mine and core_name(a["name"]) == mine:
+            rep.add("portfolio.store-name", "portfolio", "FAIL",
+                    f"the team already sells {a['name']}: the same game name on a second app",
+                    f"{a['name']} ({a.get('bundle')}) {a.get('url', '')}",
+                    "4.3(a): update the app you have, or name and make a different game")
+            rows += 1
+        elif ledger.same_game(name, a["name"]):
+            rep.add("portfolio.store-name", "portfolio", "WARN",
+                    f"the name is one of the team's live apps' with a word more or less: "
+                    f"{a['name']}", f"{a['name']} ({a.get('bundle')}) {a.get('url', '')}",
+                    "a sequel or variant of a live app reads as 4.3(a) unless it is plainly "
+                    "a different game; say how in the review notes")
+            rows += 1
+    try:
+        from PIL import Image
+    except ImportError:
+        Image = None
+    icon = find_icon(project)
+    if Image and icon and others:
+        prints = market.icon_prints([a.get("icon", "") for a in others], offline)
+        m = market.Market({"apps": {a["id"]: a for a in others}}, own_bundle=own, prints=prints)
+        with Image.open(icon) as im:
+            for r in m.icon_rows(market.icon_print(im), rel(icon, project)):
+                if r["verdict"] in ("FAIL", "WARN"):
+                    rep.add("portfolio.store-icon", "portfolio", r["verdict"],
+                            r["summary"].replace("the icon", "the icon (vs the team's live apps)"),
+                            r["evidence"], "draw this game's own icon; one look across a "
+                            "team's icons is the 'apps you submitted' variant")
+                    rows += 1
+    desc = "\n".join(t for f, _, t in fields if f in ("description", "promotional"))
+    if desc and others:
+        m = market.Market({"apps": {a["id"]: a for a in others}}, own_bundle=own)
+        for r in m.wording_rows(desc, "listing"):
+            if r["verdict"] in ("FAIL", "WARN"):
+                rep.add("portfolio.store-wording", "portfolio", r["verdict"],
+                        r["summary"] + " (one of the team's live apps)", r["evidence"],
+                        "write this game's description from this game; a listing shared "
+                        "across a team's apps is what 4.3(a) compares")
+                rows += 1
+    recent = sorted(a["released"] for a in games
+                    if a.get("released") and market.age_days(a["released"] + "T00:00:00Z") <= 30)
+    if len(recent) >= 3:
+        rep.add("portfolio.store-pace", "portfolio", "WARN",
+                f"the team released {len(recent)} games in the last 30 days",
+                ", ".join(recent), "space releases out; a burst of games from one account is "
+                "the 'apps you submitted' variant's other half")
+        rows += 1
+    if not rows:
+        rep.add("portfolio.store", "portfolio", "PASS",
+                summary + ": none shares this game's name, icon or wording", "; ".join(
+                    f"{a['name']} ({a.get('released', '')})" for a in others[:8]))
+
+
+def core_name(name: str) -> str:
+    return market.core(name)
+
+
 def check_portfolio(project: Path, portfolio: Path, packs: dict, rep: Report) -> None:
     check_bundles(project, rep)
     core = set(packs["core_path_words"])
-    me = project.resolve()
-    siblings = [d for d in sorted(portfolio.iterdir()) if d.is_dir() and d.resolve() != me
-                and ((d / "pubspec.yaml").exists() or list(d.glob("*.xcodeproj"))
-                     or list(d.glob("ios/*.xcodeproj")))]
+    siblings = sibling_repos(project, portfolio)
     if not siblings:
         rep.add("portfolio.none", "portfolio", "SKIP",
                 f"no sibling app repos in {portfolio}", "",
@@ -1359,6 +1648,12 @@ def check_footprint(project: Path, urls: list[str], name: str, olds: list[str],
             notes.append(f"its description still says {', '.join(stale)}")
         if source:
             notes.append("it holds the app's source code")
+        if meta.get("fork"):
+            notes.append(f"it is a fork of {(meta.get('parent') or {}).get('full_name', 'another repo')}"
+                         " — code that is public elsewhere")
+        if meta.get("template_repository"):
+            notes.append(f"it was created from the template "
+                         f"{meta['template_repository'].get('full_name', '')}")
         if notes:
             flagged = True
             rep.add("footprint.github", "footprint", "WARN",
@@ -1487,6 +1782,163 @@ def check_ownership(project: Path, holder_arg: str | None, team: str, rep: Repor
                 evidence, "pass --account-holder")
 
 
+# --------------------------------------------------------------------------- binary
+
+def uncrush_png(data: bytes) -> bytes:
+    """A PNG as Xcode leaves it in an app bundle ('CgBI': raw deflate, BGRA, premultiplied)
+    turned back into one Pillow reads; any other PNG comes back unchanged."""
+    if data[12:16] != b"CgBI":
+        return data
+    import struct
+    import zlib
+    chunks, pos, idat = [], 8, b""
+    width = height = 0
+    while pos < len(data):
+        n = struct.unpack(">I", data[pos:pos + 4])[0]
+        kind, body = data[pos + 4:pos + 8], data[pos + 8:pos + 8 + n]
+        pos += 12 + n
+        if kind == b"IHDR":
+            width, height = struct.unpack(">II", body[:8])
+        if kind == b"IDAT":
+            idat += body
+        elif kind not in (b"CgBI", b"IEND"):
+            chunks.append((kind, body))
+    raw = bytearray(zlib.decompress(idat, -15))
+    stride = width * 4 + 1
+    for y in range(height):
+        row = y * stride + 1
+        for x in range(row, row + width * 4, 4):
+            raw[x], raw[x + 2] = raw[x + 2], raw[x]  # BGRA → RGBA; filters work bytewise
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return (struct.pack(">I", len(body)) + kind + body
+                + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF))
+    return (b"\x89PNG\r\n\x1a\n" + b"".join(chunk(k, b) for k, b in chunks)
+            + chunk(b"IDAT", zlib.compress(bytes(raw))) + chunk(b"IEND", b""))
+
+
+def bundle_files(path: Path) -> tuple[str, dict[str, bytes]] | None:
+    """(app folder name, {path inside the .app: bytes}) of an .ipa, a .xcarchive or an .app."""
+    files: dict[str, bytes] = {}
+    if path.is_file():
+        import zipfile
+        with zipfile.ZipFile(path) as z:
+            for n in z.namelist():
+                m = re.match(r"Payload/([^/]+\.app)/(.+)", n)
+                if m and not n.endswith("/") and z.getinfo(n).file_size < 200_000_000:
+                    files[m.group(2)] = z.read(n)
+                    app = m.group(1)
+        return (app, files) if files else None
+    apps = [path] if path.suffix == ".app" else sorted(path.glob("**/*.app"))
+    if not apps:
+        return None
+    for p in apps[0].rglob("*"):
+        if p.is_file() and p.stat().st_size < 200_000_000:
+            files[str(p.relative_to(apps[0]))] = p.read_bytes()
+    return apps[0].name, files
+
+
+def binary_strings(data: bytes, min_len: int = 4) -> str:
+    """Printable text in a compiled binary: ASCII runs and UTF-16 runs (Dart keeps both)."""
+    ascii_ = re.findall(rb"[\x20-\x7e]{%d,}" % min_len, data)
+    utf16 = re.findall(rb"(?:[\x20-\x7e]\x00){%d,}" % min_len, data)
+    return "\n".join([s.decode("ascii") for s in ascii_]
+                     + [s.decode("utf-16-le", "replace") for s in utf16])
+
+
+def check_binary(project: Path, ipa: Path, name: str, sigs: dict, packs: dict,
+                 rep: Report) -> None:
+    """What App Review compares is the build: the files bundled (package assets too), the
+    icon it ships, its Info.plist and the text compiled into it."""
+    got = bundle_files(ipa) if ipa.exists() else None
+    if not got:
+        rep.add("binary.bundle", "binary", "WARN", f"no .app found in {ipa}", "",
+                "pass the .ipa, the .xcarchive or the .app that will be uploaded")
+        return
+    app, files = got
+    flutter = "Frameworks/App.framework/flutter_assets/"
+    bundled = sorted(f for f in files if f.startswith(flutter))
+    from_packages = sorted({f[len(flutter):].split("/")[1] for f in bundled
+                            if f[len(flutter):].startswith("packages/")})
+    rep.add("binary.bundle", "binary", "PASS",
+            f"{app}: {len(files)} files, {len(bundled)} Flutter assets"
+            + (f", assets from packages {', '.join(from_packages[:6])}" if from_packages else ""),
+            str(ipa))
+
+    import plistlib
+    try:
+        info = plistlib.loads(files.get("Info.plist", b""))
+    except Exception:  # an unreadable plist is a broken build, not a 4.3 matter
+        info = {}
+    shown = info.get("CFBundleDisplayName") or info.get("CFBundleName") or ""
+    bid = info.get("CFBundleIdentifier", "")
+    problems = []
+    if bid and store_apps(app_bundle_ids(project)) and bid not in store_apps(app_bundle_ids(project)):
+        problems.append(f"bundle ID {bid} is not this project's")
+    if shown and name and shown.lower() != name.lower():
+        problems.append(f"the home-screen name is \"{shown}\", the listing's \"{name}\"")
+    stale = [o for o in old_names(project, name, []) if shown and has_phrase(wtext(shown), o)]
+    if stale:
+        problems.append(f"the build still says the old name {', '.join(stale)}")
+    rep.add("binary.info", "binary", "WARN" if problems else "PASS",
+            "; ".join(problems) or f"Info.plist: {shown} ({bid})", "Info.plist",
+            "build from the project being submitted, under its current name" if problems else "")
+
+    core = set(packs["core_path_words"])
+    ui = set(packs["ui_path_words"])
+    found: dict[str, list[tuple[str, str]]] = {}
+    for f in files:
+        low = f.lower()
+        for pack in packs["packs"]:
+            if any(mk in low for mk in pack["markers"]["files"]):
+                found.setdefault(pack["id"], []).append((path_role(f, core, ui), f))
+    by_id = {p["id"]: p for p in packs["packs"]}
+    order = {"FAIL": 2, "WARN": 1, "PASS": 0}
+    for pid, hits in found.items():
+        pack = by_id[pid]
+        verdict = max((asset_verdict(pack["kind"], r) for r, _ in hits), key=order.get)
+        rep.add(f"binary.stock.{pid}", "binary", verdict,
+                f"the build ships {pack['name']} files ({len(hits)})",
+                "; ".join(f"{f} [{r}]" for r, f in hits[:4]),
+                "" if verdict == "PASS" else "a package or a forgotten folder brought them in: "
+                "replace them with original art, or leave them out of the build")
+
+    try:
+        from PIL import Image
+    except ImportError:
+        Image = None
+    icons = sorted((f for f in files if re.match(r"AppIcon[^/]*\.png$", f)),
+                   key=lambda f: len(files[f]))
+    if Image and icons:
+        images = [(f[len(flutter):], uncrush_png(files[f])) for f in bundled
+                  if Path(f).suffix.lower() in IMAGE_EXTS and "launch" not in f.lower()]
+        with Image.open(io.BytesIO(uncrush_png(files[icons[-1]]))) as im:
+            d, where, checked = icon_match(im, images)
+        if not checked:
+            rep.add("binary.icon", "binary", "SKIP", "the build bundles no image to compare "
+                    "its icon with", icons[-1])
+        else:
+            verdict = "FAIL" if d <= 10 else "WARN" if d <= 14 else "PASS"
+            rep.add("binary.icon", "binary", verdict,
+                    {"FAIL": f"the shipped icon reproduces a bundled image ({where})",
+                     "WARN": f"the shipped icon resembles a bundled image ({where})",
+                     "PASS": f"the shipped icon is not a copy of any of {checked} bundled "
+                             "images"}[verdict],
+                    f"{icons[-1]} vs {where}: dHash distance {d}/64",
+                    "" if verdict == "PASS" else "draw an icon of the game's own character "
+                    "or mechanic")
+
+    texts = [(f"{app}/{f}", files[f].decode("utf-8", "replace")) for f in bundled
+             if Path(f).suffix.lower() in (".json", ".txt", ".arb", ".csv", ".yaml")
+             and len(files[f]) < 3_000_000]
+    dart = files.get("Frameworks/App.framework/App")
+    if dart:
+        texts.append((f"{app}/Frameworks/App.framework/App", binary_strings(dart)))
+    if not scan_signature_texts(texts, sigs["signatures"], "binary", rep, "bundled file"):
+        rep.add("binary.signature", "binary", "PASS",
+                f"no famous-game fingerprint in the compiled code or {len(texts) - bool(dart)} "
+                "bundled text files")
+
+
 # --------------------------------------------------------------------------- main
 
 def main(argv: list[str] | None = None) -> int:
@@ -1502,10 +1954,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--old-name", nargs="*", default=[])
     ap.add_argument("--team", default=None)
     ap.add_argument("--account-holder", default=None)
+    ap.add_argument("--artist-id", nargs="*", default=[],
+                    help="the team's App Store developer id(s), for its live apps")
     ap.add_argument("--ledger", type=Path, default=None)
     ap.add_argument("--offline", action="store_true")
     ap.add_argument("--countries", default=",".join(market.DEFAULT_COUNTRIES),
                     help="storefronts whose charts the market group compares with")
+    ap.add_argument("--ipa", type=Path, default=None,
+                    help="the .ipa, .xcarchive or .app to be uploaded: adds the binary group")
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args(argv)
 
@@ -1544,9 +2000,44 @@ def main(argv: list[str] | None = None) -> int:
         check_market(project, args.listing, name, args.mode == "submit" or "metadata" in groups,
                      countries or list(market.DEFAULT_COUNTRIES), args.offline, rep)
     if "portfolio" in groups:
-        check_portfolio(project, (args.portfolio or project.parent).resolve(), packs, rep)
+        folder = (args.portfolio or project.parent).resolve()
+        check_portfolio(project, folder, packs, rep)
+        countries = [c.strip().lower() for c in args.countries.split(",") if c.strip()]
+        store = market.load_store()
+        live, artists, how = [], [], ""
+        if team:
+            data = ledger.load(args.ledger or ledger.default_path())
+            approved = {e["bundle"] for e in data.get("teams", {}).get(team, {}).get("events", [])
+                        if e["event"] == "approved"} | ({bundle_id(project)} - {""})
+            try:
+                live, artists, how = market.team_apps(store, team, countries, args.artist_id,
+                                                 args.account_holder or "", sorted(approved),
+                                                 args.offline,
+                                                 lambda m: print(m, file=sys.stderr))
+                if not args.offline:
+                    market.save_store(store)
+            except Exception as e:  # network trouble: say so, never pass silently
+                rep.add("portfolio.store", "portfolio", "WARN",
+                        f"the team's live apps could not be read ({e})", "",
+                        "rerun online")
+                artists = None
+        if team and artists is not None:
+            check_store_catalogue(project, name, live, artists, how,
+                                  listing_fields(project, args.listing), args.offline, rep)
+        elif not team:
+            rep.add("portfolio.store", "portfolio", "SKIP",
+                    "the team's live apps were not checked: no team ID (see account.team)", "",
+                    "pass --team, and --artist-id or --account-holder")
+        check_screenshots(project, sibling_repos(project, folder), live, args.offline, rep)
     if "footprint" in groups:
         check_footprint(project, args.url, name, olds, args.offline, rep)
+    if args.ipa and "binary" not in groups:
+        groups.append("binary")
+    if "binary" in groups:
+        if args.ipa:
+            check_binary(project, args.ipa.resolve(), name, sigs, packs, rep)
+        else:
+            rep.add("binary.bundle", "binary", "SKIP", "no --ipa given")
     if "ownership" in groups:
         check_ownership(project, args.account_holder, team, rep)
     if "account" in groups:
@@ -1563,7 +2054,12 @@ def main(argv: list[str] | None = None) -> int:
     result = {"tool": "appstore-spam-guard", "version": VERSION, "mode": args.mode,
               "groups": groups, "project": str(project), "app": name,
               "old_names": olds, "team": team, "overall": rep.overall(),
-              "checks": rep.rows}
+              "at": market.now_iso(), "checks": rep.rows}
+    if args.mode == "submit" and not args.groups and team and bundle_id(project):
+        try:  # ledger.py record --event submitted keeps it with the submission
+            ledger.save_last_scan(team, bundle_id(project), result)
+        except OSError:
+            pass
     text = json.dumps(result, indent=2, ensure_ascii=False)
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)

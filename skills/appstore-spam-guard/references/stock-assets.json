@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Free asset packs that thousands of store apps ship. Licensed use is legal, but when the same pack draws a game's main objects or its icon, the binary and the screenshots match every other app built from it, which is what 4.3(a) 'similar binary' means in practice. kind decides the verdict by role: emoji and art for main objects or the icon FAIL; for UI chrome they WARN (emoji) or pass with a note (art, icons); audio and fonts pass with a note. markers are lowercase substrings matched in credit files, README, localisation and code (credits), and in file and folder names (files). Emoji drawn as text (a string holding only emoji, such as '🍒') use the system emoji font as their art and need no pack: core_code_words and ui_code_words read their role from the words on the emoji's line and on the lines that open its list or call (`const pieces = [`, `Badge(`). Three or more emoji whose role is core FAIL; otherwise three or more WARN.",
+  "about": "Free asset packs that thousands of store apps ship. Licensed use is legal, but when the same pack draws a game's main objects or its icon, the binary and the screenshots match every other app built from it, which is what 4.3(a) 'similar binary' means in practice. kind decides the verdict by role: emoji and art for main objects or the icon FAIL; for UI chrome they WARN (emoji) or pass with a note (art, icons); audio and fonts pass with a note. kind template is code bought or copied as a whole game (Guideline 4.2.6, and the binary of every other game built from it): WARN wherever it is found; markers_min is how many distinct file markers it takes. markers are lowercase substrings matched in credit files, README, localisation and code (credits), and in file and folder names (files). Emoji drawn as text (a string holding only emoji, such as '🍒') use the system emoji font as their art and need no pack: core_code_words and ui_code_words read their role from the words on the emoji's line and on the lines that open its list or call (`const pieces = [`, `Badge(`). Three or more emoji whose role is core FAIL; otherwise three or more WARN.",
   "core_path_words": [
     "fruit", "fruits", "character", "characters", "hero", "heroes", "enemy", "enemies",
     "tile", "tiles", "piece", "pieces", "block", "blocks", "gem", "gems", "ball", "balls",
@@ -101,6 +101,10 @@
       "name": "LottieFiles free animations",
       "kind": "art",
       "markers": {"credits": ["lottiefiles"], "files": []}
-    }
+    },
+    {"id": "envato", "name": "CodeCanyon / Envato game template", "kind": "template", "markers": {"credits": ["codecanyon", "envato market", "envato license", "envato.com"], "files": ["codecanyon", "envato"]}},
+    {"id": "buildbox", "name": "Buildbox game", "kind": "template", "markers": {"credits": ["buildbox"], "files": ["buildbox"]}},
+    {"id": "sellmyapp", "name": "SellMyApp / Chupamobile app template", "kind": "template", "markers": {"credits": ["sellmyapp", "chupamobile"], "files": ["sellmyapp", "chupamobile"]}},
+    {"id": "flutter-game-template", "name": "Flutter's casual games template", "kind": "template", "markers_min": 3, "markers": {"credits": ["casual games toolkit", "package:game_template/"], "files": ["play_session_screen", "level_selection_screen", "win_game_screen", "responsive_screen", "my_button", "player_progress"]}}
   ]
 }

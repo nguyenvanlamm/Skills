@@ -1,5 +1,52 @@
 # Changelog
 
+## v1.3.0 — 2026-10-29
+
+The six gaps left after v1.2.0, in the order proposed: measure the guard, see the team's live
+apps, compare screenshots, read the build, find templates and forks, read other engines.
+
+### Added
+- **Measuring the guard** (`ledger.py`): a `submitted` event keeps a summary of the scan behind
+  it — the latest `--mode submit` run for that bundle (scan.py leaves it in the cache) or
+  `--scan FILE`, plus `--verdict` for the gate's verdict with J1–J6. `ledger.py stats` sets each
+  submission's verdict against App Review's answer, counts every WARN/FAIL row by outcome and
+  lists the PASSes that drew a 4.3. Until now the only true positive was the case the guard was
+  built from.
+- **The team's live apps** (`portfolio.store*`, `market.team_apps`): App Store lookup by
+  `--artist-id`, by the team's live bundles and by the seller name (`--account-holder`), cached a
+  week per team. FAIL when a live app has this game's name; FAIL/WARN on a near-identical icon
+  (the `market` thresholds) or a shared description passage; WARN on ≥ 3 games released in 30
+  days. Not looked up (offline, nothing cached) is WARN; looked up and nothing live is SKIP. A
+  live smoke test on a public developer (11 apps) found its games and failed a probe named
+  after one of them.
+- **Screenshots** (`portfolio.screenshots`): any image of an App Store screenshot size, in this
+  repo and in the sibling repos, plus the live apps' `screenshotUrls`; a 16×16 dHash (256 bits).
+  ≤ 24 FAIL, ≤ 40 WARN. A shared template stays J1's call (J1 now looks at the sets).
+- **The build** (`binary` group, `--ipa` for an .ipa, .xcarchive or .app): Info.plist (bundle ID
+  and name against the project's), stock-pack markers over every bundled path (package assets
+  included), the shipped icon against the bundled images (Xcode's CgBI PNGs decoded) and the
+  signature fingerprints over bundled text and the strings compiled into `App.framework/App`.
+- **Templates and forks**: `kind: template` packs in `stock-assets.json` — CodeCanyon/Envato,
+  Buildbox, SellMyApp/Chupamobile, and Flutter's casual-games template (`markers_min` 3 of its
+  screen file names) → `assets.template.*` WARN under 4.2.6. `footprint` reads GitHub's `fork`
+  and `template_repository` for the game's repo.
+- **Other engines**: Unity (`Assets/`, `ProjectSettings.asset`), Godot (`project.godot`,
+  `export_presets.cfg`) and Xcode projects outside `ios/` — their code (C#, GDScript, Swift,
+  Objective-C), art, icon, bundle IDs, team ID and name. `portfolio` compares their code too.
+
+### Calibration (2026-10-29)
+- Screenshots: 75 pairs of one screenshot exported at 6.3" and 6.9" in the local games differ by
+  0–16 of 256 bits; the closest screenshots of two different games, 57 (5th percentile 67).
+  An 8×8 hash could not separate them: two games in the shared `appstore-assets` layout
+  (caption on top, phone frame) sat 6/64 apart. `skepfield` against its 34 siblings: closest
+  60/256, PASS; a sibling's screenshot resized and saved as JPEG: FAIL.
+- The 35 Flutter games, v1.2.0 against v1.3.0 on every group but `market` and `footprint`: no
+  existing row changed. New rows only — screenshots PASS on 18 and SKIP on 17, no template
+  marker anywhere, `portfolio.store` SKIP where no team ID is set (as `account.team` says).
+- First-commit authors were considered as a fork signal and dropped: in 5 of the 35 games the
+  first commit's author is not the main one — a build tool (buildwizai) or another spelling of
+  the same people — and none is a fork; others start under tool names (AIFactory, Devin).
+
 ## v1.2.0 — 2026-10-29
 
 Four throwaway games built to probe v1.1.0 passed it with real 4.3 problems: a Suika-like

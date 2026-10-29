@@ -7,7 +7,8 @@ Record every answer in the report with the evidence you used; "looks fine" is no
 
 **Evidence**: a screenshot of the game screen (or the chosen mockup before the build exists),
 the store screenshots of each reference game, a screenshot of the developer's closest
-earlier game (the `portfolio` group names it), the store pages of the games the `market`
+earlier game (the `portfolio` group names it) and the store screenshot set of the own game
+`portfolio.screenshots` puts closest — local or live, the store pages of the games the `market`
 rows name (the closest icon, any name or wording match), and — when `metadata.saturated-genre`
 names a crowded category — the screenshots of that category's top three games on the store.
 
@@ -19,8 +20,9 @@ names a crowded category — the screenshots of that category's top three games 
 > Then: what can a player do in A that they cannot do in any of the others? One sentence, or
 > "nothing".
 
-**Verdict**: "same game" with any reference → FAIL; "same brand" with an earlier own game →
-FAIL; "same game" or "same brand" disputed by what the scan found → WARN and show the human.
+**Verdict**: "same game" with any reference → FAIL; "same brand" with an earlier own game —
+the screenshots included: one template, palette and caption style for every game of a team is
+what the "apps you submitted" variant names → FAIL; "same game" or "same brand" disputed by what the scan found → WARN and show the human.
 "Same genre" passes only with an answer to the last question: "nothing" in a crowded category
 (`metadata.saturated-genre`) → FAIL, elsewhere → WARN. 4.3(b) turns away "variants of existing
 app categories", not only copies of one app.

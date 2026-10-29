@@ -54,8 +54,8 @@ template; treat every named variant as live anyway.
 | Variant | What Apple compared | What usually triggers it | Checks here |
 |---|---|---|---|
 | apps from **other developers** | your app vs the store | a hit's progression and rules, stock or emoji art many clones ship, a listing in the hit's words, a plain variant of a crowded category (4.3(b)) | `signature`, `assets`, `icon`, `metadata`, `market`, J1–J4 |
-| **other apps you submitted** | your app vs your own catalogue | one game under several bundle IDs (4.3(a) itself), shared code and art across your games, one screenshot template, one IAP lineup, many submissions in a short window | `portfolio`, `account`, J6 |
-| a **terminated developer account** | your app vs apps from accounts Apple closed | a binary or assets matching something a closed account shipped — public source or a public web build is easy to republish; stock packs are everywhere | `assets`, `footprint`, J5 |
+| **other apps you submitted** | your app vs your own catalogue | one game under several bundle IDs (4.3(a) itself), shared code and art across your games, one screenshot template, one IAP lineup, many submissions in a short window | `portfolio` (bundle IDs, siblings, the team's live apps, screenshots), `account`, `binary`, J1, J6 |
+| a **terminated developer account** | your app vs apps from accounts Apple closed | a binary or assets matching something a closed account shipped — public source or a public web build is easy to republish; stock packs and bought templates are everywhere | `assets` (packs, templates), `binary`, `footprint` (public source, forks), J5 |
 
 "Binary" is not only code: the asset catalogue, the bundled images and sounds, and the strings
 are in it. Apple does not publish how it compares apps. The checks here are proxies for what a

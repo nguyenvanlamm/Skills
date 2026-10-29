@@ -36,7 +36,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 UA = f"appstore-spam-guard/{VERSION}"
 GAME_GENRES = {
     6014: "Games", 7001: "Action", 7002: "Adventure", 7003: "Casual", 7004: "Board",
@@ -311,6 +311,104 @@ def icon_prints(urls, offline: bool = False, log=print) -> dict[str, str]:
                     log(f"  icons {n}/{len(todo)}")
         _write_json(path, cache)
     return {u: cache[u] for u in urls if u in cache}
+
+
+def shot_print(img) -> str:
+    """A 16×16 dHash: one screenshot at two device sizes stays within 16 of 256 bits, while
+    two games in one screenshot template stay 57 or more apart (CHANGELOG v1.3.0)."""
+    return f"{dhash(img, 16):064x}"
+
+
+def shot_distance(a: str, b: str) -> int:
+    return bin(int(a, 16) ^ int(b, 16)).count("1")
+
+
+def shot_prints(urls, offline: bool = False, log=print) -> dict[str, str]:
+    """Screenshot prints by URL, downloading the ones not cached yet (needs Pillow)."""
+    path = cache_dir() / "shots.json"
+    cache: dict[str, str] = _read_json(path, {})
+    todo = [u for u in dict.fromkeys(urls) if u and u not in cache]
+    if todo and not offline:
+        from PIL import Image
+
+        def job(u: str):
+            try:
+                with Image.open(io.BytesIO(get(u, timeout=20))) as im:
+                    return u, shot_print(im)
+            except Exception:  # a dead image costs one comparison, not the run
+                return u, None
+
+        with ThreadPoolExecutor(8) as ex:
+            for u, p in ex.map(job, todo):
+                if p:
+                    cache[u] = p
+        _write_json(path, cache)
+    return {u: cache[u] for u in urls if u in cache}
+
+
+# --------------------------------------------------------------------------- the team's own apps
+
+def _software(r: dict, cc: str) -> dict:
+    return {"id": str(r["trackId"]), "cc": cc, "name": r.get("trackName", ""),
+            "seller": r.get("sellerName") or r.get("artistName", ""),
+            "artist": str(r.get("artistId", "")), "bundle": r.get("bundleId", ""),
+            "url": (r.get("trackViewUrl") or "").split("?")[0],
+            "icon": r.get("artworkUrl512") or r.get("artworkUrl100", ""),
+            "description": r.get("description", ""),
+            "shots": (r.get("screenshotUrls") or []) + (r.get("ipadScreenshotUrls") or []),
+            "released": (r.get("releaseDate") or "")[:10],
+            "game": "6014" in [str(g) for g in r.get("genreIds", [])]}
+
+
+def team_apps(store: dict, team: str, countries, artist_ids=(), seller: str = "",
+              bundles=(), offline: bool = False, log=print) -> tuple[list[dict], list[str], str]:
+    """The apps the team already sells, from its developer ids on the App Store: given, or
+    found from its live bundles and its seller name. Cached a week per team; returns the
+    apps, the developer ids and how they were looked up ('' when they were not)."""
+    cached = store.setdefault("teams", {}).get(team)
+    if cached and (offline or (age_days(cached["at"]) < MAX_AGE_DAYS
+                               and set(artist_ids) <= set(cached["artists"]))):
+        return list(cached["apps"].values()), cached["artists"], cached.get("how", "cache")
+    if offline:
+        return [], list(artist_ids), ""
+
+    def call(params: dict) -> list[dict]:
+        global _last_search
+        wait = SEARCH_GAP - (time.time() - _last_search)
+        if wait > 0:
+            time.sleep(wait)
+        _last_search = time.time()
+        url = "https://itunes.apple.com/" + ("lookup" if "term" not in params else "search")
+        return json.loads(get(f"{url}?{urllib.parse.urlencode(params)}")).get("results", [])
+
+    artists = list(dict.fromkeys(str(a) for a in artist_ids if str(a).strip()))
+    for b in bundles:
+        for cc in countries:
+            found = [r for r in call({"bundleId": b, "country": cc}) if r.get("artistId")]
+            if found:
+                artists.append(str(found[0]["artistId"]))
+                break
+    if seller:
+        want = set(name_words(seller))
+        for r in call({"term": seller, "entity": "software", "attribute": "softwareDeveloper",
+                       "limit": 50, "country": countries[0]}):
+            got = set(name_words(r.get("sellerName") or "")) | set(name_words(r.get("artistName") or ""))
+            if want and want <= got:
+                artists.append(str(r["artistId"]))
+    artists = list(dict.fromkeys(artists))
+    apps: dict[str, dict] = {}
+    for a in artists:
+        for cc in countries:
+            for r in call({"id": a, "entity": "software", "limit": 200, "country": cc}):
+                if r.get("wrapperType") == "software" and r.get("trackId"):
+                    apps.setdefault(str(r["trackId"]), _software(r, cc))
+    log(f"  team {team}: {len(apps)} apps on the App Store from developer id(s) "
+        f"{', '.join(artists) or 'none found'}")
+    how = "; ".join(x for x in (f"ids {', '.join(map(str, artist_ids))}" if artist_ids else "",
+                                f"bundles {', '.join(bundles)}" if bundles else "",
+                                f"seller '{seller}'" if seller else "") if x)
+    store["teams"][team] = {"at": now_iso(), "artists": artists, "apps": apps, "how": how}
+    return list(apps.values()), artists, how
 
 
 def _split_print(p: str) -> tuple[int, bytes]:

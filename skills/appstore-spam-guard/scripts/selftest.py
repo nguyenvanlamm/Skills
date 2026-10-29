@@ -245,6 +245,19 @@ def build_clone(parent: Path) -> Path:
     write(sib, "lib/main.dart", CLONE_DART)
     (sib / "assets/fruits").mkdir(parents=True, exist_ok=True)
     shutil.copy(root / "assets/fruits/watermelon.png", sib / "assets/fruits/watermelon.png")
+    if HAVE_PIL:  # one store screenshot (an App Store size) shipped by both games
+        from PIL import Image, ImageDraw
+        shot = Image.new("RGB", (1206, 2622), (250, 240, 225))
+        draw = ImageDraw.Draw(shot)
+        draw.rectangle((150, 120, 1050, 420), fill=(200, 60, 80))
+        draw.rounded_rectangle((180, 560, 1026, 2500), 80, fill=(30, 30, 40))
+        for i in range(6):
+            draw.ellipse((300 + i * 90, 900 + i * 230, 520 + i * 90, 1120 + i * 230),
+                         fill=(60 + i * 30, 160, 90))
+        (root / "store/screenshots").mkdir(parents=True, exist_ok=True)
+        (sib / "store").mkdir(parents=True, exist_ok=True)
+        shot.save(root / "store/screenshots/01-drop.png")
+        shot.convert("RGB").save(sib / "store/01.jpg", quality=80)
     return root
 
 
@@ -314,6 +327,52 @@ def build_blind_spots(parent: Path) -> dict[str, Path]:
     return roots
 
 
+def crushed_png(w: int, h: int, pixel) -> bytes:
+    """A PNG the way Xcode leaves it in an app bundle: CgBI chunk, BGRA, raw deflate."""
+    raw = bytearray()
+    for y in range(h):
+        raw.append(0)
+        for x in range(w):
+            r, g, b, a = pixel(x, y)
+            raw.extend((b, g, r, a))
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return (struct.pack(">I", len(data)) + kind + data
+                + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
+
+    deflate = zlib.compressobj(9, zlib.DEFLATED, -15)
+    body = deflate.compress(bytes(raw)) + deflate.flush()
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"CgBI", b"\x50\x00\x20\x06")
+            + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0))
+            + chunk(b"IDAT", body) + chunk(b"IEND", b""))
+
+
+def build_ipa(parent: Path) -> Path:
+    """An .ipa whose package brings Fluent Emoji fruit, whose shipped icon is that fruit
+    and whose compiled code spells Suika's chain — none of it in the repo."""
+    import io
+    import plistlib
+    import zipfile
+    write_png(parent / "melon.png", 256, 256, melon)
+    melon_png = (parent / "melon.png").read_bytes()
+    app = "Payload/Runner.app/"
+    flutter = app + "Frameworks/App.framework/flutter_assets/"
+    ipa = parent / "Runner.ipa"
+    with zipfile.ZipFile(ipa, "w") as z:
+        z.writestr(app + "Info.plist", plistlib.dumps(
+            {"CFBundleIdentifier": "com.example.binary", "CFBundleDisplayName": "Binary Bay"},
+            fmt=plistlib.FMT_BINARY))
+        z.writestr(app + "AppIcon60x60@2x.png", crushed_png(
+            120, 120, lambda x, y: clone_icon(x * 512 // 120, y * 512 // 120)))
+        z.writestr(flutter + "packages/fruit_pack/assets/fruits/fluent-emoji/watermelon.png",
+                   melon_png)
+        z.writestr(app + "Frameworks/App.framework/App",
+                   b"\x00\x7fELF..." + b"\x00".join(n.encode() for n in (
+                       "cherry", "strawberry", "grape", "dekopon", "persimmon", "apple",
+                       "pear", "peach", "pineapple", "melon", "watermelon")) + b"\x00")
+    return ipa
+
+
 def build_store(cache: Path, clone_icon_png: Path) -> None:
     """A tiny App Store index: one charting game the clone copies, five more that share
     its genre-word name, and nothing like the original. Fresh, so --offline uses it."""
@@ -327,7 +386,16 @@ def build_store(cache: Path, clone_icon_png: Path) -> None:
     apps += [app(i, n) for i, n in enumerate(
         ["Fruit Drop Party", "Super Fruit Drop", "Fruit Drop Pop", "Fruit Drop Kingdom",
          "Tiny Fruit Drop"], 2)]
-    store = {"version": 1, "searches": {}, "apps": {a["id"]: a for a in apps},
+    # The clone's team already sells a Fruit Drop with the same icon and text; the
+    # original's team was looked up and sells nothing yet.
+    live = app(9, "Fruit Drop", charts=[], seller="Alice Example", bundle="com.example.fruitdrop",
+               description=HIT_DESC, icon="https://fixture.invalid/1.png", game=True,
+               released="2026-01-05")
+    teams = {"TEAMTEST01": {"at": market.now_iso(), "artists": ["900"], "how": "fixture",
+                            "apps": {live["id"]: live}},
+             "TEAMTEST02": {"at": market.now_iso(), "artists": [], "how": "seller 'Alice Example'",
+                            "apps": {}}}
+    store = {"version": 1, "searches": {}, "apps": {a["id"]: a for a in apps}, "teams": teams,
              "charts": {"built": market.now_iso(), "countries": list(market.DEFAULT_COUNTRIES),
                         "fetched": 1, "failed": []}}
     cache.mkdir(parents=True, exist_ok=True)
@@ -397,6 +465,9 @@ def main() -> int:
             "metadata.saturated-genre": "WARN",
             "portfolio.bundle-ids": "PASS",
             "portfolio.sibling": "FAIL",
+            "portfolio.store-name": "FAIL",
+            "portfolio.store-wording": "FAIL",
+            "portfolio.screenshots": "FAIL" if HAVE_PIL else "WARN",
             "footprint.none": "SKIP",
             "ownership.publisher": "WARN",
             "account.open-4.3": "FAIL",
@@ -411,6 +482,21 @@ def main() -> int:
         errors += expect(r, wanted, "clone")
         if r["overall"] != "FAIL":
             errors.append(f"clone: overall expected FAIL, got {r['overall']}")
+        # The submission keeps that scan; App Review's answer then scores it.
+        kept = tmp / "clone-submit.json"
+        kept.write_text(json.dumps(r), encoding="utf-8")
+        for event, extra in (("submitted", ["--scan", str(kept)]),
+                             ("rejected", ["--guideline", "4.3(a)"])):
+            subprocess.run([sys.executable, str(LEDGER), "--ledger", str(ledger_path), "record",
+                            "--team", "TEAMTEST01", "--app", "Fruit Drop", "--bundle",
+                            "com.example.clone", "--event", event, *extra],
+                           capture_output=True, text=True)
+        st = subprocess.run([sys.executable, str(LEDGER), "--ledger", str(ledger_path), "stats",
+                             "--team", "TEAMTEST01"], capture_output=True, text=True)
+        stats = json.loads(st.stdout or "{}")
+        if stats.get("by_verdict", {}).get("FAIL", {}).get("rejected 4.3") != 1 or \
+                "signature.suika.chain" not in stats.get("rows_flagged", {}):
+            errors.append(f"ledger stats: the FAIL scan should score one 4.3 rejection: {stats}")
 
         d = scan(clone, ledger_path, "--mode", "design")
         errors += expect(d, {"design.suika.chain": "FAIL",
@@ -426,6 +512,8 @@ def main() -> int:
             "metadata.clean": "PASS",
             "portfolio.bundle-ids": "PASS",
             "portfolio.none": "SKIP",
+            "portfolio.store": "SKIP",
+            "portfolio.screenshots": "SKIP" if HAVE_PIL else "WARN",
             "footprint.none": "SKIP",
             "ownership.consistent": "PASS",
             "account.ledger": "PASS",
@@ -464,7 +552,8 @@ def main() -> int:
             capture_output=True, text=True)
         if rec.returncode != 0:
             errors.append(f"ledger record failed: {rec.stderr}")
-        r = scan(spots["flavors"], ledger_path, "--groups", "icon,portfolio,account")
+        r = scan(spots["flavors"], ledger_path, "--groups", "icon,portfolio,account",
+                 "--offline")
         wanted = {"portfolio.bundle-ids": "FAIL", "account.same-app": "WARN"}
         wanted["icon.bundled" if HAVE_PIL else "icon.unverified"] = \
             "SKIP" if HAVE_PIL else "WARN"
@@ -473,6 +562,43 @@ def main() -> int:
         if not ("halloween" in ev and "christmas" in ev) or any(
                 x in ev for x in (".dev", "RunnerTests", "SeasonWidget")):
             errors.append(f"flavors: bundle-ids evidence should be the three store apps: {ev}")
+        tpl = tmp / "spots" / "template" / "template"
+        write(tpl, "pubspec.yaml", "name: template\n")
+        for f in ("play_session/play_session_screen", "level_selection/level_selection_screen",
+                  "win_game/win_game_screen"):
+            write(tpl, f"lib/src/{f}.dart", "// from the template\n")
+        r = scan(tpl, ledger_path, "--groups", "assets")
+        errors += expect(r, {"assets.template.flutter-game-template": "WARN"}, "template")
+        # Unity, Godot and a native Xcode project: the chain in C#, GDScript and Swift.
+        chain = ["cherry", "strawberry", "grape", "dekopon", "persimmon", "apple", "pear",
+                 "peach", "pineapple", "melon", "watermelon"]
+        stacks = {k: tmp / "spots" / k / k for k in ("unity", "godot", "native")}
+        write(stacks["unity"], "ProjectSettings/ProjectSettings.asset",
+              "PlayerSettings:\n  productName: Fruit Fall\n  applicationIdentifier:\n"
+              "    iPhone: com.example.fruitfall\n  appleDeveloperTeamID: TEAMTEST04\n")
+        write(stacks["unity"], "Assets/Scripts/Fruits.cs",
+              "public enum Fruit { " + ", ".join(c.title() for c in chain) + " }\n")
+        write(stacks["godot"], "project.godot", '[application]\nconfig/name="Fruit Tumble"\n')
+        write(stacks["godot"], "export_presets.cfg",
+              'application/bundle_identifier="com.example.fruittumble"\n')
+        write(stacks["godot"], "scripts/fruits.gd", f"const FRUITS = {chain}\n")
+        write(stacks["native"], "FruitPop.xcodeproj/project.pbxproj",
+              "PRODUCT_BUNDLE_IDENTIFIER = com.example.fruitpop;\n"
+              "PRODUCT_BUNDLE_IDENTIFIER = com.example.fruitpop.lite;\n")
+        write(stacks["native"], "FruitPop/Fruits.swift",
+              "enum Fruit { case " + ", ".join(chain) + " }\n")
+        for k, root in stacks.items():
+            r = scan(root, ledger_path, "--groups", "signature,portfolio", "--offline")
+            wanted = {"signature.suika.chain": "FAIL",
+                      "portfolio.bundle-ids": "FAIL" if k == "native" else "PASS"}
+            errors += expect(r, wanted, k)
+        ipa = build_ipa(tmp / "spots")
+        r = scan(spots["badges"], ledger_path, "--groups", "binary", "--ipa", str(ipa))
+        wanted = {"binary.bundle": "PASS", "binary.stock.fluent-emoji": "FAIL",
+                  "binary.suika.chain": "FAIL"}
+        if HAVE_PIL:
+            wanted["binary.icon"] = "FAIL"
+        errors += expect(r, wanted, "ipa")
         r = scan(spots["sudoku"], ledger_path, "--groups", "metadata")
         errors += expect(r, {"metadata.saturated-genre": "WARN"}, "sudoku")
         ev = next((c["evidence"] for c in r["checks"] if c["id"] == "metadata.saturated-genre"), "")

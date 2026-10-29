@@ -6,6 +6,11 @@
         [--guideline "4.3(a)"] [--extended-review] [--date YYYY-MM-DD] [--note TEXT]
     python3 ledger.py check --team T [--bundle ID] [--app NAME] [--days 14]
     python3 ledger.py show [--team T]
+    python3 ledger.py stats [--team T]
+
+A `submitted` event keeps a summary of the scan behind it (--scan FILE, or the
+latest submit-mode scan.py run for that bundle); `stats` then sets each
+submission's verdict against App Review's answer, so the guard can be measured.
 
 Guideline 4.3 judges the developer account, not one game, so the ledger lives
 outside every repo: $APPSTORE_SPAM_GUARD_LEDGER, or
@@ -53,9 +58,42 @@ def save(path: Path, data: dict) -> None:
     tmp.replace(path)
 
 
+def scans_dir() -> Path:
+    """Where scan.py leaves its latest submit-mode summary per team and bundle."""
+    env = os.environ.get("APPSTORE_SPAM_GUARD_CACHE", "").strip()
+    base = Path(env).expanduser() if env else Path.home() / ".cache" / "appstore-spam-guard"
+    return base / "scans"
+
+
+def scan_summary(result: dict) -> dict:
+    """What a submission keeps of a scan: enough to learn which rows predict App Review."""
+    rows = result.get("checks", [])
+    return {"version": result.get("version", ""), "mode": result.get("mode", ""),
+            "overall": result.get("overall", ""), "at": result.get("at", ""),
+            "fail": sorted({r["id"] for r in rows if r["verdict"] == "FAIL"}),
+            "warn": sorted({r["id"] for r in rows if r["verdict"] == "WARN"})}
+
+
+def save_last_scan(team: str, bundle: str, result: dict) -> None:
+    p = scans_dir() / team / f"{bundle}.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(scan_summary(result), ensure_ascii=False), encoding="utf-8")
+
+
+def last_scan(team: str, bundle: str, max_days: int = 14) -> dict | None:
+    p = scans_dir() / team / f"{bundle}.json"
+    try:
+        s = json.loads(p.read_text(encoding="utf-8"))
+        age = dt.date.today() - dt.date.fromisoformat(s["at"][:10])
+    except (OSError, ValueError, KeyError):
+        return None
+    return s if age.days <= max_days else None
+
+
 def record(data: dict, team: str, app: str, bundle: str, event: str,
            guideline: str = "", extended_review: bool = False,
-           date: str = "", note: str = "") -> dict:
+           date: str = "", note: str = "", scan: dict | None = None,
+           verdict: str = "") -> dict:
     entry = {
         "date": date or dt.date.today().isoformat(),
         "app": app,
@@ -68,6 +106,10 @@ def record(data: dict, team: str, app: str, bundle: str, event: str,
         entry["extended_review"] = True
     if note:
         entry["note"] = note
+    if scan:
+        entry["scan"] = scan
+    if verdict:
+        entry["verdict"] = verdict  # the gate's verdict with J1–J6, when given
     team_data = data["teams"].setdefault(team, {"events": []})
     team_data["events"].append(entry)
     team_data["events"].sort(key=lambda e: e["date"])
@@ -167,6 +209,48 @@ def check_rows(data: dict, team: str, bundle: str | None = None, days: int = 14,
     return rows
 
 
+def stats(data: dict, team: str | None = None) -> dict:
+    """Each submission against App Review's answer: does the guard's verdict predict 4.3?"""
+    table: dict[str, dict[str, int]] = {}
+    rows: dict[str, dict[str, int]] = {}
+    missed: list[str] = []
+    for t, td in data.get("teams", {}).items():
+        if team and t != team:
+            continue
+        open_: dict[str, dict] = {}
+        outcomes: list[tuple[dict, str]] = []
+        for e in sorted(td.get("events", []), key=lambda e: e["date"]):
+            if e["event"] == "submitted":
+                open_[e["bundle"]] = e
+            elif e["bundle"] in open_:
+                sub = open_.pop(e["bundle"])
+                if e["event"] == "approved":
+                    outcome = "approved"
+                elif e["event"] == "rejected":
+                    outcome = ("rejected 4.3" if e.get("guideline", "").startswith("4.3")
+                               else "rejected other")
+                else:
+                    outcome = "withdrawn"
+                outcomes.append((sub, outcome))
+        outcomes += [(s, "pending") for s in open_.values()]
+        for sub, outcome in outcomes:
+            scan = sub.get("scan") or {}
+            verdict = sub.get("verdict") or scan.get("overall") or "unscanned"
+            table.setdefault(verdict, {}).setdefault(outcome, 0)
+            table[verdict][outcome] += 1
+            for rid in scan.get("fail", []) + scan.get("warn", []):
+                rows.setdefault(rid, {}).setdefault(outcome, 0)
+                rows[rid][outcome] += 1
+            if outcome == "rejected 4.3" and verdict == "PASS":
+                missed.append(f"{t} {sub['date']} {sub['app']} ({sub['bundle']})")
+    decided = sum(n for v in table.values() for o, n in v.items() if o != "pending")
+    return {"submissions_decided": decided, "by_verdict": table,
+            "rows_flagged": dict(sorted(rows.items())), "passed_but_rejected_4.3": missed,
+            "note": "rows_flagged counts each WARN/FAIL row id in the scan kept with a "
+                    "submission, by outcome; a row seen before 4.3 rejections and never "
+                    "before approvals is one to make FAIL"}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--ledger", type=Path, default=None, help="ledger file")
@@ -181,6 +265,14 @@ def main(argv: list[str] | None = None) -> int:
     rec.add_argument("--extended-review", action="store_true")
     rec.add_argument("--date", default="")
     rec.add_argument("--note", default="")
+    rec.add_argument("--scan", type=Path, default=None,
+                     help="scan.py's JSON to keep with a submission (default: the latest "
+                          "submit-mode scan of this bundle, if under 14 days old)")
+    rec.add_argument("--verdict", choices=("PASS", "WARN", "FAIL"), default="",
+                     help="the gate's verdict with J1–J6, when it differs from the scan's")
+
+    st = sub.add_parser("stats", help="the guard's verdicts against App Review's answers")
+    st.add_argument("--team", default=None)
 
     chk = sub.add_parser("check", help="rows for scan.py's account group")
     chk.add_argument("--team", required=True)
@@ -202,10 +294,26 @@ def main(argv: list[str] | None = None) -> int:
             except ValueError:
                 print(f"--date must be YYYY-MM-DD, got {args.date!r}", file=sys.stderr)
                 return 2
+        scan = None
+        if args.scan:
+            try:
+                scan = scan_summary(json.loads(args.scan.read_text(encoding="utf-8")))
+            except (OSError, ValueError) as e:
+                print(f"--scan {args.scan}: {e}", file=sys.stderr)
+                return 2
+        elif args.event == "submitted":
+            scan = last_scan(args.team, args.bundle)
         entry = record(data, args.team, args.app, args.bundle, args.event,
-                       args.guideline, args.extended_review, args.date, args.note)
+                       args.guideline, args.extended_review, args.date, args.note,
+                       scan, args.verdict)
         save(path, data)
-        print(json.dumps({"recorded": entry, "ledger": str(path)}, ensure_ascii=False))
+        out = {"recorded": entry, "ledger": str(path)}
+        if args.event == "submitted" and not scan:
+            out["warning"] = ("no scan kept with this submission: run scan.py --mode submit "
+                              "first or pass --scan, or stats cannot learn from it")
+        print(json.dumps(out, ensure_ascii=False))
+    elif args.cmd == "stats":
+        print(json.dumps(stats(data, args.team), indent=2, ensure_ascii=False))
     elif args.cmd == "check":
         print(json.dumps(check_rows(data, args.team, args.bundle, args.days, app=args.app),
                          indent=2, ensure_ascii=False))
