@@ -9,7 +9,7 @@ awake then.
   scripts/telegram_bridge.py uninstall-service
   scripts/telegram_bridge.py serve                          # the daemon: the only Telegram reader, all games
   scripts/telegram_bridge.py watch REPO                     # register REPO, then serve (no service installed)
-  scripts/telegram_bridge.py register REPO                  # make REPO a game the phone can reach
+  scripts/telegram_bridge.py register REPO [--was OLD_PATH] # make REPO a game the phone can reach
   scripts/telegram_bridge.py ask REPO GATE QUESTION [--option TEXT]...  # wait for a decision
   scripts/telegram_bridge.py close REPO --answered-here ANSWER          # decided at the computer
   scripts/telegram_bridge.py answers REPO                   # decisions that arrived while no session waited
@@ -424,11 +424,20 @@ def to_inbox(repo, entry):
 
 # Games
 
-def register(repo):
-    repos = read_json(REPOS) or []
+def register(repo, was=()):
+    """Add REPO to the games the phone reaches. WAS: the paths it had before a rename, dropped from the
+    registry (and moved over in the hidden list) so the old name never comes back on /games."""
+    old = {os.path.abspath(path) for path in was} - {repo}
+    before = read_json(REPOS) or []
+    repos = [path for path in before if path not in old]
     if repo not in repos:
+        repos.append(repo)
+    if repos != before:
         os.makedirs(CONFIG_DIR, exist_ok=True)
-        write_json(REPOS, repos + [repo])
+        write_json(REPOS, repos)
+    if old & set(hidden()):
+        rest = [path for path in hidden() if path not in old]
+        write_json(global_file('hidden.json'), rest + [os.path.realpath(repo)])
     set_current(repo)
 
 
@@ -1583,8 +1592,12 @@ def main(argv):
     sub = parser.add_subparsers(dest='command', required=True)
     for name in ('setup', 'serve', 'hook', 'install-service', 'uninstall-service'):
         sub.add_parser(name)
-    for name in ('watch', 'register', 'inbox', 'answers'):
+    for name in ('watch', 'inbox', 'answers'):
         sub.add_parser(name).add_argument('repo')
+    reg = sub.add_parser('register')
+    reg.add_argument('repo')
+    reg.add_argument('--was', action='append', default=[], metavar='OLD_PATH',
+                     help="the repo's path before a rename; dropped from the registry")
     ask = sub.add_parser('ask')
     ask.add_argument('repo')
     ask.add_argument('gate')
@@ -1619,8 +1632,8 @@ def main(argv):
         register(repo)
         return cmd_serve()
     if args.command == 'register':
-        register(repo)
-        print(f'registered {repo}')
+        register(repo, args.was)
+        print(f'registered {repo}' + (f' (dropped {", ".join(args.was)})' if args.was else ''))
         return 0
     if args.command == 'ask':
         return cmd_ask(repo, args.gate, args.question, args.option)

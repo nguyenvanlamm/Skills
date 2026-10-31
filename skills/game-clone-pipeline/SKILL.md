@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.19.0
+  version: 1.20.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -142,6 +142,14 @@ version for people; this file is the operating manual.
     is submitted to it. Fruit Mischief (a Suika-like with stock emoji fruit, an emoji icon and
     its twist hidden until merge 6) was rejected under 4.3(a) and put its account on Extended
     Review; run on that build, the guard fails on all four signs.
+18. **One name everywhere.** From G1 on, every place the game's name appears agrees: game folder
+    and GitHub repo, site folder, repo and Pages URL, the root Pages listing, status.md's title,
+    `Repo:` and `Landing:`, DESIGN.md, the Dart package, iOS display name and bundle id, Android
+    label and ids, web title, every link to the site, the Telegram registry ("Names"). The name
+    changes only through "Renaming the game", whatever stage the change comes from, and
+    `scripts/name_sync.py check` exits 0 at every session end from G1 on (Final report). Renames
+    that moved only the folder and the repo left web titles, Android labels, a `Landing:` line and
+    the bot's registry on the old or a placeholder name.
 
 ## Roles
 
@@ -172,8 +180,51 @@ at S0, before anything is copied in.
 
 **Names.** The game repo (folder and GitHub repo) carries the game's name in kebab-case,
 `<game>` (Moss Lantern → `moss-lantern`); the landing repo is `<game>-site`. Never a `-clone` suffix,
-in either. Until G1 fixes the name, the repo uses a working slug of the idea or target (also
-without `-clone`) and is renamed right after G1 (see S2).
+in either. In the app the name takes its other forms: Dart package `<game_snake>`
+(`moss_lantern`), iOS bundle id `<org>.<gamecompact>` (`com.nguyenvanlam.mosslantern`), and the
+name as written (`Moss Lantern`) for the iOS display name, Android label, web title and
+`MaterialApp.title`; `python3 <skill-dir>/scripts/name_sync.py names "<Game>"` prints every form.
+Until G1 fixes the name, the repo uses a working slug of the idea or target (also without
+`-clone`) and is renamed right after G1. A tagline the App Store listing adds after the name
+(`Moss Lantern: Glow Puzzle`) renames nothing.
+
+**Renaming the game** (rule 18): right after G1 (working slug → approved name), and whenever
+the name changes later (`brand-name-checker` says Modify or Abandon, `appstore-spam-guard` fails
+the name at S4 or S8, the human asks). A name chosen after G1 is the human's decision: run
+`brand-name-checker` and `appstore-spam-guard`'s name check on it, then ask gate `RENAME`
+(Approve / Reject, both verdicts in the question). Then every step in one go, `<Old>` and `<New>`
+being the names as written and `<ns>` `python3 <skill-dir>/scripts/name_sync.py`:
+1. Content, in the current stage worktree (at the computer: on `main`):
+   `<ns> rename <checkout> --old "<Old>" --new "<New>"` lists every hit and every path holding
+   a form of the old name; read it, then run it again with `--apply`. It rewrites code and
+   `package:` imports, pubspec, the iOS display name and bundle id, the Android label, ids and
+   Kotlin folder, the web title, `docs/`, `store/` texts, SPEC, DESIGN and links to the site, and
+   leaves `.clone/`, `.reports/` and CHANGELOG files alone; `--skip <glob>` keeps a file whose old
+   name is history. Once App Store Connect holds the bundle id (S8 step 2), add `--keep-ids`:
+   bundle, product and Android ids never change there; name them on a `Kept ids:` line under
+   status.md's header. By hand in status.md: the title, `Repo:` and `Landing:` with the new names,
+   and a Gate log row `RENAME | <date> | <Old> → <New> | <why>`. With a Flutter project,
+   `flutter pub get`, analyze and test exit 0. Images that show the old name (store screenshots,
+   lettering in the icon) go back to the skill that made them. Commit.
+2. Close the stage worktree as at a stage end (rule 5), and leave no other worktree open in
+   either repo: a moved folder leaves its linked worktrees pointing at the old path.
+3. Site repo, once S7 made it: the same `rename` in a site worktree ("Site repo"), commit, merge,
+   push. Root Pages repo, once S9 listed the site: the same in a worktree of
+   `<parent>/<owner>.github.io`; only this game's robots.txt and llms.txt lines change.
+4. GitHub and folders, from the game repo's root on `main`, one command each:
+   `gh repo rename <game> -R <owner>/<old> --yes`, `mv <parent>/<old> <parent>/<game>`,
+   `git -C <parent>/<game> remote set-url origin git@github.com:<owner>/<game>.git`; with a site,
+   the same three for `<old>-site` → `<game>-site`. The session follows its folder to the new
+   path. GitHub redirects a renamed repo but not its Pages site: the old
+   `https://<owner>.github.io/<old>-site/` stops answering, so every link was rewritten first.
+5. With Telegram, `<tb> register <parent>/<game> --was <parent>/<old>`; reopen the steps pane
+   on the new path.
+6. Verify: `<ns> check <parent>/<game> --old "<Old>" --online` exits 0. `--online` adds both
+   GitHub names and HTTP 200 on the new Pages URLs; a 404 right after the rename clears with
+   `gh api -X POST repos/<owner>/<game>-site/pages/builds`. A worktree missed in step 2 is
+   repaired with the `git worktree repair` command `check` prints.
+7. Once they exist, under `## Deferred (human)`: the app name and the Support and Privacy URLs
+   in App Store Connect.
 
 **Closing a branch** (rule 5), once analyze + test exit 0 on it, from the repo root on `main`:
 `git merge --no-ff <branch>`, `git push`; for a worktree's branch `git worktree remove <path>`;
@@ -249,7 +300,7 @@ because Chrome's virtual time barely moves Flutter tickers. `analysis_options.ya
    status.md `Remote:` line to `Telegram on`, then run
    `<tb> answers <repo>` and `<tb> inbox <repo>` and act on what they print. A decision in
    `.clone/telegram/decisions.jsonl` that the Gate log lacks was read by a session that stopped
-   before recording it: record it now. After G1's rename, `<tb> register <new path>`.
+   before recording it: record it now. After a rename, `<tb> register <new path> --was <old path>`.
 
 ## Telegram remote
 
@@ -342,10 +393,8 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
 - `appstore-spam-guard` in `design` mode on DESIGN.md (rule 17): a hit's progression or a stock
   art pack in the "Ours" column is a FAIL to fix before G1; its rows go into the G1 question.
 - **G1**: human approves DESIGN.md. Commit.
-- Rename the repo to the approved name (see Names), unless it already has it:
-  `gh repo rename <game>`, move the folder to `<parent>/<game>`, then
-  `git remote set-url origin git@github.com:<owner>/<game>.git` and update the repo URL in the
-  status.md header. Reopen the steps pane on the new path.
+- Rename everything to the approved name by "Renaming the game", unless the repo already has
+  it; G1 is that rename's approval, so no `RENAME` gate is asked.
 
 ### S3 — Core in Flutter (placeholder art)
 
@@ -365,6 +414,11 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
     appends to `.gitignore`;
   - before committing, `git status --short` shows nothing from `.clone/reference/`,
     `.clone/apk/`, `.clone/data/`, `build/` or `.dart_tool/`.
+- Name the app (rule 18): `flutter create` leaves the snake_case package name where people read
+  the name, so set the name as written in `CFBundleDisplayName` (`ios/Runner/Info.plist`),
+  `android:label` (`android/app/src/main/AndroidManifest.xml`), `<title>` and
+  `apple-mobile-web-app-title` (`web/index.html`), `name` and `short_name` (`web/manifest.json`)
+  and `MaterialApp.title`.
 - Local gate (rule 11): copy `templates/tool/check.sh` and `templates/tool/install_hooks.sh`
   into `tool/` and run `bash tool/install_hooks.sh` once. Every later commit, from any worktree,
   then runs format, analyze and test with git's hook variables cleared (left set, they make
@@ -377,8 +431,8 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
   `test-coverage` if branches are thin; at the computer it writes the tests on its own `feat/…`
   branch, so close that branch afterwards ("Closing a branch"); in a stage worktree it commits
   on the worktree's branch (rule 5).
-- Verify: `flutter analyze` and `flutter test` exit 0 on `main`, no branch but `main`; simulator
-  numbers recorded in DESIGN.md.
+- Verify: `flutter analyze` and `flutter test` exit 0 on `main`, no branch but `main`,
+  `name_sync.py check` exits 0; simulator numbers recorded in DESIGN.md.
   Commit after each green milestone.
 
 ### S4 — UI direction and look → gate G2
@@ -405,7 +459,8 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
    sprite or the reference game's signature object.
 4. `appstore-spam-guard` in `build` mode (rule 17), plus its J1 and J3 checks: stock or emoji
    art for main objects, an icon reproducing a bundled sprite, a hit's progression in the code,
-   or a name or icon matching a game on the App Store charts is a FAIL to fix in this stage.
+   or a name or icon matching a game on the App Store charts is a FAIL to fix in this stage
+   (a new name by "Renaming the game").
 - Verify: analyze + test exit 0 on `main`, no branch but `main`, screenshots of home and game
   captured beside the mockup's, `appstore-spam-guard` without FAIL. Commit.
 
@@ -454,7 +509,9 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
 - landing-page-generator's copy mode only prints the copy in the chat and ends with its own
   `Result: COMPLETE` block. That ends its step, not S7 (hard rule 16): put the copy into the
   site's `index.html` right away, then the privacy and support pages, Pages and the checks.
-- Verify: both URLs return 200 (`curl -sI`). Commit with `commit` in that repo.
+- Fill status.md's `Landing:` with the site repo and its Pages URL.
+- Verify: both URLs return 200 (`curl -sI`) and `name_sync.py check <repo> --online` exits 0.
+  Commit with `commit` in that repo.
 
 ### S8 — iOS: prepare on Ubuntu, build and upload on a Mac → gate G4
 
@@ -482,7 +539,8 @@ Follow `references/ios-release-runbook.md`, skipping every `asc` step (hard rule
 5. `appstore-review-checker` on the source, the iOS project and `store/` (the build too, once
    steps 2–3 are done), and `appstore-spam-guard` in `submit` mode with the team the human
    uploads from (`--team`, or `TEAM_ID`) and its J1–J6 checks (rule 17). A spam-guard FAIL
-   blocks G4. **G4**: human reads both reports and approves the package, and answers
+   blocks G4; a name FAIL is fixed by "Renaming the game" (`--keep-ids` once step 2 is done).
+   **G4**: human reads both reports and approves the package, and answers
    once whether S9 may scan the site with isitagentready.com (an outside service); with steps
    2–3 still deferred, G4 approves everything except the build and is noted as partial. G4 is
    waited for in the S8 worktree (rule 5); with steps 2–3 deferred, that worktree ends there:
@@ -512,7 +570,9 @@ Follow `references/ios-release-runbook.md`, skipping every `asc` step (hard rule
 ## Final report (end of each session)
 
 Stage reached, gates passed with dates, commands run and their exit codes, fallbacks, open
-assumptions, what the human must do next (record, approve, build on the Mac). Tick boxes in
+assumptions, what the human must do next (record, approve, build on the Mac). From G1 on, first
+run `python3 <skill-dir>/scripts/name_sync.py check <checkout>` (the stage worktree while one is
+open) and fix every FAIL it prints (rule 18); its exit code goes in the report. Tick boxes in
 `.clone/status.md` and commit it. Once S9 is done, `steps_pane.py close <repo>` and stop the
 Telegram `watch` process if this session started one; before that
 leave the pane open.
@@ -529,7 +589,8 @@ leave the pane open.
 | `references/telegram-remote.md` | the Telegram bot in detail: phone sessions, stall warnings, away mode, writing for the phone, evidence, inbox (rule 14) |
 | `scripts/contact-sheet.sh` | recording → timestamped contact sheets and strips (S1) |
 | `scripts/steps_pane.py` | steps pane in herdr, redrawn from the newest status.md (a stage worktree's included): `open`, `close`, `once` (all stages) |
-| `scripts/telegram_bridge.py` | optional Telegram remote (rule 14): `setup`, `install-service`, `serve`/`watch`, `register`, `ask`, `close`, `answers`, `inbox`, `mode`, `send`, `hook` |
+| `scripts/telegram_bridge.py` | optional Telegram remote (rule 14): `setup`, `install-service`, `serve`/`watch`, `register` (`--was` after a rename), `ask`, `close`, `answers`, `inbox`, `mode`, `send`, `hook` |
+| `scripts/name_sync.py` | one name everywhere (rule 18): `names` (every form), `rename` (dry run, `--apply`, `--keep-ids`), `check` (PASS/FAIL per place, `--old`, `--online`) |
 | `templates/status.md` | `.clone/status.md` starter |
 | `templates/tool/check.sh`, `templates/tool/install_hooks.sh` | local pre-commit gate (format, analyze, test) with git's hook variables cleared (S3) |
 | `templates/store/` | store code every game starts from, with its tests and a README (S5): save before completing, StoreKit 2 verification, never stuck |

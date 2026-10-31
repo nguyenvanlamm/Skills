@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.20.0 — 2026-10-31
+
+The S2 rename covered the folder, the GitHub repo, the remote and the status.md header, and ran
+only once, right after G1. Every game's folder, repo and site repo agree, but the new
+`name_sync.py check` run on all 17 pipeline games found what the rename never touched:
+- the web `<title>` and `manifest.json` still carry the snake_case package name in 9 games
+  (brinestack, chiselturn, keyturn-keep, lowtide-locks, ochrecut, plasmatide, skepfield,
+  slipchute, snowpack-hop) and the Android label in 2 (folioscape, keyturn-keep), because no
+  stage sets them after `flutter create`;
+- hadal-relay's status.md still says `Landing: — (S7)` with its site live;
+- the Telegram registry still lists `horde-hold`, `trending-puzzle` and `swarm-gates`;
+- nothing would rename the site repo, its Pages URL, the links to it or the root Pages listing:
+  a name changed after G1 (a spam-guard name FAIL at S4 or S8) had no procedure at all.
+
+Changes:
+- **Rule 18, one name everywhere**, and **"Renaming the game"** in Workspace: one procedure for
+  every rename, at any stage. Content first (`name_sync.py rename`, dry run then `--apply`, in
+  the stage worktree), then the site and root Pages repos in their worktrees, then the GitHub
+  renames, folder moves and remotes with no worktree open, then `register --was`, then
+  `check --online`. A rename after G1 asks gate `RENAME`; once App Store Connect holds the
+  bundle id, `--keep-ids` keeps bundle, product and Android ids and status.md lists them under
+  `Kept ids:`.
+- **New `scripts/name_sync.py`**: `names` prints the seven forms of a name; `rename` rewrites
+  each form of the old name into the same form of the new one across tracked text files and
+  paths (one-word names pick the form from context: `package:` → snake, reverse-DNS id →
+  compact, URL → kebab); `check` reports PASS/FAIL for folder, origin, status.md, DESIGN.md,
+  pubspec, iOS display name and bundle id, Android label and id, web title, site repo, stale
+  Pages links, root robots.txt and llms.txt, worktrees left behind by a move, the Telegram
+  registry and leftovers of `--old` names. Tested on two `flutter create` workspaces
+  (Beamfork → Moss Lantern, swarm-gates → Keyturn Keep with kept ids): 22 PASS, analyze and test
+  green after the rewrite.
+- **`telegram_bridge.py register --was OLD_PATH`** drops the old path from the registry and
+  the hidden list.
+- **S3** names the app where `flutter create` left the package name (iOS display name, Android
+  label, web title and manifest, `MaterialApp.title`); **S7** fills `Landing:`; S3 and S7
+  verify with `name_sync.py check`; the **Final report** runs it from G1 on.
+- A Claude Code session survives moving its own folder (its shell follows to the new path), so
+  the session that renames finishes the run.
+
 ## 1.19.0 — 2026-10-29
 
 S4 builds the chosen `huashu-design` mockup in Flutter itself, by the new

@@ -1,4 +1,4 @@
-# Quy trình clone game (bản 1.17.1)
+# Quy trình clone game (bản 1.20.0)
 
 Biến một game casual/puzzle đang thành công, hoặc một ý tưởng game (đặt cạnh các game thành công gần nhất), thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
 
@@ -12,7 +12,13 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 6. **Cổng chỉ qua khi có bằng chứng**: lệnh thật chạy xong và exit 0, hoặc câu trả lời của người được ghi vào `.clone/status.md`.
 7. **Chỉ phát hành App Store.** Không có bước Google Play.
 8. **Commit ngay sau mỗi bước** bằng skill `commit`: message tiếng Anh, kèm push. Tag và release để `/ship` làm.
-9. **Đặt tên repo theo tên game.** Repo game (thư mục và GitHub) mang đúng tên game viết thường, nối bằng gạch ngang (Moss Lantern → `moss-lantern`); repo landing là `<tên-game>-site`. Không bao giờ có đuôi `-clone`. Trước G1 dùng tên tạm theo ý tưởng (cũng không có `-clone`); duyệt tên ở G1 xong thì đổi tên repo và thư mục.
+9. **Một tên ở mọi nơi.** Repo game (thư mục và GitHub) mang đúng tên game viết thường, nối bằng gạch ngang (Moss Lantern → `moss-lantern`); repo landing là `<tên-game>-site`. Không bao giờ có đuôi `-clone`. Trong app, tên hiện trên iOS, Android, web và `MaterialApp.title` là tên viết thường lệ (`Moss Lantern`), package Dart là `moss_lantern`, bundle id iOS là `<org>.mosslantern`. Trước G1 dùng tên tạm theo ý tưởng (cũng không có `-clone`). Mỗi lần đổi tên, dù là ngay sau G1 hay muộn hơn (brand-name-checker hay spam-guard báo trùng, hoặc bạn muốn đổi), agent đổi tên game ở mọi nơi trong một lượt:
+    - code, tài liệu, `store/`, tên hiện trong app, bundle id và mọi link tới site, bằng `scripts/name_sync.py rename`;
+    - repo site và dòng của game trong `robots.txt`, `llms.txt` của repo Pages gốc;
+    - repo GitHub, thư mục, remote, đăng ký Telegram (`register --was`);
+    - các dòng `Repo:` và `Landing:` trong status.md.
+
+    Đổi tên sau G1 thì agent hỏi bạn trước (cổng `RENAME`). Khi App Store Connect đã có bundle id, bundle id và mã IAP được giữ nguyên (`--keep-ids`). Cuối mỗi phiên từ G1 trở đi, `name_sync.py check` phải exit 0. Trước đây chỉ có thư mục và repo được đổi tên; tên hiện trên web, nhãn Android, dòng `Landing:` và danh sách game của bot vẫn còn tên cũ hoặc tên tạm.
 10. **Telegram chỉ là cổng thêm.** Ngồi ở máy thì vẫn quyết trong chat; chỉ khi bạn bật chế độ vắng mặt (`/away`) agent mới hỏi qua Telegram. Từ điện thoại bạn cũng mở được phiên Claude (`/open`, `/new`). Không gửi mật khẩu hay tài khoản Apple qua Telegram.
 11. **Agent ở yên trong repo game.** Muốn xem repo khác (ví dụ `DESIGN.md` của game trước), agent đọc bằng đường dẫn đầy đủ chứ không `cd` sang đó. Repo landing (S7, S9) cũng vậy: agent tạo cho nó một worktree riêng bằng `git -C` rồi sửa trong đó. Phiên chạy nền làm mỗi bước trong một worktree riêng và chỉ ra khi xong bước, merge vào `main`. Cổng nằm giữa bước (ví dụ G4) thì chờ ngay trong worktree đó, không sang bước sau trước. Không bao giờ quay lại một worktree đã rời: từ repo khác, việc đó bật một hộp xin quyền chỉ bấm được ở máy, và phiên đứng chờ ở đó.
 12. **Code mua hàng lấy từ mẫu, không chép game trước.** S5 bắt đầu từ `templates/store/`. Mẫu này có sẵn test cho các điểm sau:
