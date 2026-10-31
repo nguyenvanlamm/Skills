@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.20.0
+  version: 1.20.1
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -199,11 +199,13 @@ being the names as written and `<ns>` `python3 <skill-dir>/scripts/name_sync.py`
    a form of the old name; read it, then run it again with `--apply`. It rewrites code and
    `package:` imports, pubspec, the iOS display name and bundle id, the Android label, ids and
    Kotlin folder, the web title, `docs/`, `store/` texts, SPEC, DESIGN and links to the site, and
-   leaves `.clone/`, `.reports/` and CHANGELOG files alone; `--skip <glob>` keeps a file whose old
-   name is history. Once App Store Connect holds the bundle id (S8 step 2), add `--keep-ids`:
+   leaves `.clone/`, `.reports/` and CHANGELOG files alone. A file whose old name is history on
+   purpose goes on a `Name history: <glob>, …` line under status.md's header; `rename` and
+   `check` both skip it. Once App Store Connect holds the bundle id (S8 step 2), add `--keep-ids`:
    bundle, product and Android ids never change there; name them on a `Kept ids:` line under
    status.md's header. By hand in status.md: the title, `Repo:` and `Landing:` with the new names,
-   and a Gate log row `RENAME | <date> | <Old> → <New> | <why>`. With a Flutter project,
+   and a Gate log row `RENAME | <date> | <Old> → <New> | <why>`, at G1 too: `check` reads the
+   old names from these rows at every session end. With a Flutter project,
    `flutter pub get`, analyze and test exit 0. Images that show the old name (store screenshots,
    lettering in the icon) go back to the skill that made them. Commit.
 2. Close the stage worktree as at a stage end (rule 5), and leave no other worktree open in
@@ -219,7 +221,8 @@ being the names as written and `<ns>` `python3 <skill-dir>/scripts/name_sync.py`
    `https://<owner>.github.io/<old>-site/` stops answering, so every link was rewritten first.
 5. With Telegram, `<tb> register <parent>/<game> --was <parent>/<old>`; reopen the steps pane
    on the new path.
-6. Verify: `<ns> check <parent>/<game> --old "<Old>" --online` exits 0. `--online` adds both
+6. Verify: `<ns> check <parent>/<game> --online` exits 0; it takes the old names from the
+   `RENAME` rows (`--old "<Old>"` adds one status.md lacks). `--online` adds both
    GitHub names and HTTP 200 on the new Pages URLs; a 404 right after the rename clears with
    `gh api -X POST repos/<owner>/<game>-site/pages/builds`. A worktree missed in step 2 is
    repaired with the `git worktree repair` command `check` prints.
@@ -572,7 +575,8 @@ Follow `references/ios-release-runbook.md`, skipping every `asc` step (hard rule
 Stage reached, gates passed with dates, commands run and their exit codes, fallbacks, open
 assumptions, what the human must do next (record, approve, build on the Mac). From G1 on, first
 run `python3 <skill-dir>/scripts/name_sync.py check <checkout>` (the stage worktree while one is
-open) and fix every FAIL it prints (rule 18); its exit code goes in the report. Tick boxes in
+open) and fix every FAIL it prints (rule 18), leftovers of every old name in status.md
+included; its exit code goes in the report. Tick boxes in
 `.clone/status.md` and commit it. Once S9 is done, `steps_pane.py close <repo>` and stop the
 Telegram `watch` process if this session started one; before that
 leave the pane open.
@@ -590,7 +594,7 @@ leave the pane open.
 | `scripts/contact-sheet.sh` | recording → timestamped contact sheets and strips (S1) |
 | `scripts/steps_pane.py` | steps pane in herdr, redrawn from the newest status.md (a stage worktree's included): `open`, `close`, `once` (all stages) |
 | `scripts/telegram_bridge.py` | optional Telegram remote (rule 14): `setup`, `install-service`, `serve`/`watch`, `register` (`--was` after a rename), `ask`, `close`, `answers`, `inbox`, `mode`, `send`, `hook` |
-| `scripts/name_sync.py` | one name everywhere (rule 18): `names` (every form), `rename` (dry run, `--apply`, `--keep-ids`), `check` (PASS/FAIL per place, `--old`, `--online`) |
+| `scripts/name_sync.py` | one name everywhere (rule 18): `names` (every form), `rename` (dry run, `--apply`, `--keep-ids`), `check` (PASS/FAIL per place; old names from status.md's `RENAME` rows, `--old`, `--online`) |
 | `templates/status.md` | `.clone/status.md` starter |
 | `templates/tool/check.sh`, `templates/tool/install_hooks.sh` | local pre-commit gate (format, analyze, test) with git's hook variables cleared (S3) |
 | `templates/store/` | store code every game starts from, with its tests and a README (S5): save before completing, StoreKit 2 verification, never stuck |

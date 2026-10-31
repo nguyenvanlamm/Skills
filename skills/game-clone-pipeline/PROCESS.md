@@ -1,4 +1,4 @@
-# Quy trình clone game (bản 1.20.0)
+# Quy trình clone game (bản 1.20.1)
 
 Biến một game casual/puzzle đang thành công, hoặc một ý tưởng game (đặt cạnh các game thành công gần nhất), thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
 
@@ -18,7 +18,7 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
     - repo GitHub, thư mục, remote, đăng ký Telegram (`register --was`);
     - các dòng `Repo:` và `Landing:` trong status.md.
 
-    Đổi tên sau G1 thì agent hỏi bạn trước (cổng `RENAME`). Khi App Store Connect đã có bundle id, bundle id và mã IAP được giữ nguyên (`--keep-ids`). Cuối mỗi phiên từ G1 trở đi, `name_sync.py check` phải exit 0. Trước đây chỉ có thư mục và repo được đổi tên; tên hiện trên web, nhãn Android, dòng `Landing:` và danh sách game của bot vẫn còn tên cũ hoặc tên tạm.
+    Đổi tên sau G1 thì agent hỏi bạn trước (cổng `RENAME`). Khi App Store Connect đã có bundle id, bundle id và mã IAP được giữ nguyên (`--keep-ids`). Mỗi lần đổi tên có một dòng `RENAME` trong Gate log. Cuối mỗi phiên từ G1 trở đi, `name_sync.py check` phải exit 0; lệnh này tự đọc các tên cũ từ status.md nên bắt được cả chữ tên cũ còn sót, thư mục tên cũ và đường dẫn cũ trong bot. File nào cố ý giữ tên cũ thì ghi vào dòng `Name history:`. Trước đây chỉ có thư mục và repo được đổi tên; tên hiện trên web, nhãn Android, dòng `Landing:` và danh sách game của bot vẫn còn tên cũ hoặc tên tạm.
 10. **Telegram chỉ là cổng thêm.** Ngồi ở máy thì vẫn quyết trong chat; chỉ khi bạn bật chế độ vắng mặt (`/away`) agent mới hỏi qua Telegram. Từ điện thoại bạn cũng mở được phiên Claude (`/open`, `/new`). Không gửi mật khẩu hay tài khoản Apple qua Telegram.
 11. **Agent ở yên trong repo game.** Muốn xem repo khác (ví dụ `DESIGN.md` của game trước), agent đọc bằng đường dẫn đầy đủ chứ không `cd` sang đó. Repo landing (S7, S9) cũng vậy: agent tạo cho nó một worktree riêng bằng `git -C` rồi sửa trong đó. Phiên chạy nền làm mỗi bước trong một worktree riêng và chỉ ra khi xong bước, merge vào `main`. Cổng nằm giữa bước (ví dụ G4) thì chờ ngay trong worktree đó, không sang bước sau trước. Không bao giờ quay lại một worktree đã rời: từ repo khác, việc đó bật một hộp xin quyền chỉ bấm được ở máy, và phiên đứng chờ ở đó.
 12. **Code mua hàng lấy từ mẫu, không chép game trước.** S5 bắt đầu từ `templates/store/`. Mẫu này có sẵn test cho các điểm sau:

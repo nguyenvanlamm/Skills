@@ -4,7 +4,8 @@ Written by the game-clone-pipeline skill. Resume from the first unchecked stage.
 Reference: {{STORE_URLS}} · Repo: {{REPO_URL}} · Landing: {{SITE_REPO_URL}}
 <!-- Landing: "—" until S7 fills in the site repo and its Pages URL. A rename (SKILL.md "Renaming the game")
 rewrites the title, Repo: and Landing:. Only when a rename keeps ids App Store Connect already holds, add a line
-`Kept ids: <iOS bundle id>, <Android applicationId>` right here. -->
+`Kept ids: <iOS bundle id>, <Android applicationId>` right here; only for files that keep an old name on purpose,
+a line `Name history: <glob>, …`. -->
 Evidence: {{SOURCES}}  <!-- what the human has: APK, data files, video, description -->
 Remote: Telegram {{off|on}}  <!-- on when ~/.config/game-clone-pipeline/telegram.env exists; here/away lives in .clone/telegram/mode -->
 
@@ -33,6 +34,7 @@ Waiting on: —
 | Gate | Date | Decision | Notes |
 |---|---|---|---|
 <!-- Notes: where the human decided, `tại máy` or `via Telegram` -->
+<!-- Every rename adds a row `| RENAME | YYYY-MM-DD | Old Name → New Name | why |`; name_sync.py check reads the old names here. -->
 
 ## Deferred (human)
 

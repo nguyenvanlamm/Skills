@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.20.1 — 2026-10-31
+
+1.20.0's `check` looked for leftovers of an old name only when given `--old`, and the Final report
+runs it without one. A session that skipped `rename`, or text pasted back later, passed every
+session-end check.
+
+Changes:
+- **`check` reads the old names from status.md**: Gate log rows `| RENAME | date | Old → New | … |`,
+  `renamed from <slug>` in the title or Reference line, `was <slug>` in the title. Leftovers of
+  them in the game repo, site repo and root Pages lines, old folders and old paths in the
+  Telegram registry now fail at every session end; `--old` only adds a name status.md lacks.
+- **`Name history: <glob>, …`** under status.md's header: files that keep an old name on
+  purpose, skipped by `check` and `rename` alike.
+- "Renaming the game" step 1 requires the `RENAME` row, at G1 too; the status.md template shows it.
+- Run on the 17 games: only the 4 renamed ones gain FAILs. keyturn-keep and plasmatide have
+  old names left in files and old paths in the bot's registry; skepfield has an old registry
+  path only; snowpack-hop has the old name in `docs/idea-validation.md`. The other 13 are
+  unchanged. A fixture with a planted "Beamfork" fails on that line without `--old` and passes
+  once it is gone.
+
 ## 1.20.0 — 2026-10-31
 
 The S2 rename covered the folder, the GitHub repo, the remote and the status.md header, and ran

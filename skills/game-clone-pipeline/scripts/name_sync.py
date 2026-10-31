@@ -19,8 +19,10 @@ ids alone: once App Store Connect has them they never change.
 is approved it only checks that the folder and GitHub repo agree on the working slug. From G1 on it
 checks every place below that exists yet: folder, origin, status.md Repo/Landing, DESIGN.md, pubspec,
 iOS display name and bundle id, Android label and applicationId, web title, site repo, stale Pages
-URLs, the root Pages repo's robots.txt and llms.txt, linked worktrees, the Telegram registry and, with
---old, every leftover of the old name. --online adds `gh repo view` and HTTP 200 on the Pages URLs.
+URLs, the root Pages repo's robots.txt and llms.txt, linked worktrees, the Telegram registry and every
+leftover of an old name: the ones status.md records (Gate log `RENAME` rows, `renamed from …`, `was …`)
+plus any --old. `Name history:` and `Kept ids:` lines in status.md exempt files and ids on purpose.
+--online adds `gh repo view` and HTTP 200 on the Pages URLs.
 Standard library only (plus `git`, and `gh` for --online).
 """
 import argparse
@@ -191,7 +193,8 @@ def read_text_file(path):
 def cmd_rename(args):
     repo = os.path.abspath(args.path)
     mapper = Mapper(args.old, args.new, args.keep_ids)
-    files = listed_files(repo, args.skip)
+    state = status_of(repo)
+    files = listed_files(repo, args.skip + (state['history'] if state else []))
     edits, moves, total = [], [], 0
     for rel in files:
         text = read_text_file(os.path.join(repo, rel))
@@ -278,7 +281,11 @@ def read(path):
 
 
 def parse_status(text):
-    state = {'name': None, 'header': '', 'done': set(), 'g1': False, 'kept': set()}
+    """status.md → name, header, done stages, G1 approved, kept ids, old names, history globs.
+
+    Old names come from what a rename leaves in status.md: Gate log rows `| RENAME | date | Old → New | … |`,
+    `renamed from <slug>` in the title or Reference line, and `was <slug>` in the title's parentheses."""
+    state = {'name': None, 'header': '', 'done': set(), 'g1': False, 'kept': set(), 'olds': [], 'history': []}
     in_log = False
     for line in text.splitlines():
         if line.startswith('## '):
@@ -287,18 +294,32 @@ def parse_status(text):
         if m := re.match(r'#\s*Clone status:\s*(.+?)\s*\(clone of', line):
             name = re.sub(r'\s*\(.*$', '', m.group(1)).strip()
             state['name'] = None if '{{' in name else name
+            state['olds'] += re.findall(r'\bwas\s+`?([A-Za-z0-9][\w-]*)', m.group(1))
+            state['olds'] += re.findall(r'\brenamed from\s+`?([A-Za-z0-9][\w-]*)', m.group(1))
         elif line.startswith('Reference:'):
             state['header'] = line
+            state['olds'] += re.findall(r'\brenamed from\s+`?([A-Za-z0-9][\w-]*)', line)
         elif m := re.match(r'Kept ids:\s*(.*)$', line):
             # bundle / Android ids App Store Connect already holds, kept through a rename (`rename --keep-ids`)
             state['kept'] = set(re.findall(r'[A-Za-z][\w]*(?:\.[\w]+)+', m.group(1)))
+        elif m := re.match(r'Name history:\s*(.*)$', line):
+            # files whose old name is history on purpose: skipped by `check` and `rename` alike
+            state['history'] = [g.strip('` ') for g in re.split(r'[,\s]+', m.group(1)) if g.strip('` ')]
         elif m := re.match(r'- \[[xX]\] (S\d+)\b', line):
             state['done'].add(m.group(1))
         elif in_log and line.startswith('|'):
             cells = [c.strip() for c in line.strip('|').split('|')]
             if cells and cells[0] == 'G1' and len(cells) > 2 and APPROVED.match(cells[2].strip('*"“ ')):
                 state['g1'] = True
+            elif cells and cells[0].upper() == 'RENAME' and len(cells) > 2:
+                if m := re.match(r'(.+?)\s*(?:→|->)\s*\S', cells[2]):
+                    state['olds'].append(m.group(1).strip('*`"“” '))
     return state
+
+
+def status_of(path):
+    text = read(os.path.join(path, '.clone', 'status.md'))
+    return parse_status(text) if text is not None else None
 
 
 def header_field(header, key):
@@ -403,6 +424,20 @@ def cmd_check(args):
     f = forms(name)
     slug, site_slug = f['kebab'], f['kebab'] + '-site'
 
+    # Old names: --old plus what status.md records (RENAME rows, "renamed from", "was"), so every
+    # session-end check finds leftovers without anyone remembering the old name.
+    olds, seen = [], {slug}
+    for old in args.old + state['olds']:
+        if not words_of(old):
+            continue
+        kebab = forms(old)['kebab']
+        if kebab not in seen:
+            seen.add(kebab)
+            olds.append(old)
+    skips = args.skip + state['history']
+    if olds:
+        report.add('INFO', 'old names', ', '.join(olds) + (' (from status.md)' if state['olds'] else ''))
+
     # Game repo
     report.ok(folder == slug, 'folder', f'{folder}', f'{folder}, expected {slug} (mv {repo} {parent}/{slug})')
     report.ok(remote_name == slug, 'origin', url, f'{url or "missing"}, expected …/{owner or "<owner>"}/{slug}.git')
@@ -473,7 +508,7 @@ def cmd_check(args):
         report.ok(good, 'web title', got, f'<title>{got}</title>, manifest name {wm.get("name")!r}, expected {name}')
 
     stale = re.compile(rf'[\w-]+\.github\.io/(?!{re.escape(site_slug)}(?![\w-]))[\w-]+-site\b')
-    hits = grep_files(checkout, stale, args.skip)
+    hits = grep_files(checkout, stale, skips)
     report.ok(not hits, 'site URLs in game repo', f'only {site_slug}', 'other sites: ' + summary(hits))
 
     worktrees = git(repo, 'worktree', 'list', '--porcelain', check=False).stdout
@@ -493,7 +528,7 @@ def cmd_check(args):
     site_due = 'S7' in state['done']
     if not os.path.isdir(site):
         others = [d for d in os.listdir(parent) if d.endswith('-site') and d != site_slug and
-                  d.startswith(tuple(forms(o)['kebab'] for o in args.old))] if args.old else []
+                  d.startswith(tuple(forms(o)['kebab'] for o in olds))] if olds else []
         if site_due or others:
             report.add('FAIL', 'site folder', f'{site} missing' + (f'; found {", ".join(others)}' if others else ''))
         else:
@@ -510,7 +545,7 @@ def cmd_check(args):
         index = read(os.path.join(site, 'index.html'))
         report.ok(index is not None and name in index, 'site index.html', f'names {name}',
                   'missing' if index is None else f'never names "{name}"')
-        hits = grep_files(site, stale, args.skip)
+        hits = grep_files(site, stale, skips)
         report.ok(not hits, 'site URLs in site repo', f'only {site_slug}', 'other sites: ' + summary(hits))
 
     # Root Pages repo
@@ -538,7 +573,7 @@ def cmd_check(args):
             registered = json.loads(read(repos_json) or '[]')
         except ValueError:
             registered = []
-        old_paths = [os.path.join(parent, forms(o)['kebab']) for o in args.old]
+        old_paths = [os.path.join(parent, forms(o)['kebab']) for o in olds]
         stale_paths = [p for p in registered if p in old_paths]
         good = repo in registered and not stale_paths
         report.ok(good, 'Telegram registry', 'registered',
@@ -549,7 +584,7 @@ def cmd_check(args):
         report.add('SKIP', 'Telegram registry', 'Telegram not set up')
 
     # Leftovers of the old name
-    for old in args.old:
+    for old in olds:
         o = forms(old)
         if o['kebab'] == slug:
             continue
@@ -558,7 +593,7 @@ def cmd_check(args):
         for where in (checkout, site):
             if not os.path.isdir(where):
                 continue
-            hits = grep_old(where, leftover, args.skip, keep)
+            hits = grep_old(where, leftover, skips, keep)
             report.ok(not hits, f'old "{o["title"]}" in {os.path.basename(where)}', 'none',
                       summary(hits) + f' (name_sync.py rename {where} --old "{old}" --new "{name}"'
                       + (' --keep-ids)' if keep else ')'))
@@ -570,7 +605,7 @@ def cmd_check(args):
         report.ok(not gone, f'old "{o["title"]}" folders', 'none left', 'still there: ' + ', '.join(gone))
 
     if args.online:
-        online(report, owner, slug, site_slug, os.path.isdir(site), [forms(o)['kebab'] for o in args.old])
+        online(report, owner, slug, site_slug, os.path.isdir(site), [forms(o)['kebab'] for o in olds])
     return report.print()
 
 
