@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.20.2 — 2026-11-02
+
+Jutwood looked stuck at S7. The background session's `gh repo create nguyenvanlamm/jutwood-site
+--public` was refused by the auto mode classifier (`[Create Public Surface]`) although the same
+command had passed for the 12 sites before it (keyturn-keep-site the day before). The agent asked
+on Telegram, the human answered "Agent được phép tạo", and the retry was refused again: a Telegram
+answer arrives as task output, not as the human's words, and adding the allow rule from a session
+is refused as `[Self-Modification]`. The session then moved on to S8 but left `Now: S7 · 1` and no
+Deferred line, so status.md read as a stop. `~/.claude/settings.json` had no allow rule at all.
+
+Changes:
+- **Start step 6, site permissions**: check `~/.claude/settings.json` for the two S7 allow rules
+  (`gh repo create <owner>/*-site --public *`, `gh api -X POST repos/<owner>/*-site/pages *`)
+  and ask the human to add them at the start, when they are most likely at the computer.
+- **S7 "Refused" bullet**: no retry and no "the agent may do it" option; gate `S7-repo` offers
+  "Tôi tự chạy lệnh" (commands written out) or "Để sau", the S7 line goes under Deferred (human),
+  `Now:` follows the step actually worked, and S7 is ticked before G4.
+- **Background sessions**: why a classifier refusal cannot be lifted from Telegram or by the agent.
+- PROCESS.md: the S7 row names the two rules.
+
 ## 1.20.1 — 2026-10-31
 
 1.20.0's `check` looked for leftovers of an old name only when given `--old`, and the Final report

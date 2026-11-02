@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.20.1
+  version: 1.20.2
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -267,7 +267,14 @@ runs. So:
   gate that passes `--no-pub` crashes (`Bad state: No element` in native assets);
 - no `sleep` to wait (it is blocked): a background `ask` or command reports when it ends;
 - the shell is zsh: spell `<tb>` out each time (`TB="python3 …"; $TB ask` fails, zsh does not
-  split it) and quote URLs and globs (`'https://youtu.be/…?si=…'`).
+  split it) and quote URLs and globs (`'https://youtu.be/…?si=…'`);
+- the classifier judges each call afresh, so the same command can pass one day and be refused
+  the next: `gh repo create <owner>/<game>-site --public` passed for 12 sites and was refused
+  for the 13th (`[Create Public Surface]`, 2026-11-02), and the retry after the human's "yes"
+  on Telegram was refused too. A Telegram answer reaches the session as task output, never as
+  the human's own words, so it cannot lift a refusal; and no session may add the allow rule
+  itself (`[Self-Modification]`). Only allow rules the human puts in place first make a step
+  safe (Start step 6).
 
 **This machine** (Ubuntu): no phone or adb and no Linux desktop toolchain, so a local run is a
 web build in Chrome, served on a free port (8080 is often another project's; never stop it).
@@ -304,6 +311,13 @@ because Chrome's virtual time barely moves Flutter tickers. `analysis_options.ya
    `<tb> answers <repo>` and `<tb> inbox <repo>` and act on what they print. A decision in
    `.clone/telegram/decisions.jsonl` that the Gate log lacks was read by a session that stopped
    before recording it: record it now. After a rename, `<tb> register <new path> --was <old path>`.
+6. **Site permissions** (once per session, until S7 is ticked): `grep -c -- '-site --public'
+   ~/.claude/settings.json`. When it prints 0 (or the file is missing), say it now, in the chat and,
+   in away mode, with `<tb> send`: S7 needs these two rules in `permissions.allow` of
+   `~/.claude/settings.json`, added by the human (an agent is refused editing it):
+   `"Bash(gh repo create <owner>/*-site --public *)"` and
+   `"Bash(gh api -X POST repos/<owner>/*-site/pages *)"`, with `<owner>` spelled out. Log it
+   once under Fallbacks and go on; S7 then follows its "refused" bullet if the classifier says no.
 
 ## Telegram remote
 
@@ -513,6 +527,16 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
   `Result: COMPLETE` block. That ends its step, not S7 (hard rule 16): put the copy into the
   site's `index.html` right away, then the privacy and support pages, Pages and the checks.
 - Fill status.md's `Landing:` with the site repo and its Pages URL.
+- **Refused** (auto mode denies `gh repo create` or the Pages call): do not retry it, and do not
+  offer "the agent may do it" (Background sessions: no answer lifts the refusal). Ask gate
+  `S7-repo` with `--option "Tôi tự chạy lệnh"` and `--option "Để sau"`, both commands written
+  out in the question, ready to paste after `!`. Then, in the same commit, add
+  `S7: create and publish <game>-site (commands in the S7-repo question)` under
+  `## Deferred (human)` and set `Now:` to the step actually being worked (`S8 · 1 …`), so
+  status.md never says S7 while S8 runs. Go on with S8: the URLs are known in advance
+  (`https://<owner>.github.io/<game>-site/privacy.html`, `…/support.html`). When the human says
+  the repo exists, run the Pages call (409 means it is already on), the checks below, fill
+  `Landing:`, tick S7 and drop the Deferred line, all before G4.
 - Verify: both URLs return 200 (`curl -sI`) and `name_sync.py check <repo> --online` exits 0.
   Commit with `commit` in that repo.
 

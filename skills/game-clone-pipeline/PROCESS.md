@@ -1,4 +1,4 @@
-# Quy trình clone game (bản 1.20.1)
+# Quy trình clone game (bản 1.20.2)
 
 Biến một game casual/puzzle đang thành công, hoặc một ý tưởng game (đặt cạnh các game thành công gần nhất), thành một game Flutter **khác rõ**, chỉ có tiếng Anh, rồi đưa lên App Store, kèm landing page. Skill `game-clone-pipeline` chạy quy trình này; file này là bản tóm tắt cho người đọc.
 
@@ -175,7 +175,7 @@ Chi tiết lệnh ở `references/ios-release-runbook.md`.
 | `/ship` | S8: `/ship --no-auto` |
 | asccli | **Hoãn** (luật 12): không chạy `asc`; agent chuẩn bị file, bạn làm trên web App Store Connect |
 | `/appstore-assets` | S8 |
-| Tạo repo landing page mới | S7, làm **trước** khi nộp vì cần URL privacy/support |
+| Tạo repo landing page mới | S7, làm **trước** khi nộp vì cần URL privacy/support. Cần 2 allow rule trong `~/.claude/settings.json` do bạn thêm (SKILL.md, Start bước 6): auto mode có thể chặn việc tạo repo public, và trả lời "đồng ý" qua Telegram không gỡ được |
 | `/search-optimiser`, `/design-optimiser` | S9: `search-optimizer`, `design-optimizer` (tên đúng) |
 | Push lên GitHub Actions | **Bỏ.** Không dùng GitHub Actions ở đâu cả (luật 11): kiểm tra chạy trên máy (analyze, test, pre-commit); landing deploy Pages từ nhánh `main` |
 
