@@ -1,0 +1,80 @@
+# social/config.yaml — gameplay-to-social settings for one game.
+#
+# Written at the first run, only with values the developer confirmed. Later runs read it and do
+# not ask again. Anything unknown stays null and is asked once, then saved here.
+# Template: <skill>/assets/config.example.yaml (the names below are examples).
+
+version: 1
+confirmed_on: 2026-11-03
+
+game:
+  name: Pebble Hop                  # display name as on the store
+  package: pebble_hop               # pubspec name
+  flame: false
+  platforms: [android, ios, web]
+  orientation: portrait             # portrait | landscape
+  has_audio: true                   # false → record with --game-audio no; a silent track is expected
+  ids:
+    android: com.example.pebble_hop # for am force-stop and replay pushes
+    ios: com.example.pebbleHop
+  window_title: Pebble Hop          # desktop only: the window to grab
+  levels:
+    count: 60
+    numbering: "1-based; level N = levelTable[N - 1]"
+    loader: "GameScreen(level: levelTable[n - 1], store: …) — lib/ui/game_screen.dart:37"
+  bot: "Level.plan played by Autoplay through GameScreen(demo: plan) — lib/game/autoplay.dart"
+  switched_off_in_capture:          # what main_capture.dart leaves out, and how
+    - "purchases: GameScreen gets shop: null"
+    - "saves: in-memory ProgressStore"
+    - "tutorial: levels 5+ have no hint"
+  hooks: []                         # approved guarded hooks in game code: file:line + what they print
+
+capture:
+  entry: lib/main_capture.dart
+  play_mode: bot                    # bot | replay | script | human
+  device:                           # asked once when several are usable
+    id: R5CT1234ABC
+    platform: android               # android | ios-sim | linux | macos | windows | web
+    name: "Galaxy A54"
+  build_mode: auto                  # auto | profile | release | debug
+  seed: 42
+  takes: 2                          # 2–3 when the game is random or a human plays
+  hold_ms: 3000
+  tiktok_layout: full               # full | safe | T,B,L,R margins
+  replays: {}                       # level -> social/replays/level_<N>.json (play mode replay)
+
+posts:
+  platforms:                        # language and market per platform
+    tiktok: {language: vi, market: VN}
+    reddit: {language: en, market: global}
+    linkedin: {language: en, market: global}
+    x: {language: en, market: global}
+  brand_voice: "a solo dev who laughs at their own hardest levels; warm, a bit cheeky, never salesy"
+  links:                            # null when there is none yet; posts never invent one
+    app_store: null
+    play_store: null
+    wishlist: null
+    website: null
+  hashtags:
+    own: "#PebbleHop"               # the game's tag, in every post
+    core: ["#puzzlegame", "#gamemobile", "#cozygame"]
+  accounts:
+    tiktok: personal                # personal | business (business: Commercial Music Library only)
+    x_premium: false
+  ai_use: null                      # e.g. "code written with AI help; art and levels by hand" — some subs require disclosure
+  release_state: null               # e.g. "not released yet" | "on the App Store since 2026-12-01"; "coming soon" needs this
+  subreddits: []                    # subs used before: {name, rules, checked, result}
+
+facts:                              # hard facts confirmed by the developer; posts may only use these
+  - id: levels_total
+    text: "60 levels"
+    source: "lib/game/progress.dart:46"
+    confirmed: 2026-11-03
+  - id: team
+    text: "solo dev"
+    source: "the developer"
+    confirmed: 2026-11-03
+  - id: started
+    text: "started in October 2026"
+    source: "git log, first commit 2026-10-02"
+    confirmed: 2026-11-03

@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: existing-video-reddit-linkedin
+expected_outcome: |
+  Run inside a set-up game project with a user-supplied gameplay video. The skill skips running and recording the game, probes and checks the given video, exports at least the 16:9 (Reddit) and 4:5 (LinkedIn) versions plus a cover into a new social/output run folder, extracts frames and writes brief.md, writes posts.json containing only reddit and linkedin with at least 3 variants each (Reddit split over 2-3 subreddits with rules and check dates, titles without hashtags or emoji; LinkedIn with a short hook, at most 3 hashtags and the link or a note in the first comment), and validate_posts exits 0. No hard fact appears that is not in config.yaml facts.

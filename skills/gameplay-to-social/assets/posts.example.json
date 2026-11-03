@@ -1,0 +1,495 @@
+{
+  "schema": "gameplay-to-social/posts@1",
+  "created": "2026-11-03T17:20:00+07:00",
+  "game": {
+    "name": "Pebble Hop",
+    "own_hashtag": "#PebbleHop",
+    "core_hashtags": [
+      "#puzzlegame",
+      "#gamemobile"
+    ],
+    "links": {
+      "app_store": "https://apps.apple.com/app/id0000000000",
+      "play_store": null,
+      "website": null
+    }
+  },
+  "run": {
+    "level": 10,
+    "requested": "chạy game ở level 10, quay đoạn đầu tầm 20s rồi làm bài cho cả 4 nền tảng",
+    "assumptions": [
+      "duration 20 s (as asked); cut from CAPTURE_LEVEL_START",
+      "the bot clears level 10 in 6.8 s: the clip continues into level 11 at 8.3 s"
+    ],
+    "platforms": [
+      "tiktok",
+      "reddit",
+      "linkedin",
+      "x"
+    ],
+    "trend_check": {
+      "verified": true,
+      "checked_at": "2026-11-03",
+      "sources": [
+        "https://hoahoctro.tienphong.vn/",
+        "https://www.rockstargames.com/newswire/"
+      ]
+    }
+  },
+  "accounts": {
+    "tiktok": "personal",
+    "x_premium": false
+  },
+  "facts": [
+    {
+      "id": "team",
+      "text": "solo dev",
+      "source": "confirmed by the developer 2026-11-03",
+      "confirmed": true
+    },
+    {
+      "id": "levels_total",
+      "text": "60 levels",
+      "source": "lib/game/progress.dart:46, confirmed 2026-11-03",
+      "confirmed": true
+    },
+    {
+      "id": "playtest_restarts",
+      "text": "playtesters restarted level 10 more than any other level",
+      "source": "the developer's playtest notes, confirmed 2026-11-03",
+      "confirmed": true
+    },
+    {
+      "id": "wobble_change",
+      "text": "a wobble before the pebble sinks cut the quits on level 10",
+      "source": "the developer's playtest notes, confirmed 2026-11-03",
+      "confirmed": true
+    },
+    {
+      "id": "solver_shortcuts",
+      "text": "the solver found three shortcuts nobody planned",
+      "source": "the developer, confirmed 2026-11-03",
+      "confirmed": true
+    }
+  ],
+  "tiktok": {
+    "language": "vi",
+    "chosen": "tt-2",
+    "chosen_reason": "",
+    "variants": [
+      {
+        "id": "tt-1",
+        "angle": "tưởng dễ mà bị lừa",
+        "angle_type": "relatable",
+        "video": "video/tiktok_9x16.mp4",
+        "on_screen_hook": "Tưởng dễ… cho đến khi tới màn 10",
+        "title": "",
+        "caption": "Tưởng game giải đố nhẹ nhàng, ai ngờ màn 10 lừa mình 3 lần 😭\nẾch nhảy lệch một hòn đá là chìm luôn, không kịp ân hận.\nBạn qua màn này mấy lần? 👇",
+        "hashtags": [
+          "#PebbleHop",
+          "#gamemobile",
+          "#puzzlegame",
+          "#gaming"
+        ],
+        "trend_hashtags": [],
+        "sound": {
+          "choice": "original",
+          "name": "tiếng game",
+          "note": "tiếng đá chìm 'bõm' là điểm nhấn"
+        },
+        "cover_timestamp": 6.9,
+        "cover_text": "Màn 10 lừa mình",
+        "pinned_comment": "Ai qua được ngay lần đầu thì để lại số bước, mình không tin đâu 😤",
+        "post_time": "2026-11-05 20:00 ICT (Thu)",
+        "claims": [],
+        "scores": {
+          "hook": 4,
+          "emotion": 4,
+          "trend": 3,
+          "engagement": 4,
+          "platform_fit": 5,
+          "hashtags": 4
+        },
+        "notes": "relatable 'tưởng dễ' frame, the sinking pebble is the payoff at 6.8 s"
+      },
+      {
+        "id": "tt-2",
+        "angle": "thách đấu số bước",
+        "angle_type": "challenge",
+        "video": "video/tiktok_9x16.mp4",
+        "on_screen_hook": "Chan đê: qua màn này dưới 8 bước",
+        "title": "",
+        "caption": "Chan đê! Màn 10 mình qua đúng 8 bước, không thừa bước nào 😤\nNhìn thì chill chứ hụt một nhịp là ếch đi bơi.\nBạn làm được ít hơn không? Comment số bước của bạn 👇",
+        "hashtags": [
+          "#PebbleHop",
+          "#gamegiaido",
+          "#puzzlegame",
+          "#thuthach",
+          "#fyp"
+        ],
+        "trend_hashtags": [],
+        "sound": {
+          "choice": "original",
+          "name": "tiếng game",
+          "note": "giữ nhịp nhảy để người xem đếm bước"
+        },
+        "cover_timestamp": 6.9,
+        "cover_text": "Dưới 8 bước?",
+        "pinned_comment": "Số bước của bạn là bao nhiêu? Thấp nhất mình ghim lên đầu 🏆",
+        "post_time": "2026-11-06 12:00 ICT (Fri)",
+        "claims": [],
+        "scores": {
+          "hook": 5,
+          "emotion": 4,
+          "trend": 5,
+          "engagement": 5,
+          "platform_fit": 5,
+          "hashtags": 4
+        },
+        "notes": "'chan đê' is the live dare slang; a number the clip shows (8 steps) makes the dare concrete"
+      },
+      {
+        "id": "tt-3",
+        "angle": "mùa thi: còn khó hơn đề thi",
+        "angle_type": "trend_bridge",
+        "video": "video/tiktok_9x16.mp4",
+        "on_screen_hook": "Màn 10 còn khó hơn đề thi",
+        "title": "",
+        "caption": "Level 10 còn khó hơn đề thi học kỳ 😭 Ôn bài xong mở game giải trí, ai ngờ còn căng hơn.\nTag đứa bạn đang ôn thi vào thử 👇",
+        "hashtags": [
+          "#PebbleHop",
+          "#gamemobile",
+          "#muathi",
+          "#gaming"
+        ],
+        "trend_hashtags": [
+          {
+            "tag": "#muathi",
+            "bridge": "Level 10 còn khó hơn đề thi học kỳ 😭"
+          }
+        ],
+        "sound": {
+          "choice": "trending",
+          "name": "chọn trong app lúc đăng",
+          "note": "nhạc buồn hài để hợp mood ôn thi"
+        },
+        "cover_timestamp": 6.9,
+        "cover_text": "Khó hơn đề thi",
+        "pinned_comment": "Môn nào khó hơn màn 10? Comment nào 👇",
+        "post_time": "2026-12-20 21:00 ICT (Sun)",
+        "claims": [],
+        "scores": {
+          "hook": 4,
+          "emotion": 4,
+          "trend": 4,
+          "engagement": 5,
+          "platform_fit": 4,
+          "hashtags": 4
+        },
+        "notes": "exam season (late Dec – mid Jan) bridged in the first line"
+      }
+    ]
+  },
+  "reddit": {
+    "language": "en",
+    "subreddits": [
+      {
+        "subreddit": "r/indiegames",
+        "why": "gameplay-first sub for small games; a short clip of a puzzle with a twist fits",
+        "rules": [
+          "gameplay media required",
+          "flair the post (Video)",
+          "no store or social links in the post: link in a comment"
+        ],
+        "rules_checked": "2026-11-03 via third-party summary (okara.ai); sidebar not opened",
+        "link_in_comment": true,
+        "post_time": "2026-11-05 15:00 UTC (Thu)",
+        "chosen": "rd-1a",
+        "variants": [
+          {
+            "id": "rd-1a",
+            "angle": "is level 10 fair or just mean",
+            "angle_type": "story",
+            "video": "video/landscape_16x9.mp4",
+            "title": "I made a small puzzle game where pebbles sink after one hop. Level 10 keeps fooling my friends, is it fair or just mean?",
+            "flair": "Video",
+            "oc": true,
+            "spoiler": false,
+            "body": "Solo dev here. Every pebble sinks once you leave it, so the whole puzzle is picking an order. Level 10 is where most of my friends restart a few times. I can't tell anymore if it's a good 'aha' or just unfair, so I'd love blunt opinions.",
+            "first_comment": "It's on the App Store if you want to try it: https://apps.apple.com/app/id0000000000. Tell me where you got stuck.",
+            "claims": [
+              {
+                "text": "solo dev",
+                "fact_id": "team"
+              }
+            ],
+            "scores": {
+              "hook": 4,
+              "emotion": 3,
+              "trend": 2,
+              "engagement": 5,
+              "platform_fit": 5,
+              "hashtags": 5
+            }
+          },
+          {
+            "id": "rd-1b",
+            "angle": "my own game beats me",
+            "angle_type": "humor",
+            "video": "video/landscape_16x9.mp4",
+            "title": "My own puzzle game still beats me on level 10, and I'm the one who wrote the solver",
+            "flair": "Video",
+            "oc": true,
+            "spoiler": false,
+            "body": "The solver says 8 hops. My record is 11. Here's the clip of the solver doing it like it's nothing.",
+            "first_comment": "App Store link, if you want to beat my 11: https://apps.apple.com/app/id0000000000",
+            "claims": [],
+            "scores": {
+              "hook": 4,
+              "emotion": 4,
+              "trend": 2,
+              "engagement": 4,
+              "platform_fit": 4,
+              "hashtags": 5
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "r/puzzlevideogames",
+        "why": "small but exactly on topic: people who like order-and-planning puzzles",
+        "rules": [
+          "self-promotion reportedly allowed when you take part in the comments"
+        ],
+        "rules_checked": "2026-11-03 via third-party summary (Thread Otter); sidebar not opened",
+        "link_in_comment": false,
+        "post_time": "2026-11-07 15:00 UTC (Sat)",
+        "chosen": "rd-2a",
+        "variants": [
+          {
+            "id": "rd-2a",
+            "angle": "level 1 vs level 10 difficulty curve",
+            "angle_type": "comparison",
+            "video": "video/landscape_16x9.mp4",
+            "title": "Level 1 vs level 10 in my pebble-hopping puzzle: where does it stop feeling fair?",
+            "flair": "",
+            "oc": true,
+            "spoiler": false,
+            "body": "Level 1 teaches that a pebble sinks after you leave it. By level 10 you have to plan the whole route before the first hop. I'm tuning the curve and would like to hear where it starts to feel like guessing.",
+            "first_comment": "Link for anyone who wants to try it: https://apps.apple.com/app/id0000000000",
+            "claims": [],
+            "scores": {
+              "hook": 3,
+              "emotion": 3,
+              "trend": 2,
+              "engagement": 4,
+              "platform_fit": 5,
+              "hashtags": 5
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "linkedin": {
+    "language": "en",
+    "chosen": "li-1",
+    "chosen_reason": "",
+    "variants": [
+      {
+        "id": "li-1",
+        "angle": "the level we almost deleted",
+        "angle_type": "story",
+        "video": "video/linkedin_4x5.mp4",
+        "video_version": "4:5",
+        "hook": "Level 10 is the level I almost deleted.\nPlaytesters restarted it more than any other, and I read that as a bug.",
+        "body": "It wasn't. They restarted because they could see the right route, just not in time.\n\nSo instead of making it easier, I made the mistake easier to see: the pebble wobbles before it sinks.\n\nRestarts stayed about the same. Quits dropped.\n\nHard is fine. Unclear is what makes people leave.",
+        "cta": "How do you tell 'hard' from 'unfair' when you test your own work?",
+        "hashtags": [
+          "#gamedevelopment",
+          "#mobilegames",
+          "#PebbleHop"
+        ],
+        "first_comment": "The game, if you want to try level 10 yourself: https://apps.apple.com/app/id0000000000",
+        "post_time": "2026-11-10 08:30 ICT (Tue)",
+        "claims": [
+          {
+            "text": "restarted it more than any other",
+            "fact_id": "playtest_restarts"
+          },
+          {
+            "text": "quits dropped",
+            "fact_id": "wobble_change"
+          }
+        ],
+        "scores": {
+          "hook": 5,
+          "emotion": 4,
+          "trend": 3,
+          "engagement": 5,
+          "platform_fit": 5,
+          "hashtags": 4
+        }
+      },
+      {
+        "id": "li-2",
+        "angle": "a solver that proves every level",
+        "angle_type": "tech",
+        "video": "video/linkedin_4x5.mp4",
+        "video_version": "4:5",
+        "hook": "Before I ship a level, a solver has to beat it.\nThat one rule changed how I design puzzles.",
+        "body": "The game is Flutter with a single CustomPainter, and the rules are plain Dart with no UI. That split means the same code runs the game, the tests and a breadth-first solver.\n\nThe solver finds the shortest route and that becomes the par. If it can't find one, the level doesn't ship.\n\nIt also caught three levels that had a shortcut I never saw.",
+        "cta": "Do you keep your game rules free of the UI layer? What did it buy you?",
+        "hashtags": [
+          "#Flutter",
+          "#FlutterDev",
+          "#PebbleHop"
+        ],
+        "first_comment": "Clip is the solver's route through level 10. Game: https://apps.apple.com/app/id0000000000",
+        "post_time": "2026-11-12 08:30 ICT (Thu)",
+        "claims": [
+          {
+            "text": "three levels that had a shortcut",
+            "fact_id": "solver_shortcuts"
+          }
+        ],
+        "scores": {
+          "hook": 4,
+          "emotion": 3,
+          "trend": 3,
+          "engagement": 4,
+          "platform_fit": 5,
+          "hashtags": 4
+        }
+      },
+      {
+        "id": "li-3",
+        "angle": "solo dev beaten by own level",
+        "angle_type": "behind_the_scenes",
+        "video": "video/linkedin_4x5.mp4",
+        "video_version": "4:5",
+        "hook": "I'm a solo dev and my own level 10 beats me.\nHere's why I left it that way.",
+        "body": "When you build a puzzle you know the answer, so you can't feel the difficulty anymore.\n\nWatching other people play is the only honest test. Their restarts told me where the 'aha' was. My own playthroughs told me nothing.",
+        "cta": "What's your way of seeing your own work with fresh eyes?",
+        "hashtags": [
+          "#gamedevelopment",
+          "#PebbleHop"
+        ],
+        "first_comment": "Try it: https://apps.apple.com/app/id0000000000",
+        "post_time": "2026-11-17 08:30 ICT (Tue)",
+        "claims": [
+          {
+            "text": "solo dev",
+            "fact_id": "team"
+          }
+        ],
+        "scores": {
+          "hook": 4,
+          "emotion": 4,
+          "trend": 2,
+          "engagement": 4,
+          "platform_fit": 4,
+          "hashtags": 3
+        }
+      }
+    ]
+  },
+  "x": {
+    "language": "en",
+    "chosen": "x-2",
+    "chosen_reason": "",
+    "variants": [
+      {
+        "id": "x-1",
+        "angle": "level 1 vs level 10 meme",
+        "angle_type": "comparison",
+        "video": "video/landscape_16x9.mp4",
+        "post": "level 1: cute frog, cozy pebbles\nlevel 10: the pebbles have chosen violence 💀 #PebbleHop",
+        "thread": [],
+        "hashtags": [
+          "#PebbleHop"
+        ],
+        "trend_hashtags": [],
+        "alt_text": "A frog hops across pebbles on water; each pebble sinks right after the frog leaves it, and the frog reaches the goal in 8 hops.",
+        "reply_with_link": "play it here: https://apps.apple.com/app/id0000000000",
+        "community": null,
+        "post_time": "2026-11-05 14:00 UTC (Thu)",
+        "claims": [],
+        "scores": {
+          "hook": 4,
+          "emotion": 4,
+          "trend": 3,
+          "engagement": 3,
+          "platform_fit": 5,
+          "hashtags": 4
+        }
+      },
+      {
+        "id": "x-2",
+        "angle": "GTA VI week, someone's gotta hold it down",
+        "angle_type": "trend_bridge",
+        "video": "video/landscape_16x9.mp4",
+        "post": "Everyone's playing GTA VI this week. Someone's gotta hold it down: me, losing to my own level 10 💀 #PebbleHop #GTA6",
+        "thread": [],
+        "hashtags": [
+          "#PebbleHop",
+          "#GTA6"
+        ],
+        "trend_hashtags": [
+          {
+            "tag": "#GTA6",
+            "bridge": "Everyone's playing GTA VI this week."
+          }
+        ],
+        "alt_text": "A frog hops across sinking pebbles and clears a puzzle level in 8 hops.",
+        "reply_with_link": "the level that beats me: https://apps.apple.com/app/id0000000000",
+        "community": null,
+        "post_time": "2026-11-19 15:00 UTC (Thu)",
+        "claims": [],
+        "scores": {
+          "hook": 5,
+          "emotion": 4,
+          "trend": 5,
+          "engagement": 4,
+          "platform_fit": 5,
+          "hashtags": 4
+        }
+      },
+      {
+        "id": "x-3",
+        "angle": "the solver thread",
+        "angle_type": "tech",
+        "video": "video/landscape_16x9.mp4",
+        "post": "I wrote a solver to prove every level of my puzzle game can be beaten.\nIt says level 10 takes 8 hops. My friends say it's impossible. 🧵 #PebbleHop #indiedev",
+        "thread": [
+          "The rules are plain Dart with no Flutter imports, so the game, the tests and the solver share one copy of the rules.",
+          "Breadth-first search over (frog position, sunk pebbles). The shortest route becomes the par. No route, no ship.",
+          "It also found three shortcuts I never intended. Two stayed in. They were fun."
+        ],
+        "hashtags": [
+          "#PebbleHop",
+          "#indiedev"
+        ],
+        "trend_hashtags": [],
+        "alt_text": "The solver's 8-hop route through level 10, pebbles sinking behind the frog.",
+        "reply_with_link": "the game: https://apps.apple.com/app/id0000000000",
+        "community": null,
+        "post_time": "2026-11-06 15:00 UTC (Fri)",
+        "claims": [
+          {
+            "text": "three shortcuts I never intended",
+            "fact_id": "solver_shortcuts"
+          }
+        ],
+        "scores": {
+          "hook": 4,
+          "emotion": 3,
+          "trend": 3,
+          "engagement": 4,
+          "platform_fit": 4,
+          "hashtags": 4
+        }
+      }
+    ]
+  }
+}

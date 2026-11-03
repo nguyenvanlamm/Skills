@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: first-run-unsetup-project
+expected_outcome: |
+  Run inside a Flutter game project that has no social/config.yaml and no lib/main_capture.dart. The skill detects the project (Flutter, no Flame, android/ios/web, 60 levels, a demo autoplay that plays a level's solver plan), summarises what it found with file references, asks in one message for the missing settings (languages and markets per platform, links, brand voice, the game's own and core hashtags it proposes, TikTok account type, X Premium, who plays while recording, which README/git facts may be used), proposes the content of lib/main_capture.dart for this game and suggests ignoring social/output/. It writes no project files before the user agrees: lib/main.dart is unchanged and no main_capture.dart or config.yaml with invented answers exists.
