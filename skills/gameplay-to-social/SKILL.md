@@ -14,7 +14,7 @@ description: >-
   trailers (game-ad-video), store screenshots (appstore-assets) or auto-posting.
 license: MIT
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: "Nguyen Van Lam"
 ---
 
@@ -114,6 +114,7 @@ Run them as `dart <skill>/scripts/<name>.dart …`. They use dart: libraries onl
 | level | check that it exists (`game.levels.count`); for a user's file, read it from the HUD | none: ask if missing |
 | duration | allowed error ±2 s; a user's file is cut to it, or kept whole if shorter | 20 s |
 | clip | starts at `CAPTURE_LEVEL_START`, so loading is never in it | the start of the level |
+| end card | when the clip ends on a win/lose card (popup), the card fills only the last S seconds; the rest is play | `capture.end_card_s` in config, else `clip.end_card_s` in platform_specs (2 s) |
 | platforms | | all four |
 | languages | | from config |
 
@@ -152,6 +153,10 @@ end card (within ±2 s of the request), the level alone (shorter), or a human ta
      start when that screen is locked.
    - Read `warnings`, `webgl_renderer` and `browser_fps` in the take JSON.
    - Use 2–3 takes when the game is random or a human plays.
+   - When the level ends inside the clip (a win or a loss), record `--duration D+3`: the export
+     then picks the exact length that puts the end card in the last S seconds.
+   - On web, the take JSON has `page_px` (the page in device pixels) and `capture_px`. A page
+     larger than the capture lost its right or bottom edge; export fails the take on it.
    - Exit codes: 6 means a tool is missing, 7 a build or launch failure (show the log tail),
      8 means `CAPTURE_LEVEL_START` never came.
 4. A real iPhone can't be recorded from here. Ask the user to screen-record on the phone and
@@ -164,16 +169,26 @@ end card (within ±2 s of the request), the level alone (shorter), or a human ta
 ## Step 3: check and export
 
 ```
-dart <skill>/scripts/process_video.dart export --run <run> --take <run>/work/takes/take_1.json[,take_2.json] --duration D
+dart <skill>/scripts/process_video.dart export --run <run> --take <run>/work/takes/take_1.json[,take_2.json] --duration D \
+  [--end-card S]                               # when the level ends inside the clip
 # or a user's file:  --in FILE [--start S]     # optional: --platforms reddit,linkedin
 ```
+
+**End card.** With `--end-card S`, the clip ends S seconds after the win/lose card appears, as
+long as that stays within `D ± 2 s`. The card's time comes from a `CAPTURE_EVENT popup` (the
+template's route observer logs every dialog), an `end card` event from a game hook, or else
+`CAPTURE_LEVEL_END + clip.end_card_delay_s` (`end_card_source: estimated`). `qc.json` holds
+`end_card_at` and `end_card_shown_s`. If the `end_card` check warns, the card came too early or
+too late for the asked length: retune the bot so the card appears near `D − S` (an off-screen
+sweep of its timing, flutter_capture.md § 1), re-record and export again.
 
 `--platforms` exports only the ratios those platforms need. A user's file that opens on a blank
 or still screen is trimmed automatically (`start` in the output says so). Check the first frame
 of the contact sheet anyway, and pass `--start` when a menu is still in the cut.
 
 1. **Checks.** Duration ±2 s, no black stretch, no still stretch, sound present (unless the
-   game or source has none), smoothness and resolution. With several takes, the script keeps
+   game or source has none), smoothness, resolution, `viewport` (web: the whole page was
+   captured) and `end_card` (with `--end-card`). With several takes, the script keeps
    the best one that passes: the most motion and no early loss.
 2. **On exit 5 (QC failed).** Re-record, at most 2 more times. If it still fails, stop and
    report each failed check.
@@ -272,8 +287,14 @@ Follow `references/review_rubric.md`:
 5. Then run:
 
 ```
-dart <skill>/scripts/validate_posts.dart <run>/posts.json --render <run>/posts.md
+dart <skill>/scripts/validate_posts.dart <run>/posts.json --render <run>/posts.md \
+  --render-txt <run>/posts.txt --txt-lang <L> --local-tz <TZ>
 ```
+
+`L` is `posts.report_language` from config, else the language the user writes in; `TZ` is
+`posts.developer_tz` (ICT for a developer in Vietnam). `posts.txt` is the report the user reads:
+plain text, only the chosen post of each platform (one per subreddit), copy-ready blocks, and a
+schedule in the developer's time. The other variants stay in posts.json and posts.md.
 
 Fix every error and run it again until it exits 0. Write `<run>/review_report.md` in the
 rubric's format.
@@ -284,7 +305,7 @@ rubric's format.
 social/output/lv<level>_<YYYYMMDD-HHMM>/
   video/            raw.mp4  tiktok_9x16.mp4  landscape_16x9.mp4  linkedin_4x5.mp4  cover.jpg
                     [tiktok_9x16_peakfirst.mp4] [tiktok_9x16_hook.mp4]
-  brief.md  posts.json  posts.md  review_report.md
+  brief.md  posts.txt  posts.json  posts.md  review_report.md
   work/             takes/, qc.json, frames/, previews (safe to delete)
 ```
 
@@ -296,6 +317,7 @@ If `detect_project` reported `gitignore_ignores_output: false`, remind the user 
 can be committed by mistake (suggest the `.gitignore` line again).
 
 End with a short summary for the user:
+- `posts.txt` first: it is the report to read and copy from;
 - the video paths;
 - the chosen variant per platform (id, angle, the first line);
 - warnings: QC, "trends not verified", subreddit rules second-hand, assumptions.

@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: record-level-lose-endcard
+expected_outcome: |
+  Run inside a set-up game project whose capture entry can lose on purpose (for example Bus Loop Rush: lib/main_capture.dart reads CAPTURE_OUTCOME=lose; social/config.yaml exists; the device is Chrome on this machine). The skill records level 8 losing, with --duration about 33 s, and exports with --end-card so the lose popup is on screen only for the last 2 ± 0.3 s of a clip of 30 ± 2 s. The web take records page_px no larger than capture_px and the viewport check passes, so no edge of the screen is cut off. It writes posts.json, posts.md and posts.txt; posts.txt has a schedule in the developer's time zone and exactly one post per platform (one per subreddit on Reddit), and validate_posts exits 0. Posts never claim a person played: a bot did.

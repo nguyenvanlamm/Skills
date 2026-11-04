@@ -41,6 +41,7 @@ capture:
   takes: 2                          # 2–3 when the game is random or a human plays
   hold_ms: 3000
   tiktok_layout: full               # full | safe | T,B,L,R margins
+  end_card_s: 2                     # a win/lose card ending the clip stays on screen only this long
   replays: {}                       # level -> social/replays/level_<N>.json (play mode replay)
 
 posts:
@@ -50,6 +51,8 @@ posts:
     linkedin: {language: en, market: global}
     x: {language: en, market: global}
   brand_voice: "a solo dev who laughs at their own hardest levels; warm, a bit cheeky, never salesy"
+  report_language: vi               # labels of posts.txt (vi | en); the posts keep their own language
+  developer_tz: ICT                 # posts.txt shows every post_time in this zone (ICT | UTC | ET | PT)
   links:                            # null when there is none yet; posts never invent one
     app_store: null
     play_store: null

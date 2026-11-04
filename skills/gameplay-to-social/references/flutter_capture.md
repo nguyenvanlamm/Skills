@@ -84,6 +84,11 @@ Rules:
   ```dart
   if (const bool.fromEnvironment('CAPTURE_MODE')) print('CAPTURE_LEVEL_START');
   ```
+- **End card marker**: keep `navigatorObservers: [CaptureRouteObserver()]` on the capture
+  entry's MaterialApp. Every dialog opened during the level is logged as `CAPTURE_EVENT popup`,
+  which `export --end-card` uses to end the clip on the win/lose card. A game that draws its end
+  card in the widget tree instead prints `CAPTURE_EVENT end card` from a guarded hook. Without
+  either, the export estimates the card at `CAPTURE_LEVEL_END + clip.end_card_delay_s`.
 - **No DEBUG ribbon**: profile and release builds never show one. For debug builds (emulator
   fallback, iOS simulator) the template sets `WidgetsApp.debugAllowBannerOverride = false`.
   That hides the ribbon whatever the game's MaterialApp says.
@@ -109,6 +114,7 @@ drive` or the browser console.
 | `CAPTURE_READY` | first frame | start the recorder (the hold screen covers the recorder's start-up) |
 | `CAPTURE_LEVEL_START level=N` | the level is playable | the cut point (snapped to the scene change within 0.9 s before it) |
 | `CAPTURE_EVENT <label>` | a moment worth a look | peak and cover hints, the brief |
+| `CAPTURE_EVENT popup <route>` | a dialog opened after the level start (the template's `CaptureRouteObserver`) | the end card's time for `export --end-card`; a game without dialog routes prints `CAPTURE_EVENT end card` from a guarded hook |
 | `CAPTURE_LEVEL_END …` | level over | the brief; "lost early" ranks a take down |
 | `CAPTURE_REPLAY_META {…}` / `CAPTURE_REPLAY {…}` | replay-record takes | written to `social/replays/level_<N>.json` |
 | `CAPTURE_ERROR <msg>` | set-up failed (no such level, unreadable replay) | stops the take with that message |
@@ -254,6 +260,7 @@ Exit codes:
 | Take drops to ~40 fps with sound | one ffmpeg grabbing X11 and pulse together | the recorder uses two processes (built in) |
 | `width not divisible by 2` | odd window size | the recorder crops to even (built in) |
 | Xvfb take shows only the top-left of a huge page | `--window-size` passed in device pixels | CSS pixels = display ÷ scale factor (built in) |
+| Web take cut off on the right (pause button, last booster missing) | Chrome lays a window out at least ~500 CSS px wide; a 412-px window rendered 500 wide | the window is 540 CSS px wide (scale 2.0 on 1080) (built in, 2026-11-04) |
 | Xvfb take at single-digit fps, sprites missing | Chrome fell back to SwiftShader | GPU flags through ANGLE/Vulkan (built in); check `webgl_renderer`, set `G2S_CHROME_GPU_FLAGS` if needed |
 | On-screen take at 1 fps, QC "choppy" | the desktop was locked or blanked | unattended takes use Xvfb; the recorder refuses a locked screen (built in) |
 | Cut opens on the blank hold screen | the marker printed before the first level frame reached the screen | the snap looks 1.6 s ahead as well as back (built in) |

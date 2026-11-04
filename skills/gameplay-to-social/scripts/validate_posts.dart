@@ -1,8 +1,11 @@
 // Hard checks for posts.json, then (optionally) posts.md rendered from it.
 //
 //   dart validate_posts.dart <run>/posts.json [--json] [--render <run>/posts.md] [--skip-files]
+//        [--render-txt <run>/posts.txt [--txt-lang vi|en] [--local-tz ICT|UTC|ET|PT]]
 //
 // --skip-files: don't require the video files (checking an example or a draft before export).
+// --render-txt: plain-text report with only the chosen posts and a schedule in --local-tz
+//   (lib/posts_txt.dart). Like --render, it is written only when there are no errors.
 //
 // Limits come from references/platform_specs.md (g2s-specs), required fields from
 // references/posts_format.md (g2s-fields), editorial rules from references/review_rubric.md
@@ -15,6 +18,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'lib/common.dart';
+import 'lib/posts_txt.dart';
 import 'lib/specs.dart';
 import 'lib/text_metrics.dart';
 
@@ -680,6 +684,16 @@ void main(List<String> argv) {
     stdout.writeln('wrote $render');
   } else if (render != null) {
     stdout.writeln('posts.md not written: fix the errors first');
+  }
+  final renderTxt = args['render-txt'];
+  if (renderTxt != null && errors.isEmpty) {
+    writeText(
+        renderTxt,
+        renderText(doc, checker.totals,
+            lang: args.str('txt-lang', 'vi'), localTz: args.str('local-tz', 'ICT'), baseDir: File(path).parent.path));
+    stdout.writeln('wrote $renderTxt');
+  } else if (renderTxt != null) {
+    stdout.writeln('posts.txt not written: fix the errors first');
   }
   exit(errors.isEmpty ? 0 : 1);
 }

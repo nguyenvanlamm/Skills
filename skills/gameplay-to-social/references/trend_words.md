@@ -1,6 +1,6 @@
 # Trend words
 
-Updated: 2026-11-03
+Updated: 2026-11-04
 
 This file holds words, formats, sounds and hashtags that are live, by language and platform. It
 is shared by every game.
@@ -57,12 +57,13 @@ X is small in Vietnam. Text slang starts on Threads and Facebook.
 | "Loading" | format | an on-screen % climbs while it comes together: "Loading level 99… 12% → 100%" over a solve | 2026-10-30 | later.com/blog/tiktok-trends |
 | "Just take it back to the beginning" | format | then-vs-now origin story: first prototype → today | 2026-10-30 | later.com |
 | "Someone's gotta hold it down" (ADÉLA "Ain't In LA") | format | one shot of work while everyone's away: "Everyone's playing GTA VI. Someone's gotta hold it down." | 2026-11-01 | napoleoncat.com/blog/tiktok-trends |
-| "Answer in one word" | format | "Describe this level in one word." Great comment bait | 2026-11-02 | newengen.com/insights/tiktok-trends |
-| "Be OK" (Ingrid Michaelson) | format | cheerful visuals + a confessed stress: "me smiling while my build fails review" | 2026-11-02 | newengen.com |
+| "Answer in one word" | format | "Describe this level in one word." Great comment bait | 2026-11-04 | newengen.com/insights/tiktok-trends (page updated 2026-11-02) |
+| "Be OK" (Ingrid Michaelson) | format | cheerful visuals + a confessed stress: "me smiling while my build fails review" | 2026-11-04 | newengen.com (page updated 2026-11-02) |
+| "Two Fishes" (Love Island USA audio) | format | defend a questionable take with total seriousness, take in on-screen text: "my parking strategy was flawless (it was not)" | 2026-11-04 | newengen.com/insights/tiktok-trends (page updated 2026-11-02) |
 | "My reaction" | format | react to player solutions with faces only | 2026-10-16 | later.com |
 | "Getting robbed" | format | something happens behind a distracted creator: a spot-the-detail hook | 2026-10-16 | later.com |
 | "Text message from -A" | format | mystery text signed -A: "I know you skipped the tutorial. -A" | 2026-10-02 | later.com |
-| "Housewife" – Tate McRae | sound | top late-October sound; personal accounts only (check CML for business) | 2026-10-30 | socialbee.com/blog/trending-tiktok-songs |
+| "Housewife" – Tate McRae | sound | top late-October sound; personal accounts only (check CML for business) | 2026-11-04 | newengen.com (page updated 2026-11-02); socialbee.com |
 | "POP" – Lil Uzi Vert | sound | fast-cut showcases, combo clips | 2026-11-02 | newengen.com |
 | "Paper Moon Static" – Marnie Cusk | sound | calm showcase background | 2026-10-21 | socialbee.com |
 | Fail clips, split-screen, ASMR sort/merge | format | what mobile puzzle games win with on TikTok now | 2026-10-23 | mistplay.com/blog/trending-games-from-tiktok |

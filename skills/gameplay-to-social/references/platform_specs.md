@@ -1,6 +1,6 @@
 # Platform specs
 
-Updated: 2026-11-03
+Updated: 2026-11-04
 
 Every number the scripts check lives in the `g2s-specs` block below: `validate_posts.dart` reads
 the text limits, `process_video.dart` the export sizes, video limits, TikTok UI zones and QC
@@ -102,5 +102,11 @@ qc.fps.warn_ratio: 0.75
 qc.upscale.warn: 1.5
 qc.snap.min_score: 0.25
 qc.opening.dull_ratio: 0.6
+
+# End card (the skill's own): a clip that ends on a win/lose card keeps it on screen this long
+# (process_video export --end-card). Without a popup event, the card is assumed to appear this
+# long after CAPTURE_LEVEL_END (a 0.5 s game delay plus ~0.1 s of marker and frame latency, measured 2026-11-04).
+clip.end_card_s: 2
+clip.end_card_delay_s: 0.6
 capture.log_latency_s: 0.1
 ```

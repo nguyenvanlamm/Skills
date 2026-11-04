@@ -1,7 +1,7 @@
 // Cuts a recording at the level start, checks it, and exports one MP4 per platform ratio.
 //
 //   dart process_video.dart export  --run DIR (--take T.json[,T2.json…] | --in FILE [--start S])
-//                                   [--duration 20] [--lead 0] [--crop W:H:X:Y]
+//                                   [--duration 20] [--lead 0] [--crop W:H:X:Y] [--end-card [S]]
 //                                   [--tiktok-layout full|safe|T,B,L,R] [--expect-audio auto|yes|no]
 //                                   [--platforms tiktok,reddit,linkedin,x] [--no-snap] [--no-lead-trim] [--force]
 //   dart process_video.dart cover   --run DIR --at SECONDS
@@ -11,7 +11,10 @@
 //
 // export writes DIR/video/{raw.mp4, tiktok_9x16.mp4, landscape_16x9.mp4, linkedin_4x5.mp4,
 // cover.jpg, cover_<ratio>.jpg} and DIR/work/{qc.json, cover_candidates.jpg, safezone_tiktok.jpg,
-// cuts/}. --platforms limits the ratios to those platforms. With several takes it checks each one
+// cuts/}. --end-card S ends the clip S s (default clip.end_card_s) after the win/lose card
+// appears (a `popup`/`end card` event, else CAPTURE_LEVEL_END + clip.end_card_delay_s), within the
+// duration tolerance. Web takes with page_px larger than capture_px fail the `viewport` check.
+// --platforms limits the ratios to those platforms. With several takes it checks each one
 // and keeps the best that passes. A user file (--in) that opens on a blank or still screen is
 // trimmed to where play begins. Sizes, platform limits and QC thresholds come from
 // references/platform_specs.md.
@@ -267,6 +270,40 @@ Future<(double, String)?> detectLeadIn(String input) async {
   return null;
 }
 
+/// When the win/lose card appears, in recording seconds, and how that is known:
+/// - an `end card` event (a game hook) → 'event';
+/// - else the first `popup` event (main_capture's route observer) from CAPTURE_LEVEL_END on → 'event';
+/// - else CAPTURE_LEVEL_END + clip.end_card_delay_s → 'estimated';
+/// - else the last `popup` event → 'event'.
+(double, String)? endCardAt(Map<String, dynamic> take) {
+  final events = [for (final e in (take['events'] as List?) ?? const []) if (e is Map && e['t'] is num) e];
+  double t(Map e) => (e['t'] as num).toDouble();
+  final hook = events.where((e) => '${e['label']}' == 'end card');
+  if (hook.isNotEmpty) return (t(hook.first), 'event');
+  final popups = events.where((e) => '${e['label']}'.startsWith('popup')).toList();
+  final end = take['level_end_s'] is num ? (take['level_end_s'] as num).toDouble() : null;
+  if (end != null) {
+    final after = popups.where((e) => t(e) >= end - 0.2 && t(e) <= end + 3);
+    if (after.isNotEmpty) return (t(after.first), 'event');
+    return (end + spec.number('clip.end_card_delay_s', 0.5), 'estimated');
+  }
+  if (popups.isNotEmpty) return (t(popups.last), 'event');
+  return null;
+}
+
+/// Web takes on Xvfb record the page size: a page larger than the capture lost an edge.
+Check? viewportCheck(Map<String, dynamic> take) {
+  final page = take['page_px'], cap = take['capture_px'];
+  if (page is! Map || cap is! Map) return null;
+  final pw = (page['w'] as num).round(), ph = (page['h'] as num).round();
+  final cw = (cap['w'] as num).round(), ch = (cap['h'] as num).round();
+  if (pw > cw + 2 || ph > ch + 2) {
+    return Check('viewport', 'fail',
+        'the page is $pw×$ph px but the capture is $cw×$ch: the ${pw > cw + 2 ? 'right' : 'bottom'} edge is cut off; re-record');
+  }
+  return Check('viewport', 'pass', 'page $pw×$ph px fits the $cw×$ch capture');
+}
+
 Future<void> cut(String input, String out, double start, double dur, {String? crop, required double fps}) async {
   final vf = [
     if (crop != null) 'crop=$crop',
@@ -510,6 +547,9 @@ Future<void> cmdExport(Args args) async {
   final layout = args.str('tiktok-layout', 'full');
   final force = args.flag('force');
   final snap = args.flag('snap', fallback: true);
+  // --end-card S (a bare --end-card takes platform_specs clip.end_card_s).
+  final endCardArg = args['end-card'];
+  final endCard = endCardArg == null ? null : (double.tryParse(endCardArg) ?? spec.number('clip.end_card_s', 2));
 
   final wanted = args.str('platforms', '').split(',').map((p) => p.trim()).where((p) => p.isNotEmpty).toSet();
   final chosenTargets = [for (final t in targets()) if (wanted.isEmpty || t.platforms.any(wanted.contains)) t];
@@ -557,7 +597,35 @@ Future<void> cmdExport(Args args) async {
     }
     start = math.max(0, start - lead);
     final available = info.duration - start;
-    final dur = math.min(target, available);
+    var dur = math.min(target, available);
+    // End card: end the clip [endCard] s after the win/lose card appears, when that stays within
+    // the asked duration's tolerance; otherwise keep the asked duration and say why.
+    Check? endCardCheck;
+    Map<String, Object>? endCardInfo;
+    if (endCard != null && !userFile) {
+      final ec = endCardAt(src);
+      if (ec == null) {
+        endCardCheck = Check('end_card', 'warn', 'no end card in the take (no popup event, no CAPTURE_LEVEL_END): cut at the asked duration');
+      } else {
+        final at = ec.$1 - start;
+        final want = at + endCard;
+        final tol = spec.number('qc.duration.tolerance_s', 2);
+        if ((want - target).abs() <= tol && want <= available + 0.05) {
+          dur = math.min(want, available);
+          endCardCheck = Check('end_card', 'pass', 'end card at ${fmtS(at)} s (${ec.$2}): on screen for the last ${fmtS(dur - at)} s');
+        } else {
+          endCardCheck = Check('end_card', 'warn',
+              'end card at ${fmtS(at)} s (${ec.$2}): ending ${fmtS(endCard)} s after it needs ${fmtS(want)} s, '
+              '${want > available + 0.05 ? 'longer than the recording' : 'outside ${fmtS(target)} ± ${fmtS(tol)} s'}; '
+              'kept ${fmtS(dur)} s. Retune the bot so the end card comes near ${fmtS(target - endCard)} s, or record longer');
+        }
+        endCardInfo = {
+          'end_card_at': double.parse(at.toStringAsFixed(2)),
+          'end_card_shown_s': double.parse(math.max(0.0, dur - at).toStringAsFixed(2)),
+          'end_card_source': ec.$2,
+        };
+      }
+    }
     final fps = info.fps >= 50 ? 60.0 : 30.0;
     final cutPath = '$work/cuts/cut_${i + 1}.mp4';
     await cut(input, cutPath, start, dur, crop: crop, fps: fps);
@@ -572,6 +640,9 @@ Future<void> cmdExport(Args args) async {
     if (!userFile && src['level_start_s'] == null) {
       checks.add(Check('level_start', 'warn', 'no CAPTURE_LEVEL_START: the cut starts at the recording start'));
     }
+    if (endCardCheck != null) checks.add(endCardCheck);
+    final viewport = viewportCheck(src);
+    if (viewport != null) checks.add(viewport);
     final events = <Map<String, Object>>[
       for (final e in (src['events'] as List?) ?? const [])
         if (e is Map && e['t'] is num && (e['t'] as num) - start >= 0 && (e['t'] as num) - start <= dur)
@@ -593,6 +664,7 @@ Future<void> cmdExport(Args args) async {
       'start_how': startHow,
       'duration_s': double.parse(a.info.duration.toStringAsFixed(2)),
       'lost_early': lost,
+      ...?endCardInfo,
       'events': events,
       'checks': [for (final c in checks) c.toJson()],
       '_analysis': a,
@@ -673,6 +745,8 @@ Future<void> cmdExport(Args args) async {
     'cover_at': coverAt,
     'opening_dull': pace['opening_dull'],
     'peak_at': pace['peak_at'],
+    if (best['end_card_at'] != null)
+      'end_card': {'at': best['end_card_at'], 'shown_s': best['end_card_shown_s'], 'source': best['end_card_source']},
     'events': best['events'],
     'look_at': ['work/cover_candidates.jpg', if (chosenTargets.any((t) => t.name == 'tiktok_9x16')) 'work/safezone_tiktok.jpg'],
     'qc': 'work/qc.json',

@@ -101,6 +101,19 @@ void markLevelStart() {
   }
 }
 
+/// Logs `CAPTURE_EVENT popup <route>` whenever a dialog opens during the level (showDialog,
+/// showGeneralDialog, bottom sheets). process_video `export --end-card S` takes the first popup
+/// after CAPTURE_LEVEL_END as the win/lose card and ends the clip S s after it. A game that draws
+/// its end card without a route prints the line itself from a guarded hook:
+///   if (const bool.fromEnvironment('CAPTURE_MODE')) print('CAPTURE_EVENT end card');
+class CaptureRouteObserver extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (!_levelStarted || route is! PopupRoute) return;
+    captureEvent('popup ${route.settings.name ?? route.runtimeType}');
+  }
+}
+
 // ─────────────────────────────────────────────────────────────── entry
 
 Future<void> main() async {
@@ -137,6 +150,8 @@ Future<void> main() async {
   runApp(
     MaterialApp(
       debugShowCheckedModeBanner: false,
+      // Win/lose dialogs become `popup` events: the end card's time for export --end-card.
+      navigatorObservers: [CaptureRouteObserver()],
       // GAME: the game's theme, localizations and providers, as its own MaterialApp has them.
       home: CaptureHost(
         background: const Color(

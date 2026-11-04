@@ -378,6 +378,9 @@ class Take {
   String recorder = '';
   String? gpu;
   final List<int> browserFps = [];
+  // Web on Xvfb: the page's size in device pixels against the captured display.
+  ({int w, int h})? pagePx;
+  ({int w, int h})? capturePx;
   String? error;
   int errorCode = 1;
   final Completer<void> ready = Completer();
@@ -894,7 +897,9 @@ Future<void> runTake(Plan plan, Take take) async {
       });
       final q = 'capture_level=${plan.level}&capture_seed=${take.seed}&capture_play_mode=${plan.playMode}&capture_hold_ms=${plan.holdMs}';
       final url = 'http://127.0.0.1:${plan.server!.port}/?$q';
-      final css = plan.orientation == 'portrait' ? display!.width / 412 : display!.height / 412;
+      // Chrome never lays a window out narrower than ~500 CSS px: a 412-wide window rendered 500
+      // wide and the capture lost the right edge. 540 CSS px (scale 2.0 on a 1080 display) clears it.
+      final css = plan.orientation == 'portrait' ? display!.width / 540 : display!.height / 540;
       final cls = 'g2s-capture-$pid-${take.n}';
       final chromeArgs = [
         '--user-data-dir=${profile.path}', '--no-first-run', '--no-default-browser-check', '--disable-extensions',
@@ -1047,6 +1052,26 @@ Future<void> runTake(Plan plan, Take take) async {
     if (take.recStartHost != null && take.levelStartHost! < take.recStartHost!) {
       take.warnings.add('the level started ${fmtS(take.recStartHost! - take.levelStartHost!)}s before the recorder: raise --hold-ms');
     }
+    // A page wider or taller than the Xvfb display is cut off at the right or bottom edge
+    // (Chrome lays a window out at least ~500 CSS px wide). process_video fails such a take.
+    final c = cdp;
+    if (plan.platform == 'web' && c != null && display != null && display.virtual) {
+      try {
+        final v = await c.evaluate('[innerWidth, innerHeight, devicePixelRatio]').timeout(const Duration(seconds: 5));
+        if (v is List && v.length == 3) {
+          final dpr = (v[2] as num).toDouble();
+          final page = (w: ((v[0] as num) * dpr).round(), h: ((v[1] as num) * dpr).round());
+          take.pagePx = page;
+          take.capturePx = (w: display.width, h: display.height);
+          if (page.w > display.width + 2 || page.h > display.height + 2) {
+            take.warnings.add('the page is ${page.w}×${page.h} px but the capture is ${display.width}×${display.height}: '
+                'the ${page.w > display.width + 2 ? 'right' : 'bottom'} edge is cut off');
+          }
+        }
+      } on Object catch (e) {
+        take.addLog('page size check failed: $e');
+      }
+    }
     final until = take.levelStartHost! + plan.duration + plan.tail;
     while (nowS < until) {
       if (take.appExited.isCompleted) {
@@ -1088,6 +1113,8 @@ Map<String, Object?> takeJson(Plan plan, Take take, String file, String recorder
         if (rel(e['host'] as double) != null) {'t': rel(e['host'] as double), 'label': e['label']},
     ],
     if (take.gpu != null) 'webgl_renderer': take.gpu,
+    if (take.pagePx != null) 'page_px': {'w': take.pagePx!.w, 'h': take.pagePx!.h},
+    if (take.capturePx != null) 'capture_px': {'w': take.capturePx!.w, 'h': take.capturePx!.h},
     if (take.browserFps.isNotEmpty) 'browser_fps': {
       'min': take.browserFps.reduce(math.min),
       'median': (List<int>.of(take.browserFps)..sort())[take.browserFps.length ~/ 2],

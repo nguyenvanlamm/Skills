@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.1.0 — 2026-11-04
+
+From a level-8 "lose, ~30 s" run where three things had to be fixed by hand.
+
+### Added
+
+- **End card in the last seconds** (`process_video.dart export --end-card S`): when the level
+  ends inside the clip, the clip ends S s after the win/lose card appears (default
+  `clip.end_card_s: 2` in platform_specs, `capture.end_card_s` in config), within the duration
+  tolerance. The card's time comes from a `CAPTURE_EVENT popup` (new `CaptureRouteObserver` in
+  `assets/main_capture.dart`), an `end card` event, or `CAPTURE_LEVEL_END +
+  clip.end_card_delay_s` (estimated). `qc.json` reports `end_card_at`, `end_card_shown_s`,
+  `end_card_source`; an `end_card` check warns when the card comes too early or too late.
+- **Viewport check**: web takes on Xvfb record `page_px` and `capture_px` (CDP), and export
+  fails a take whose page is larger than the capture (an edge was cut off).
+- **posts.txt** (`validate_posts.dart --render-txt FILE --txt-lang vi|en --local-tz ICT`,
+  `scripts/lib/posts_txt.dart`): a plain-text report with only the chosen post of each platform
+  (one per subreddit), a schedule in the developer's time zone (ET/PT with US daylight time),
+  copy-ready blocks and notes. Config keys `posts.report_language`, `posts.developer_tz`.
+
+### Fixed
+
+- **Web takes lost the right edge**: Chrome lays a window out at least ~500 CSS px wide, so the
+  412-px window rendered wider than the 1080-px Xvfb display. The window is now 540 CSS px wide
+  (scale 2.0 on 1080), and flutter_capture.md § 8 has the row.
+
 ## v1.0.0 — 2026-11-03
 
 First version. You ask in plain words ("chạy game ở level 10, quay đoạn đầu tầm 20s"); the

@@ -1,9 +1,17 @@
-# posts.json and posts.md
+# posts.json, posts.md and posts.txt
 
 Read at Step 6, before writing posts.json. `validate_posts.dart` checks the file against this
 page (the `g2s-fields` block), `platform_specs.md` (limits) and `review_rubric.md` (rules), then
 renders `posts.md` from it with `--render`. Never write posts.md by hand. That way posts.md
 always matches the data the validator passed.
+
+`--render-txt posts.txt --txt-lang vi|en --local-tz ICT` also writes the plain-text report the
+user reads (`scripts/lib/posts_txt.dart`): the chosen variant of each platform only (one per
+subreddit), a schedule converted to the developer's time zone, copy-ready blocks under dashed
+labels, then notes (second-hand subreddit rules, a sound to pick, `run.assumptions`). It reads
+`post_time` as `YYYY-MM-DD HH:MM ZONE …` with ZONE one of UTC, GMT, ICT, ET, PT, EST, EDT, PST,
+PDT, CET, CEST (ET/PT follow US daylight time); any other format is shown as written. Never
+write posts.txt by hand either.
 
 ## Shape
 
