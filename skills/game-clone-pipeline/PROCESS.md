@@ -31,6 +31,7 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
     Chép code của game trước từng làm cùng một lỗi lan ra 11 game.
 13. **`Waiting on:` chỉ ghi khi agent thật sự dừng chờ bạn.** Việc hoãn cho bạn (các bước Apple) nằm ở mục `## Deferred (human)` trong status.md, còn agent vẫn làm tiếp phần khác. Khi `Waiting on:` có chữ, bot không báo lúc phiên chết giữa chừng. Khi chỉ còn chờ bước Apple, status.md ghi đúng một dạng: `Now: S8 · 6 waiting for the Apple steps` và `Waiting on: S8-apple: build VALID + Apple ID`.
 14. **Phiên chạy nền gọi Bash từng lệnh đơn.** Cơ chế cô lập worktree từ chối những lệnh nó không kiểm được (lệnh ghép, `cd`, biến, heredoc); những lần bị từ chối này chiếm 54% số lỗi của các lần chạy trước. Agent sửa file bằng công cụ Edit/Write. Repo mới phải có commit đầu tiên trước khi vào worktree. Worktree mới phải chạy `flutter pub get` trước lần commit đầu, nếu không hook có `--no-pub` sẽ crash.
+15. **Game nào cũng phải có tiếng.** Âm thanh làm ở S4 cùng lúc dựng giao diện, từ bộ mẫu `templates/sound/`: tiếng tự tổng hợp bằng `tool/gen_sfx.py` (không lấy tiếng của game gốc hay pack có sẵn), mỗi sự kiện ở dòng 7 bảng khác biệt có một tiếng, có nút **Sound: On/Off** trong Settings, nút gạt im lặng của iPhone tắt được. `scripts/sound_check.py` phải exit 0 ở bước kiểm S4, trước G4 và cuối mỗi phiên từ S4 trở đi. Trước bản 1.21.0, 18 trong 25 game làm ra không có tiếng nào: hướng dẫn chỉ có hai dòng như tuỳ chọn, không bước kiểm nào để ý, còn các cổng duyệt chỉ xem ảnh.
 
 ## Các bước
 
@@ -40,7 +41,7 @@ Biến một game casual/puzzle đang thành công, hoặc một ý tưởng gam
 | S1 | Agent + Người | Dùng những gì bạn có (APK, data game, video vài phút, mô tả); agent lấy thêm trang store rồi viết `SPEC.md` | `reverse-engineer-anything`, `scripts/contact-sheet.sh` | **G0b** duyệt SPEC |
 | S2 | Agent → Người | `DESIGN.md`: bảng khác biệt, kinh tế game, mục tiêu độ khó, tên game | `brand-name-checker`, `appstore-spam-guard` (`design`) | **G1** duyệt thiết kế |
 | S3 | Agent | Tạo project ngay trong repo game đã có (use in place, không `git init` lại, gộp `.gitignore`); core Flutter với hình tạm: luật bằng Dart thuần, test, bot, `tool/simulate.dart`; cài hook kiểm tra trước mỗi commit (`tool/check.sh` từ `templates/tool/`) | `flutter-init`, `test-coverage` | analyze + test exit 0 |
-| S4 | Agent → Người | 3 hướng UI → chọn 1 → áp vào Flutter → làm icon (nhân vật/cơ chế của chính game, không emoji, không sprite có sẵn) | `huashu-design` (hoặc `lam-design`), dựng mockup bằng Flutter theo `references/mockup-to-flutter.md`, `logo-designer`, `appstore-spam-guard` (`build`) | **G2** chọn hướng |
+| S4 | Agent → Người | 3 hướng UI → chọn 1 → áp vào Flutter, kèm âm thanh tự tổng hợp + nút Sound → làm icon (nhân vật/cơ chế của chính game, không emoji, không sprite có sẵn) | `huashu-design` (hoặc `lam-design`), dựng mockup bằng Flutter theo `references/mockup-to-flutter.md`, âm thanh từ `templates/sound/`, `scripts/sound_check.py`, `logo-designer`, `appstore-spam-guard` (`build`) | **G2** chọn hướng |
 | S5 | Agent + Người | IAP + Restore từ `templates/store/`, booster chống farm, analytics (nếu chọn), người thật chơi thử, chỉnh lại độ khó. Chưa chơi thử thì ghi vào mục hoãn, không chặn G3 | | **G3** duyệt gói và giá |
 | S6 | Agent | Soát codebase → issue → sửa, merge từng PR rồi xóa nhánh | `codebase-modernizer`, `plan-to-issues`, `issue-work-loop` | test xanh, chỉ còn `main` |
 | S7 | Agent | Repo landing tối thiểu có privacy + support, GitHub Pages deploy thẳng từ nhánh `main` (không dùng Actions) | `landing-page-generator` | 2 URL sống |
@@ -166,7 +167,7 @@ Chi tiết lệnh ở `references/ios-release-runbook.md`.
 | Flutter clone game tương tự | S3 |
 | Đổi một ít cho hay hơn, đỡ giống | S2, có cổng khác biệt chặt hơn (`references/differentiation-gate.md`) |
 | `huashu-design` ra 3 bản UI/UX | S4 |
-| Chọn 1 bản, hoàn thiện UI/UX | S4: dựng đúng mockup đã chọn bằng Flutter (`references/mockup-to-flutter.md`) + `logo-designer` |
+| Chọn 1 bản, hoàn thiện UI/UX | S4: dựng đúng mockup đã chọn bằng Flutter (`references/mockup-to-flutter.md`) + âm thanh (`templates/sound/`) + `logo-designer` |
 | Thêm IAP giá hợp lý vào cốt game | Thiết kế ở S2, làm ở S5, duyệt giá ở G3 |
 | Check sang nhánh mới `ios` | **Thay** bằng main + tag |
 | Chuẩn bị iOS để upload | S8: `flutter-ios-release` + bộ build trên Mac |

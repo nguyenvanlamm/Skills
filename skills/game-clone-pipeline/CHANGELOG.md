@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.21.0 — 2026-11-09
+
+Games came out of the pipeline silent. Popcorn Pigeons reached S9 without a sound and the human noticed only when
+playing the local web build. A survey of the 25 pipeline games in `~/Documents/projects` found 18 with no sound file at
+all; of the 10 started after v1.19.0, 9 were silent. Four causes:
+- SKILL.md's S4 step 2 listed tokens, fonts, art, screens and screenshots but not sound. Sound was two
+  optional-sounding lines in `references/mockup-to-flutter.md` ("or CC0"), with no deliverables.
+- Nothing failed on a silent game: not S4 Verify, not the step 6 tests (fonts only), not the build report,
+  `appstore-spam-guard`, `tool/check.sh`, `name_sync.py` or the Final report.
+- Every gate looks at pictures (G2 screenshots); the S5 playtest is usually deferred while the human is away, so nobody
+  heard a game before the Mac build.
+- v1.19.0 dropped `flutter-ui-revamp` from S4, and its "wire sound effects" step went with it.
+
+Changes:
+- **`templates/sound/`**, from the working Popcorn Pigeons code:
+  - `tool/gen_sfx.py`: standard-library synthesis kit, bit-exact AAC, five starter sounds;
+  - `lib/ui/sfx.dart`: one low-latency player per sound, iOS ambient category, `SoundScope` in
+    `MaterialApp.builder`, `withTapSound`;
+  - `test/sfx_template_test.dart`: ids ↔ files ↔ generator ↔ pubspec, switch and tap behaviour;
+  - a README listing what each game writes itself: event mapping, animation timing, the Settings switch, CREDITS
+    row, levels measured with `astats`.
+  - Verified in a fresh `flutter create` project: analyze clean, tests pass, two generator runs give identical files.
+- **`scripts/sound_check.py`**: PASS/WARN/FAIL rows, exit 1 on a FAIL. Checks: an audio plugin; ≥ 4 declared sound
+  files iOS can play (OGG/Opus fail, undeclared files fail); every id (`static const ids`, `enum Sound…`, quoted paths)
+  has its file; the iOS ambient category (or `respectSilence: true`); a Sound switch; a CREDITS row; a sound test.
+  On the existing games: popcorn-pigeons, plasmatide, hadal-relay and nibblume pass. nightwall, keyturn-keep and
+  haboob-run have sound but no Sound switch (haboob-run also no sound test). The 18 silent games fail.
+- **SKILL.md**:
+  - S4 step 2 makes sound part of the build;
+  - `sound_check.py` exits 0 at S4 Verify, before G4 (the G4 question names the sounds and the switch), and at every
+    Final report from S4 on;
+  - workspace tree, files table and description updated.
+- **`references/mockup-to-flutter.md`**: step 4 is required and concrete; step 6 adds the sound tests; the build report
+  gets a sound row.
+- `templates/status.md` S4 line; PROCESS.md rule 15 and S4 rows.
+
 ## 1.20.2 — 2026-11-02
 
 Jutwood looked stuck at S7. The background session's `gh repo create nguyenvanlamm/jutwood-site

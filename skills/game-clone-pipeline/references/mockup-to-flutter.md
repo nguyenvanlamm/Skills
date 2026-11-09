@@ -33,14 +33,33 @@ of its own.
    - No asset pack, emoji, clip-art or stock sprite for main objects, game glyphs or the app
      icon (differentiation-gate row 13; `appstore-spam-guard` fails them).
    - Material Icons, bundled with the SDK, only for system chrome the mockup shows that way.
-4. **Sound.** Your own work, synthesised by a script in `tool/` (the `tool/gen_sfx.py`
-   pattern), or CC0 with a CREDITS row. Ship `.m4a`: AVPlayer on iOS cannot play OGG.
+4. **Sound (required).** A game leaves S4 with sound; `scripts/sound_check.py` fails S4 Verify,
+   the check before G4 and every Final report until it has. Start from `templates/sound/` and
+   follow its README:
+   - copy `tool/gen_sfx.py`, `lib/ui/sfx.dart` and the template test; add `audioplayers` and
+     `assets/audio/` to `pubspec.yaml`; create `Sfx` in `main()` and put `SoundScope` in
+     `MaterialApp.builder`;
+   - one synthesised sound per event in DESIGN.md row 7: the player's action, each rule's
+     visible reaction, win, lose, button taps, purchase delivered. Own work from the kit's
+     helpers (CC0 only with a CREDITS row); never the reference game's sounds or a stock pack;
+   - a pure event → sound mapping with tests, and timing tied to the animation: the action on
+     the tap, a reaction when the board shows it, the outcome when the step ends;
+   - a `Sound: On` / `Sound: Off` row in Settings, saved in progress (old saves default to on);
+   - `.m4a` (AVPlayer on iOS cannot play OGG) and the iOS ambient category the template sets
+     (the silent switch mutes the game, the player's music keeps playing);
+   - balance the levels with the README's `astats` one-liner, and listen once in the web build.
+
+   When a game turns out silent, look at the plugin, the declared folder and the event wiring
+   first: `sound_check.py` names which is missing.
 5. **Screens, one at a time.** Presentation only: rules, state and persistence stay as S3 left
    them. Keep the widget keys and strings the tests use. Run `flutter analyze` and
    `flutter test` after each screen before starting the next.
 6. **Tests the look needs.** A test reads `pubspec.yaml` and checks:
    - every `fontFamily` the theme names is declared and every font file it lists exists;
-   - each family's licence text is declared and reaches `LicenseRegistry`.
+   - each family's licence text is declared and reaches `LicenseRegistry`;
+   - every sound id has its `.m4a`, matches `tool/gen_sfx.py` and the folder is declared (the
+     template test), plus the game's own: each event kind maps to its sound, and the Settings
+     switch toggles, persists and silences.
 
    Text scale 1.3 and 2.0 on a 375×667 screen must not overflow.
 7. **Compare with the mockup.** `tool/screenshot_main.dart` renders the real screens in fixed
@@ -49,13 +68,16 @@ of its own.
    - A difference is fixed toward the mockup.
    - A change to the mockup is a question for the human (rule 9).
 8. **Record.** In `design-demos/build-report.md`, write a before/after table (direction, fonts,
-   icons, colours, theme, semantics, haptics, asset bytes, app icon), the checks run, and the
-   rollback: revert the S4 commits.
+   icons, colours, theme, semantics, haptics, sound (ids, bytes, the Settings switch), asset
+   bytes, app icon), the checks run (`sound_check.py` included), and the rollback: revert the S4
+   commits.
 
 ## Why not `flutter-ui-revamp`
 
 Pipeline games used it at S4 until v1.19.0. Its own design step was skipped (G2 had already
-chosen the look). Its asset-pack catalogue went unused: 13 games' credits list only Google
+chosen the look). It also carried the "wire sound effects" step; when it went, sound shrank to
+two optional-sounding lines here, and 9 of the next 10 games shipped silent (v1.21.0 made step 4
+required and checked). Its asset-pack catalogue went unused: 13 games' credits list only Google
 Fonts, SDK Material Icons and their own sounds and logos. Its packs for main objects now fail
 row 13. Its verify missed nightwall's font block that was never written to `pubspec.yaml`, so
 the game ran on the fallback font until S6. Step 6's test exists for that. The skill stays the

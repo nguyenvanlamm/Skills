@@ -6,7 +6,7 @@ description: >-
   stages: pick target and reference games → evidence from whatever the human has (APK via REA,
   game data, a short video, a description) → SPEC → differentiation and economy design →
   Flutter core with tests, bot and simulator → 3 UI directions (huashu-design) →
-  mockup in Flutter + icon → IAP and playtest → codebase-modernizer, plan-to-issues, fixes →
+  mockup in Flutter + sound + icon → IAP and playtest → codebase-modernizer, plan-to-issues, fixes →
   privacy/support pages → iOS built on a Mac → appstore-assets, aso-marketing,
   appstore-review-checker → ship and submit → search-optimizer, design-optimizer.
   Pauses at human gates, commits each stage, resumes from `.clone/status.md`. Use when
@@ -22,7 +22,7 @@ capabilities:
   - flutter
   - app-store
 metadata:
-  version: 1.20.2
+  version: 1.21.0
   author: "Nguyen Van Lam"
 permissions:
   filesystem: { read: true, write: true }
@@ -170,6 +170,8 @@ DESIGN.md               # S2: differentiation table, economy, difficulty targets
 .clone/telegram/        # Telegram remote state: mode, inbox, pending question (git-ignored)
 tool/simulate.dart      # S3: plays many seeded games with a bot and a careless player
 tool/check.sh           # S3: local gate (format, analyze, test) the pre-commit hook runs
+tool/gen_sfx.py         # S4: synthesises the game's sounds into assets/audio/*.m4a (templates/sound/)
+lib/ui/sfx.dart         # S4: sound player, SoundScope, tap sound (templates/sound/)
 lib/store/              # S5: shop and save store from templates/store/, tests in test/
 scripts/build-ios.sh    # S8: from templates/, archive/export/upload on a Mac
 docs/IOS-BUILD-ON-MAC.md
@@ -466,9 +468,13 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
 2. Build the chosen mockup in Flutter in this session, by `references/mockup-to-flutter.md`:
    tokens from its CSS, its Google Fonts with their licences, main objects, glyphs and
    backgrounds painted in code, one screen at a time with analyze and test, then the real
-   screens shot beside the mockup. It works on `main` or the stage worktree (rule 5), with no
-   branch of its own; `design-demos/build-report.md` records the before and after and the
-   rollback (revert the S4 commits).
+   screens shot beside the mockup. **Sound is part of this step, not an extra:** the game's own
+   synthesised effects from `templates/sound/` (its README), a sound for every event in
+   DESIGN.md row 7, and a Sound On/Off switch in Settings. 18 of the first 25 pipeline games
+   shipped silent because sound was two optional-sounding lines in the reference and no check
+   looked for it. It works on `main` or the stage worktree (rule 5), with no branch of its own;
+   `design-demos/build-report.md` records the before and after and the rollback (revert the S4
+   commits).
 3. `logo-designer` for the app icon, run inline: its subagents and SVG rasterisers (rsvg,
    cairosvg, inkscape) are missing here, so one script draws every variant from one geometry,
    headless Chrome renders the PNGs and Pillow drops the alpha. Generate platform icons (no
@@ -479,7 +485,8 @@ Files sent to the Telegram bot (up to 20 MB) are saved by type into the same fol
    or a name or icon matching a game on the App Store charts is a FAIL to fix in this stage
    (a new name by "Renaming the game").
 - Verify: analyze + test exit 0 on `main`, no branch but `main`, screenshots of home and game
-  captured beside the mockup's, `appstore-spam-guard` without FAIL. Commit.
+  captured beside the mockup's, `python3 <skill-dir>/scripts/sound_check.py <checkout>` exits 0,
+  `appstore-spam-guard` without FAIL. Commit.
 
 ### S5 — IAP, boosters, telemetry, playtest → gate G3
 
@@ -567,6 +574,9 @@ Follow `references/ios-release-runbook.md`, skipping every `asc` step (hard rule
    steps 2–3 are done), and `appstore-spam-guard` in `submit` mode with the team the human
    uploads from (`--team`, or `TEAM_ID`) and its J1–J6 checks (rule 17). A spam-guard FAIL
    blocks G4; a name FAIL is fixed by "Renaming the game" (`--keep-ids` once step 2 is done).
+   `scripts/sound_check.py` must exit 0 before G4 too: a silent game goes back to S4 step 2
+   (`templates/sound/`), and the G4 question names the sounds and the Settings switch so the
+   human knows to listen in TestFlight.
    **G4**: human reads both reports and approves the package, and answers
    once whether S9 may scan the site with isitagentready.com (an outside service); with steps
    2–3 still deferred, G4 approves everything except the build and is noted as partial. G4 is
@@ -600,7 +610,9 @@ Stage reached, gates passed with dates, commands run and their exit codes, fallb
 assumptions, what the human must do next (record, approve, build on the Mac). From G1 on, first
 run `python3 <skill-dir>/scripts/name_sync.py check <checkout>` (the stage worktree while one is
 open) and fix every FAIL it prints (rule 18), leftovers of every old name in status.md
-included; its exit code goes in the report. Tick boxes in
+included; its exit code goes in the report. From S4 on, also run
+`python3 <skill-dir>/scripts/sound_check.py <checkout>`, fix every FAIL (templates/sound/README.md)
+and report its exit code. Tick boxes in
 `.clone/status.md` and commit it. Once S9 is done, `steps_pane.py close <repo>` and stop the
 Telegram `watch` process if this session started one; before that
 leave the pane open.
@@ -619,8 +631,10 @@ leave the pane open.
 | `scripts/steps_pane.py` | steps pane in herdr, redrawn from the newest status.md (a stage worktree's included): `open`, `close`, `once` (all stages) |
 | `scripts/telegram_bridge.py` | optional Telegram remote (rule 14): `setup`, `install-service`, `serve`/`watch`, `register` (`--was` after a rename), `ask`, `close`, `answers`, `inbox`, `mode`, `send`, `hook` |
 | `scripts/name_sync.py` | one name everywhere (rule 18): `names` (every form), `rename` (dry run, `--apply`, `--keep-ids`), `check` (PASS/FAIL per place; old names from status.md's `RENAME` rows, `--old`, `--online`) |
+| `scripts/sound_check.py` | the game is not silent (S4 Verify, before G4, Final report): audio plugin, ≥ 4 declared sound files iOS can play, every sound id has its file, iOS ambient category, a Sound switch, a CREDITS row, a sound test; exit 1 on a FAIL |
 | `templates/status.md` | `.clone/status.md` starter |
 | `templates/tool/check.sh`, `templates/tool/install_hooks.sh` | local pre-commit gate (format, analyze, test) with git's hook variables cleared (S3) |
 | `templates/store/` | store code every game starts from, with its tests and a README (S5): save before completing, StoreKit 2 verification, never stuck |
+| `templates/sound/` | sound every game starts from (S4): `tool/gen_sfx.py` synthesis kit, `lib/ui/sfx.dart` player (iOS ambient, SoundScope, tap sound), a test, and a README with what each game writes itself (event mapping, timing, Settings switch, levels) |
 | `templates/build-ios.sh`, `templates/ExportOptions.plist` | Mac archive/export/upload kit (S8) |
 | `templates/privacy.html`, `templates/support.html` | App Store privacy and support pages (S7) |
