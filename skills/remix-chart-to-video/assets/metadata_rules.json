@@ -1,0 +1,10 @@
+{
+  "banned_phrases": [
+    {"pattern": "\\bofficial\\b", "why": "video không phải bản chính thức của nghệ sĩ hay của NCT"},
+    {"pattern": "(mv|video|bxh|bảng xếp hạng|audio|bản)\\s+chính\\s+thức", "why": "không được viết như thể đây là bản hay BXH chính thức"},
+    {"pattern": "no\\s*copyright|non[- ]?copyright|copyright\\s*free|free\\s*copyright|\\bncs\\b", "why": "bài gốc có bản quyền; không được ghi là không bản quyền"},
+    {"pattern": "không\\s+(dính\\s+)?bản\\s+quyền|khong\\s+ban\\s+quyen|miễn\\s+phí\\s+bản\\s+quyền", "why": "bài gốc có bản quyền; không được ghi là không bản quyền"},
+    {"pattern": "bản\\s+quyền\\s+thuộc\\s+(về\\s+)?(m10|kênh|chúng\\s+tôi)", "why": "kênh không sở hữu bản quyền bài gốc"},
+    {"pattern": "\\bedm\\b", "why": "bản phối là vinahouse; kênh chỉ gọi đúng tên vinahouse, không ghi EDM"}
+  ]
+}

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: stops-to-ask-about-missing-songs
+expected_outcome: |
+  The run folder holds a saved chart whose rank 3 has no certain original (decision "uncertain"), with NCT access off. The skill runs the pipeline, which stops at the "originals" stage with exit 10. The agent shows the human which rank is missing and why, the three choices (take the next rank, skip it, supply the file, with the file name the run expects), and asks. It does not choose for the human: no `pipeline.py decide`, no manifest.json, and nothing is sent to NhacCuaTui.
+context:
+  scaffold_script: place-files.sh

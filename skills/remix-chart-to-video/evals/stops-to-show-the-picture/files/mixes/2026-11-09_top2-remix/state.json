@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "run": {
+    "name": "2026-11-09_top2-remix",
+    "dir": "__WS__/mixes/2026-11-09_top2-remix",
+    "title": "Top 2 Remix Việt · 2026-11-09",
+    "chart_date": "2026-11-09",
+    "count": 2,
+    "sequence": null,
+    "nct_run_id": 1,
+    "chart_source": "lượt NCT #1 đã lưu",
+    "config_path": "__WS__/mixes/config.json",
+    "created_at": 1794300000.0
+  },
+  "stages": [
+    {
+      "id": "preflight",
+      "label": "Kiểm tra máy",
+      "status": "done",
+      "checks": [],
+      "elapsed_s": 1.0,
+      "inputs_hash": "fixture"
+    },
+    {
+      "id": "chart",
+      "label": "Lấy BXH",
+      "status": "done",
+      "checks": [],
+      "elapsed_s": 1.0,
+      "inputs_hash": "fixture"
+    },
+    {
+      "id": "originals",
+      "label": "Tải bản gốc",
+      "status": "todo",
+      "checks": []
+    },
+    {
+      "id": "art",
+      "label": "Ảnh gốc",
+      "status": "todo",
+      "checks": []
+    },
+    {
+      "id": "remix",
+      "label": "Phối Vinahouse",
+      "status": "todo",
+      "checks": []
+    },
+    {
+      "id": "mix",
+      "label": "Ghép mix",
+      "status": "todo",
+      "checks": []
+    },
+    {
+      "id": "cover",
+      "label": "Ảnh bìa",
+      "status": "todo",
+      "checks": []
+    },
+    {
+      "id": "video",
+      "label": "Render video",
+      "status": "todo",
+      "checks": []
+    },
+    {
+      "id": "youtube",
+      "label": "Thông tin YouTube",
+      "status": "todo",
+      "checks": []
+    },
+    {
+      "id": "report",
+      "label": "Báo cáo",
+      "status": "todo",
+      "checks": []
+    }
+  ],
+  "now": null,
+  "waiting": null,
+  "heartbeat": 1794300000.0,
+  "nct_commands": [],
+  "decisions": {},
+  "result": {},
+  "pids": {}
+}

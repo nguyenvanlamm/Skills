@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "chart": {
+    "tag": "V-REMIX_TOP_50",
+    "title": "Top 50 Nhạc Remix Việt",
+    "date": "2026-11-09",
+    "url": "https://www.nhaccuatui.com/chart/1-7-d313-2026",
+    "nct_run_id": 1
+  },
+  "requested_count": 5,
+  "window": 7,
+  "exact_top": false,
+  "tracks": [
+    {
+      "id": 1,
+      "rank": 1,
+      "title": "Xin Đừng Rời Xa Anh",
+      "artist": "Lê Gia Bảo",
+      "label": "Lê Gia Bảo - Xin Đừng Rời Xa Anh",
+      "chart_title": "Xin Đừng Rời Xa Anh (Remix Short 1)",
+      "chart_artist": "Lê Gia Bảo",
+      "chart_url": "https://www.nhaccuatui.com/song/vT7LwCziSqW4",
+      "distributor": "BELIEVE MUSIC",
+      "release_information": "Phát hành: 2026-04-29; Nhà phân phối: BELIEVE MUSIC",
+      "slug": "r01_x",
+      "bpm": 128.0,
+      "key": "A minor",
+      "source": {
+        "path": "x.mp3",
+        "kind": "nct_original",
+        "duration": 300.0
+      }
+    },
+    {
+      "id": 2,
+      "rank": 2,
+      "title": "Không Môn Đăng Hộ Đối",
+      "artist": "Nguyễn Vĩ",
+      "label": "Nguyễn Vĩ - Không Môn Đăng Hộ Đối",
+      "chart_title": "Không Môn Đăng Hộ Đối Remix",
+      "chart_artist": "Nguyễn Vĩ",
+      "chart_url": "https://www.nhaccuatui.com/song/en45yaybAr2S",
+      "distributor": "Do Music",
+      "release_information": "Phát hành: 2026-08-31; Nhà phân phối: Do Music",
+      "slug": "r02_x",
+      "bpm": 128.0,
+      "key": "A minor",
+      "source": {
+        "path": "x.mp3",
+        "kind": "nct_original",
+        "duration": 300.0
+      }
+    },
+    {
+      "id": 3,
+      "rank": 4,
+      "title": "Mở Lòng Vì Ai",
+      "artist": "Inso",
+      "label": "Inso - Mở Lòng Vì Ai",
+      "chart_title": "Mở Lòng Vì Ai (Thazh x Đông Remix)",
+      "chart_artist": "Inso",
+      "chart_url": "https://www.nhaccuatui.com/song/N1Ot27z11WZu",
+      "distributor": "The Orchard",
+      "release_information": "Phát hành: 2026-01-16; Nhà phân phối: The Orchard",
+      "slug": "r04_x",
+      "bpm": 128.0,
+      "key": "A minor",
+      "source": {
+        "path": "x.mp3",
+        "kind": "nct_original",
+        "duration": 300.0
+      }
+    },
+    {
+      "id": 4,
+      "rank": 6,
+      "title": "Hẹn Hò Nhưng Không Yêu",
+      "artist": "Wendy Thảo, Air Media",
+      "label": "Wendy Thảo, Air Media - Hẹn Hò Nhưng Không Yêu",
+      "chart_title": "Hẹn Hò Nhưng Không Yêu (Thazh x Đông Remix)",
+      "chart_artist": "Wendy Thảo, Air Media",
+      "chart_url": "https://www.nhaccuatui.com/song/mJdDD06e0qL9",
+      "distributor": "The Orchard",
+      "release_information": "Phát hành: 2025-11-03; Nhà phân phối: The Orchard",
+      "slug": "r06_x",
+      "bpm": 128.0,
+      "key": "A minor",
+      "source": {
+        "path": "x.mp3",
+        "kind": "nct_original",
+        "duration": 300.0
+      }
+    },
+    {
+      "id": 5,
+      "rank": 7,
+      "title": "Như Một Người Dưng",
+      "artist": "Nguyễn Thạc Bảo Ngọc",
+      "label": "Nguyễn Thạc Bảo Ngọc - Như Một Người Dưng",
+      "chart_title": "Như Một Người Dưng (Jerk Drill x Synth Club)",
+      "chart_artist": "Nguyễn Thạc Bảo Ngọc",
+      "chart_url": "https://www.nhaccuatui.com/song/DuK1WQuAteF1",
+      "distributor": "INGROOVES MUSIC GROUP",
+      "release_information": "Phát hành: 2026-08-25; Nhà phân phối: INGROOVES MUSIC GROUP; Album: Như Một Người Dưng (Jerk Drill x Synth Club)",
+      "slug": "r07_x",
+      "bpm": 128.0,
+      "key": "A minor",
+      "source": {
+        "path": "x.mp3",
+        "kind": "nct_original",
+        "duration": 300.0
+      }
+    }
+  ],
+  "playlist": [
+    {
+      "position": 1,
+      "track": 1,
+      "chapter": "00:00",
+      "chapter_seconds": 0
+    },
+    {
+      "position": 2,
+      "track": 2,
+      "chapter": "06:08",
+      "chapter_seconds": 368
+    },
+    {
+      "position": 3,
+      "track": 3,
+      "chapter": "11:29",
+      "chapter_seconds": 689
+    },
+    {
+      "position": 4,
+      "track": 4,
+      "chapter": "16:52",
+      "chapter_seconds": 1012
+    },
+    {
+      "position": 5,
+      "track": 5,
+      "chapter": "22:20",
+      "chapter_seconds": 1340
+    }
+  ],
+  "mix": {
+    "total_seconds": 1655,
+    "duration": 1654.72,
+    "integrated_lufs": -14.0,
+    "true_peak_dbtp": -1.1
+  }
+}

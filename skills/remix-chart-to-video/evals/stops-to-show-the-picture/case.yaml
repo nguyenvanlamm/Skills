@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: stops-to-show-the-picture
+expected_outcome: |
+  Both songs of this two-song run have their originals, so the pipeline passes the song selection and draws a provisional cover (the config uses the gradient background, so no image service is called). It then stops after stage S3 with exit 10. The agent looks at the provisional cover, gives the human its path and the two text lines, and asks whether they are happy with it or want another picture, their own picture, or other text. It does not approve for the human: no `pipeline.py decide --art`, StemForge is not started, and nothing is sent to NhacCuaTui.
+context:
+  scaffold_script: place-files.sh

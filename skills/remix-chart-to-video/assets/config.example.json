@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "repos": {
+    "downloader": "/path/to/tiktok-nct-downloader",
+    "stemforge": "/path/to/StemForge",
+    "mixcover": "/path/to/m10-mixcover",
+    "visualizer": "/path/to/m10-visualizer"
+  },
+  "nct": {
+    "live_access": null,
+    "chart": "V-REMIX_TOP_50",
+    "interval_s": 60,
+    "home": null
+  },
+  "selection": {
+    "count": 12,
+    "min_duration_s": 90,
+    "max_duration_s": 600,
+    "max_size_mb": 200,
+    "on_missing": "ask",
+    "max_rank": 50
+  },
+  "remix": {
+    "target_bpm": 128,
+    "target_key": "auto",
+    "quality": "high",
+    "host": "127.0.0.1",
+    "port": 8765,
+    "acestep_port": 8001,
+    "separator": null,
+    "max_attempts": 2,
+    "warn_tempo_stretch": 1.25,
+    "job_timeout_s": 2400,
+    "stall_s": 600,
+    "start_timeout_s": 180,
+    "poll_s": 3,
+    "cleanup_jobs": null
+  },
+  "mix": {
+    "transition": "overlap",
+    "overlap_bars": 4,
+    "lead_in_bars": 4,
+    "tail_bars": 4,
+    "vocal_activity_min": 0.5,
+    "dj_bars": 8,
+    "start_fade_s": 1.0,
+    "curve": "tri",
+    "crossfade_s": 4.0,
+    "max_beat_offset_ms": 60,
+    "min_beat_correlation": 0.25,
+    "target_lufs": -14.0,
+    "lufs_tolerance": 1.5,
+    "true_peak_max_dbtp": -1.0,
+    "silence_db": -50,
+    "silence_min_s": 1.5,
+    "preview_pad_s": 10
+  },
+  "cover": {
+    "title": "TOP {count} REMIX VIỆT",
+    "title_inexact": "{count} BÀI REMIX VIỆT HOT",
+    "subtitle": "Vinahouse Remix · Tháng {month}/{year}",
+    "confirmed": false,
+    "review": true,
+    "preset": "m10",
+    "thumb_tracks": 10,
+    "seed": null,
+    "seed_retries": 1,
+    "label": "{artist} - {title}"
+  },
+  "video": {
+    "look": null,
+    "preset": "m10",
+    "fps": 60,
+    "size": "1920x1080",
+    "workers": 0,
+    "background_still": true,
+    "tracklist": "side",
+    "side_title": "remix nhạc hot tiktok",
+    "side_column_width": 0.24,
+    "side_title_min_size": 0.037,
+    "side_track_max": 0.026,
+    "side_track_min": 0.016,
+    "max_side_diff": 20,
+    "cover_zoom_amount": 0.008,
+    "min_cover_ssim": 0.8,
+    "duration_tolerance_s": 0.1
+  },
+  "panel": {
+    "stall_warn_s": 300
+  },
+  "youtube": {
+    "language": "vi",
+    "channel": "M10 Music",
+    "max_review_rounds": 2
+  }
+}
