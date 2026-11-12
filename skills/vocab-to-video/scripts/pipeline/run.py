@@ -5,12 +5,16 @@ Usage:
 
 The folder must contain dialogue.json. Steps: validate -> tts -> build -> publish (upload fields) -> thumbnail -> render -> check.
 Progress is written to state.json; finished work (unchanged TTS lines, up-to-date videos) is reused.
+state.json also holds `progress` (the step being worked on, the steps done in this run, the last
+FAIL line), which steps_pane.py shows to the human.
 """
 from __future__ import annotations
 
 import argparse
+import builtins
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import time
@@ -30,6 +34,33 @@ FORMATS = {"16x9": ("Dialogue16x9", (1920, 1080), "episode"),
 STEPS = ["validate", "tts", "build", "publish", "thumbnail", "render", "check"]
 
 
+# The run in progress, kept here so that main() can close it whatever way the pipeline ends.
+LIVE: dict = {}
+
+
+def print(*args, **kwargs) -> None:
+    """print, and remember the last FAIL line so the steps pane can show why a step stopped."""
+    text = " ".join(str(a) for a in args).strip()
+    if text.startswith("FAIL") and LIVE:
+        LIVE["state"]["progress"]["error"] = text[4:].strip()
+    builtins.print(*args, **kwargs, flush=True)
+
+
+def finish(code: int) -> None:
+    """Close the run's progress: every step done, or stopped at the current one."""
+    if not LIVE:
+        return
+    prog = LIVE["state"]["progress"]
+    if code == 0:
+        if prog["current"] and prog["current"] not in prog["done"]:
+            prog["done"].append(prog["current"])
+        prog.update(status="done", current=None, detail="")
+    else:
+        prog["status"] = "failed"
+    prog["updated_at"] = time.time()
+    write_json(LIVE["path"], LIVE["state"])
+
+
 def image_size(path: Path) -> tuple[int, int]:
     out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
                           "stream=width,height", "-of", "csv=p=0", str(path)],
@@ -38,7 +69,7 @@ def image_size(path: Path) -> tuple[int, int]:
     return int(w), int(h)
 
 
-def main() -> int:
+def run_pipeline() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("level_dir", type=Path)
     ap.add_argument("--until", choices=STEPS[1:], default="check")
@@ -51,10 +82,26 @@ def main() -> int:
     state_path = d / "state.json"
     state = read_json(state_path) if state_path.is_file() else {"steps": {}}
 
+    state["progress"] = {"status": "running", "current": None, "detail": "", "done": [], "error": None,
+                         "until": args.until, "pid": os.getpid(), "started_at": time.time(),
+                         "step_started_at": time.time(), "updated_at": time.time()}
+    LIVE.update(path=state_path, state=state)
+
+    def begin(step: str, detail: str = "") -> None:
+        """Tell the steps pane which step starts now; the step before it counts as done."""
+        prog = state["progress"]
+        if prog["current"] != step:
+            if prog["current"] and prog["current"] not in prog["done"]:
+                prog["done"].append(prog["current"])
+            prog["step_started_at"] = time.time()
+        prog.update(current=step, detail=detail, updated_at=time.time())
+        write_json(state_path, state)
+
     def mark(step: str, **info) -> None:
         state["steps"][step] = {"done_at": time.strftime("%Y-%m-%dT%H:%M:%S"), **info}
         write_json(state_path, state)
 
+    begin("validate")
     print(f"[validate] {d}")
     errors, warnings, stats = validate(dialogue, cfg)
     for w in warnings:
@@ -65,12 +112,14 @@ def main() -> int:
         return 1
     mark("validate", **stats)
 
+    begin("tts")
     print("[tts]")
     metas = synth_lines(dialogue, cfg, d / "lines")
     mark("tts", lines=len(metas))
     if args.until == "tts":
         return 0
 
+    begin("build")
     print("[build]")
     full = [m for m in metas if m["index"] > 0]
     hook = [m for m in metas if m["index"] == 0]
@@ -90,6 +139,7 @@ def main() -> int:
               f"{'Widen' if short_s < lo else 'Narrow'} the 'short' line range in dialogue.json and run again.")
         return 1
 
+    begin("publish")
     print("[publish]")
     problems, warnings = build_publish(d, dialogue, episode, cfg)
     for w in warnings:
@@ -102,6 +152,7 @@ def main() -> int:
     mark("publish", file=str(d / "out" / "publish.md"))
     print(f"  upload fields: {d / 'out' / 'publish.md'}")
 
+    begin("thumbnail")
     print("[thumbnail]")
     meta = read_json(d / "metadata.json")
     base = f"{d.parent.name}_{dialogue['level']}"
@@ -141,7 +192,9 @@ def main() -> int:
     name = f"{d.parent.name}_{dialogue['level']}"
     rendered = state["steps"].get("render", {}).get("files", {})
     failed = False
-    for fmt in args.format or list(FORMATS):
+    formats = args.format or list(FORMATS)
+    for n, fmt in enumerate(formats, 1):
+        begin("render", f"{fmt} {n}/{len(formats)}")
         comp, size, source = FORMATS[fmt]
         props = d / f"{source}.json"
         expect_s = read_json(props)["durationMs"] / 1000
@@ -165,6 +218,7 @@ def main() -> int:
             print(f"  rendered in {time.time() - t0:.0f}s")
         if args.until == "render":
             continue
+        begin("render", f"{fmt} {n}/{len(formats)} kiểm tra")
         problems, vstats = check(out, size, expect_s, cfg["loudness_lufs"], d / "check", cfg["fps"])
         print(f"[check] {fmt}: {vstats['duration_s']}s, {vstats.get('fps')} fps, {vstats.get('lufs')} LUFS")
         for p in problems:
@@ -176,6 +230,15 @@ def main() -> int:
         write_json(state_path, state)
     print("RESULT: FAIL" if failed else "RESULT: PASS")
     return 1 if failed else 0
+
+
+def main() -> int:
+    code = 1
+    try:
+        code = run_pipeline()
+        return code
+    finally:
+        finish(code)
 
 
 if __name__ == "__main__":

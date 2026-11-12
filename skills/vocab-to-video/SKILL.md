@@ -29,6 +29,17 @@ You write the dialogue and the upload texts; `scripts/pipeline/run.py` does ever
    and say so. If the list has more than 12 words, split it into several episodes and tell the user.
 2. **Create the episode folder** `<episodes>/<YYYY-MM-DD>_<slug>/` (slug: 1-3 ASCII words for the
    theme). Save the words, one per line, to `words.txt`. Create `A2/` and `B1/` inside.
+   Then open the steps pane, so the human can see which step the work is at:
+
+   ```bash
+   python3 <skill>/scripts/pipeline/steps_pane.py open <episodes>/<name>
+   ```
+
+   It splits a pane to the right of the chat and keeps itself up to date from the files you write
+   and from what `run.py` reports; you never update it by hand. Exit 69 means herdr is not
+   available: print the output of `steps_pane.py once <episodes>/<name>` in the chat at each step
+   change instead. Leave the pane open when the work ends; close it (`steps_pane.py close`) only
+   when the human says so.
 3. **Write `<LEVEL>/dialogue.json`** for each level. Read `references/dialogue-rules.md` first and
    follow it exactly: it holds the JSON schema, the level rules, the length targets, and the rules
    for the opening hook (first 3 seconds) and the short cut. The two
@@ -84,6 +95,8 @@ You write the dialogue and the upload texts; `scripts/pipeline/run.py` does ever
 ## Useful commands
 
 ```bash
+# the steps pane: open it, print it once as plain text, close it
+python3 steps_pane.py open|once|close <episodes>/<name>
 # only check the text
 uv run python validate_dialogue.py <episodes>/<name>/A2/dialogue.json
 # only rebuild the upload fields (after build has run once)
