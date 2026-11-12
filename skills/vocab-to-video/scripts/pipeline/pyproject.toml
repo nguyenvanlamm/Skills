@@ -1,0 +1,6 @@
+[project]
+name = "podcast-francais-pipeline"
+version = "0.1.0"
+description = "Vocabulary -> French dialogue -> TTS -> episode timeline"
+requires-python = ">=3.11,<3.14"
+dependencies = ["edge-tts>=7.0"]

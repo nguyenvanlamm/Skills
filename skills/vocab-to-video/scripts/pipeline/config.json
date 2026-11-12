@@ -1,0 +1,127 @@
+{
+  "fps": 60,
+  "speakers": {
+    "lea": {
+      "name": "Léa",
+      "voice": "fr-FR-VivienneMultilingualNeural",
+      "image": "lea.png",
+      "color": "#FF8A5B",
+      "side": "left"
+    },
+    "hugo": {
+      "name": "Hugo",
+      "voice": "fr-FR-RemyMultilingualNeural",
+      "image": "hugo.png",
+      "color": "#4FC3F7",
+      "side": "right"
+    }
+  },
+  "levels": {
+    "A2": {
+      "rate": "-10%",
+      "words": [
+        240,
+        360
+      ],
+      "turns": [
+        22,
+        34
+      ],
+      "max_words_per_line": 22
+    },
+    "B1": {
+      "rate": "+0%",
+      "words": [
+        300,
+        440
+      ],
+      "turns": [
+        18,
+        30
+      ],
+      "max_words_per_line": 28
+    }
+  },
+  "duration_s": [
+    120,
+    180
+  ],
+  "timing_ms": {
+    "lead_in": 300,
+    "hook_gap": 650,
+    "gap": 380,
+    "tail_keep": 160,
+    "outro": 1500
+  },
+  "loudness_lufs": -14,
+  "publish": {
+    "language": "fr",
+    "keywords": [
+      "français",
+      "french"
+    ],
+    "category": "Education",
+    "category_id": 27,
+    "playlist": "Dialogues en français {level}",
+    "chapter_start_label": "Début du dialogue",
+    "headings": {
+      "chapters": "⏱️ Chapitres",
+      "vocab": "📚 Vocabulaire ({level})",
+      "transcript": "📝 Transcription"
+    },
+    "footer": "🔔 Abonne-toi pour d'autres dialogues en français.",
+    "seed_queries": [
+      [
+        "dialogue en français",
+        "fr"
+      ],
+      [
+        "dialogue en français {level}",
+        "fr"
+      ],
+      [
+        "dialogue français {level}",
+        "fr"
+      ],
+      [
+        "apprendre le français",
+        "fr"
+      ],
+      [
+        "apprendre le français {level}",
+        "fr"
+      ],
+      [
+        "conversation en français",
+        "fr"
+      ],
+      [
+        "compréhension orale français {level}",
+        "fr"
+      ],
+      [
+        "french conversation",
+        "en"
+      ],
+      [
+        "french conversation {level}",
+        "en"
+      ],
+      [
+        "learn french",
+        "en"
+      ],
+      [
+        "french listening practice",
+        "en"
+      ]
+    ]
+  },
+  "hook": {
+    "max_words": 12
+  },
+  "short_duration_s": [
+    30,
+    60
+  ]
+}
