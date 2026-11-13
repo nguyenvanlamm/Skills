@@ -8,9 +8,10 @@ import re
 import shutil
 from pathlib import Path
 
+from . import center
 from . import config as cfgmod
 from . import ffmpeg
-from .common import SKILL_DIR, RcvError, check, digest, parse_ts, read_json, run, sha256_file, write_json, write_text
+from .common import SKILL_DIR, RcvError, check, digest, fold, parse_ts, read_json, run, sha256_file, write_json, write_text
 
 CACHE_LINE = re.compile(r'(vừa tạo|lấy từ cache \(không tốn tiền\)):\s*(\S.*?)\s+seed=(\d+)')
 SIDE_LINE = re.compile(r'cô gái ở (?:1/3 )?bên (trái|phải)')
@@ -41,6 +42,57 @@ def side_signature(cfg: dict) -> str:
     keys = ('tracklist', 'side_column_width', 'side_title_min_size', 'side_track_max', 'side_track_min')
     return digest([side_title(cfg), {k: vid.get(k) for k in keys}, SIDE_TITLE_FONT.name,
                    sha256_file(SIDE_HELPER) if SIDE_HELPER.is_file() else None])
+
+
+POSTER_KEYS = ('thumb_style', 'poster_tracks', 'poster_column_width', 'poster_title_min_size', 'poster_track_max', 'poster_track_min')
+THUMB_SIZE = (1280, 720)
+POSTER_TITLE_MAX_H, POSTER_TITLE_BLOCK_H = 0.30, 0.62       # the title may be this large on a thumbnail
+
+
+def wants_poster(cfg: dict) -> bool:
+    return cfg['cover'].get('thumb_style', 'poster') == 'poster'
+
+
+def poster_signature(cfg: dict) -> list:
+    return [cfg['cover'].get(k) for k in POSTER_KEYS]
+
+
+def draw_poster(cfg: dict, tracks: list[dict], title: str, out_jpg: Path, raw: Path | None, side: str,
+                name: str) -> tuple[dict | None, list[dict]]:
+    """The thumbnail as a poster: the picture, and at the side away from the DJ the cover's
+    title in large slanted letters above the first `cover.poster_tracks` songs and a line
+    "+ N bài khác". A thumbnail is shown about 320 px wide: the cover scaled down has ten song
+    lines of 17 px, which nobody reads at that size. Drawn by the same helper as the video's
+    side column, at 1280x720."""
+    repo, python = _python(cfg)
+    cov = cfg['cover']
+    w, h = THUMB_SIZE
+    px = lambda key: max(1, round(float(cov[key]) * h))  # noqa: E731
+    shown = tracks[:max(0, int(cov['poster_tracks']))]
+    rest = len(tracks) - len(shown)
+    spec = {'repo': str(repo), 'preset': str(cov['preset']), 'out': str(out_jpg), 'size': [w, h],
+            'raw': str(raw) if raw and Path(raw).is_file() else None, 'side': side,
+            'column_width': float(cov['poster_column_width']), 'title': title, 'title_font': str(SIDE_TITLE_FONT),
+            'tracks': [t['title'] for t in shown], 'footer': f'+ {rest} bài khác' if rest and shown else '',
+            'title_min_px': px('poster_title_min_size'), 'track_max_px': px('poster_track_max'), 'track_min_px': px('poster_track_min'),
+            'title_max_h': POSTER_TITLE_MAX_H, 'title_block_h': POSTER_TITLE_BLOCK_H}
+    out_jpg.unlink(missing_ok=True)
+    rc, out, err = run([str(python), str(SIDE_HELPER), json.dumps(spec, ensure_ascii=False)], cwd=str(repo), timeout=300)
+    try:
+        info = json.loads(out.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        info = None
+    if rc != 0 or not info or not out_jpg.is_file():
+        return None, [check(name, 'FAIL', f'không vẽ được thumbnail kiểu poster (mã {rc}): {(err or out).strip()[-200:]}')]
+    ok = ffmpeg.image_size(out_jpg) == THUMB_SIZE and info['fits']
+    detail = (f'{w}x{h}, tiêu đề "{" / ".join(info["title_lines"])}" cỡ {"–".join(str(s) for s in sorted(set(info["title_sizes"])))} px, '
+              f'{len(shown)} bài cỡ {info["track_px"]} px' + (f', "+ {rest} bài khác"' if rest and shown else '')) if ok else \
+        (f'tiêu đề "{title}" và {len(shown)} bài không vừa thumbnail kể cả ở cỡ nhỏ nhất: rút ngắn cover.title, giảm cover.poster_tracks, '
+         'hoặc `pipeline.py set cover.thumb_style tracklist`')
+    checks = [check(name, 'PASS' if ok else 'FAIL', detail)]
+    if info['cut']:
+        checks.append(check(f'{name}_warnings', 'WARN', f'{info["cut"]} tên bài trên thumbnail bị cắt bằng "…"'))
+    return info, checks
 
 
 def text_side(output: str) -> str:
@@ -100,16 +152,17 @@ def draw_side(cfg: dict, tracks: list[dict], out_png: Path, raw: Path | None, si
     return info, checks
 
 
-def side_geometry(cfg: dict) -> dict | None:
+def side_geometry(cfg: dict, preset: str | None = None) -> dict | None:
     """Can the spectrum ring reach the side column? Both tools size things as fractions of
     the frame, so this is arithmetic on their presets: the ring's farthest bar tip (radius with
-    its bass pulse, the gap, the longest bar and its cap) against the column's inner edge."""
+    its bass pulse, the gap, the longest bar and its cap) against the column's inner edge.
+    `preset` is the run's own visualizer preset (its centre), else `video.preset`."""
     vz, (mc, mc_python) = cfgmod.repo(cfg, 'visualizer'), _python(cfg)
     ring = ('import json, sys\nfrom visualizer.preset import load_preset\n'
             'c = load_preset(sys.argv[1], [])["effects"]["circular_spectrum"]\n'
             'print(c["radius"] * (1 + c.get("ring_pulse", 0)) + c["inner_ring"]["gap"] + c["min_length"]'
             ' + c["max_length"] * (1 + c.get("peak_cap", 0)))')
-    rc1, out1, _ = run([vz / '.venv' / 'bin' / 'python', '-c', ring, cfg['video']['preset']], cwd=str(vz), timeout=120)
+    rc1, out1, _ = run([vz / '.venv' / 'bin' / 'python', '-c', ring, preset or cfg['video']['preset']], cwd=str(vz), timeout=120)
     rc2, out2, _ = run([mc_python, '-c', 'import sys\nfrom mixcover.preset import Preset\n'
                                          'print(Preset.load(sys.argv[1]).get("layout.margin"))', cfg['cover']['preset']],
                        cwd=str(mc), timeout=120)
@@ -160,14 +213,17 @@ def playlist_tracks(manifest: dict) -> list[dict]:
 
 def art_signature(run_dir, cfg: dict, manifest: dict) -> str:
     """What the human approves at the picture stop: this picture with these text lines (the
-    cover's two and the video background's title). A new picture or new text is a new
-    signature, so it is shown again."""
+    cover's two and the video background's title), and the video's centre. A new picture, new
+    text or another centre is a new signature, so it is shown again."""
     raw = Path(run_dir) / 'art' / 'raw.png'
     title, subtitle = texts(cfg, manifest)
-    return digest([sha256_file(raw) if raw.is_file() else 'no-picture', title, subtitle, side_title(cfg)])
+    own = center.run_files(run_dir, cfg)
+    return digest([sha256_file(raw) if raw.is_file() else 'no-picture', title, subtitle, side_title(cfg)]
+                  + ([poster_signature(cfg)] if wants_poster(cfg) else [])      # the thumbnail is part of what they approve
+                  + ([own['key']] if own else []))
 
 
-def review_message(run_dir, cfg: dict, manifest: dict, info: dict) -> str:
+def review_message(run_dir, cfg: dict, manifest: dict, info: dict, checks: list[dict] | None = None) -> str:
     """What the human reads when the run stops after the picture stage."""
     run_dir = Path(run_dir)
     title, subtitle = texts(cfg, manifest)
@@ -179,13 +235,32 @@ def review_message(run_dir, cfg: dict, manifest: dict, info: dict) -> str:
         lines.append(f'  Nền video (tiêu đề "{side_title(cfg).upper()}" trên danh sách bài đánh số, không tên ca sĩ, '
                      f'không mốc thời gian, ở mép; logo sẽ nằm giữa): '
                      f'{run_dir / "art" / "provisional_side.png"}')
+    if (run_dir / 'art' / 'provisional_thumb.jpg').is_file():
+        lines.append(f'  Thumbnail (kiểu poster: tiêu đề lớn và {cfg["cover"]["poster_tracks"]} bài đầu, đọc được ở cỡ YouTube hiển thị): '
+                     f'{run_dir / "art" / "provisional_thumb.jpg"}')
     if info.get('raw'):
         lines.append(f'  Ảnh không chữ: {info["raw"]}')
+    cen = info.get('center')
+    if cen:
+        frame = info.get('center_frame')
+        lines.append(f'  Phần giữa video (logo M10 giữ nguyên): {cen["labels"]}, còn {cen["unused"]}/{cen["total"]} tổ hợp chưa dùng'
+                     + (f'; khung hình: {frame}' if frame else '; khung hình có ở bản xem thử của hai kiểu hình'))
     lines += [f'  Nguồn ảnh: {how}',
-              f'  Chữ trên ảnh: "{title}" / "{subtitle}"',
-              f'  ok    -> pipeline.py decide --run {run_dir} --art ok',
+              f'  Chữ trên ảnh: "{title}" / "{subtitle}"']
+    # Things the human should know before saying "ok": a check of the picture that already
+    # failed (approving it would only fail the stage on the next run), and two titles that differ.
+    for c in checks or []:
+        if c['status'] == 'FAIL':
+            lines.append(f'  LỖI cần sửa trước khi duyệt · {c["name"]}: {c["detail"]}')
+    video_title = side_title(cfg)
+    if video_title and (run_dir / 'art' / 'provisional_side.png').is_file() and fold(video_title) != fold(title):
+        lines.append(f'  Lưu ý: tiêu đề trên nền video ("{video_title.upper()}") khác tiêu đề trên ảnh bìa ("{title}"); '
+                     'nếu muốn giống nhau: pipeline.py set video.side_title "…"')
+    lines += [f'  ok    -> pipeline.py decide --run {run_dir} --art ok',
               f'  redo  -> pipeline.py decide --run {run_dir} --art redo      (ảnh mới với seed khác; tốn 1 ảnh trong hạn mức miễn phí mỗi ngày)',
               f'  image -> pipeline.py decide --run {run_dir} --art image --path FILE',
+              *([f'  đổi phần giữa -> pipeline.py decide --run {run_dir} --center redo      (màu và dáng vòng phổ khác; ảnh giữ nguyên)']
+                if cen else []),
               '  sửa chữ -> pipeline.py set cover.title "…" hoặc cover.title_inexact / cover.subtitle / video.side_title, rồi chạy lại']
     return '\n'.join(lines)
 
@@ -250,6 +325,10 @@ def fetch_art(run_dir, cfg: dict, manifest: dict, decisions: dict | None = None)
                            + '\nCách khác: đặt cover.image thành một ảnh có sẵn, hoặc cover.dry_run=true.', 3)
         w, h = ffmpeg.image_size(art / 'raw.png')
         checks.append(check('art_size', 'PASS' if abs(w / h - 16 / 9) < 0.01 else 'WARN', f'{w}x{h}'))
+    cchecks, cinfo = center.pick(run_dir, cfg, decisions)     # the video's centre: ring colours and shape, particles
+    checks += cchecks
+    info['center'] = cinfo
+    own = center.run_files(run_dir, cfg)
     if wants_side(cfg):                                    # what the video will show behind the logo
         side = text_side(out)
         sinfo, schecks = draw_side(cfg, tracks, art / 'provisional_side.png', art / 'raw.png' if info.get('raw') else None,
@@ -257,7 +336,20 @@ def fetch_art(run_dir, cfg: dict, manifest: dict, decisions: dict | None = None)
         if sinfo is None:
             raise RcvError(schecks[0]['detail'])
         checks += schecks
-        info.update(text_side=side, side_column=sinfo, side_geometry=side_geometry(cfg))
+        info.update(text_side=side, side_column=sinfo, side_geometry=side_geometry(cfg, own and own['preset']))
+    (art / 'provisional_center.png').unlink(missing_ok=True)
+    if own and tracks:                                     # one frame of the centre, on the video background
+        src = tracks[0].get('source') or {}
+        pchecks, frame = center.preview_frame(run_dir, cfg, src.get('path'), float(src.get('duration') or 0),
+                                              info.get('text_side'), info.get('side_geometry'))
+        checks += pchecks
+        info['center_frame'] = frame
+    (art / 'provisional_thumb.jpg').unlink(missing_ok=True)
+    if wants_poster(cfg):                                  # the thumbnail needs no chapter times: show it now
+        pinfo, pchecks = draw_poster(cfg, tracks, title, art / 'provisional_thumb.jpg', art / 'raw.png' if info.get('raw') else None,
+                                     text_side(out), 'thumbnail_poster')
+        checks += pchecks
+        info.update(text_side=info.get('text_side') or text_side(out), poster=pinfo)
     info['signature'] = art_signature(run_dir, cfg, manifest)
     write_json(art / 'art.json', info)
     return checks, info
@@ -301,6 +393,14 @@ def make_cover(run_dir, cfg: dict, manifest: dict, mix: dict, limits: dict | Non
         size = ffmpeg.image_size(path)
         checks.append(check(name, 'PASS' if size == want else 'FAIL', f'{size[0]}x{size[1]}, {path.stat().st_size} byte'))
     thumb = out_dir / 'cover_thumb.jpg'
+    if wants_poster(cfg):                                  # the thumbnail people see: a poster, not the cover scaled down
+        poster = out_dir / 'thumb_poster.jpg'
+        side = text_side(out) if SIDE_LINE.search(out) else art.get('text_side', 'right')
+        pinfo, pchecks = draw_poster(cfg, tracks, title, poster, Path(art['raw']) if art.get('raw') else None, side, 'thumbnail_poster')
+        checks += pchecks
+        thumb = poster
+    else:
+        (out_dir / 'thumb_poster.jpg').unlink(missing_ok=True)
     limit = ((limits or {}).get('thumbnail_max_bytes') or {})
     if thumb.is_file():
         if limit.get('verified') and limit.get('value'):
@@ -328,9 +428,10 @@ def make_cover(run_dir, cfg: dict, manifest: dict, mix: dict, limits: dict | Non
         checks.append(check('mixcover_warnings', 'WARN', '; '.join(notes[:4])))
     if not art.get('raw'):
         checks.append(check('cover_art', 'WARN', 'ảnh bìa dùng nền gradient (không có ảnh DJ)'))
-    for name, dest in (('cover.png', 'cover.png'), ('cover_thumb.jpg', 'thumbnail.jpg')):
-        if (out_dir / name).is_file():
-            shutil.copyfile(out_dir / name, run_dir / dest)
+    (run_dir / 'thumbnail.jpg').unlink(missing_ok=True)   # never an older run's style under the new name
+    for path, dest in ((out_dir / 'cover.png', 'cover.png'), (thumb, 'thumbnail.jpg')):
+        if path.is_file():
+            shutil.copyfile(path, run_dir / dest)
     if wants_side(cfg):                                    # the video background: title and song list at the side
         vdir = run_dir / 'video'
         vdir.mkdir(exist_ok=True)
@@ -341,7 +442,8 @@ def make_cover(run_dir, cfg: dict, manifest: dict, mix: dict, limits: dict | Non
         sinfo, schecks = draw_side(cfg, tracks, bg, Path(art['raw']) if art.get('raw') else None, side, 'video_background')
         checks += schecks
         if sinfo is not None:
-            geo = side_geometry(cfg)
+            own = center.run_files(run_dir, cfg)
+            geo = side_geometry(cfg, own and own['preset'])
             if geo is None:
                 checks.append(check('side_column_clear', 'SKIP', 'không đọc được preset của visualizer hoặc mixcover để tính khoảng cách'))
             else:

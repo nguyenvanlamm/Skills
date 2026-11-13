@@ -12,7 +12,12 @@ it can shadow a module Pillow or mixcover imports.
 
     side_text.py SPEC_JSON
     SPEC: {repo, preset, raw, out, size, side, column_width, title, title_font, tracks,
-           title_min_px, track_max_px, track_min_px}
+           title_min_px, track_max_px, track_min_px,
+           footer?, title_max_h?, title_block_h?}
+
+The same drawing makes the poster thumbnail: a wider column, a larger title (`title_max_h`,
+`title_block_h`: its largest font size and largest share of the height), the first few songs
+and a `footer` line ("+ 8 bài khác") under them. An `out` ending in .jpg is saved as JPEG.
 
 `side` is where the column goes ("right" when the DJ stands left). It is `column_width` of the
 frame wide, inside the preset's `layout.margin`; the skill sets that width so the spectrum ring
@@ -35,6 +40,9 @@ from pathlib import Path
 SLANT = 0.18             # title: italic slant, sideways shift per pixel of height (about 10 degrees)
 SHADOW = 0.06            # title: offset of the solid pink copy behind each line, in that line's size
 LINE_GAP = 0.12          # title: space between the ink of two lines, in the lower line's size
+MARK_GAP = 0.22          # title: extra space under a line with a mark below its letters (the dot of "Ạ"), in that
+                         # line's size: at LINE_GAP alone the mark reads as an accent on the line underneath
+MARK_MIN = 0.04          # title: ink this far below the baseline (in the line's size) is such a mark
 MAX_RATIO = 1.4          # title: no line larger than this times the smallest, so the block holds together
 MAX_LINES = 4
 MAX_TITLE_SIZE_H = 0.20  # title: largest font size, as a share of the height
@@ -80,7 +88,9 @@ def main() -> int:
     words = title.split(' ') if title else []
     tracks = [' '.join(str(t).split()) for t in spec.get('tracks') or []]
     n = len(tracks)
-    cap = round(MAX_TITLE_SIZE_H * H)
+    footer = ' '.join(str(spec.get('footer') or '').split())
+    cap = round(float(spec.get('title_max_h') or MAX_TITLE_SIZE_H) * H)
+    block_h = float(spec.get('title_block_h') or MAX_TITLE_BLOCK_H)
 
     def width(font, text: str) -> int:
         b = font.getbbox(text, anchor='ls')
@@ -98,6 +108,11 @@ def main() -> int:
         extra = round(SLANT * m.height)
         return m.transform((m.width + extra, m.height), Image.Transform.AFFINE, (1, SLANT, -extra, 0, 1, 0),
                            Image.Resampling.BICUBIC)
+
+    @lru_cache(maxsize=None)
+    def mark_below(text: str, size: int) -> bool:
+        """Does the line carry a mark under its letters (dấu nặng)? Its ink then ends below the baseline."""
+        return ImageFont.truetype(f_title, size).getbbox(text, anchor='ls')[3] > MARK_MIN * size
 
     def offset(size: int) -> int:
         return max(1, round(SHADOW * size))
@@ -119,7 +134,8 @@ def main() -> int:
         smallest = min(sizes)
         sizes = [min(s, round(MAX_RATIO * smallest)) for s in sizes]
         masks = [line_ink(line, s) for line, s in zip(lines, sizes)]
-        gaps = [round(LINE_GAP * s) for s in sizes[1:]]
+        gaps = [round(LINE_GAP * low + (MARK_GAP * up if mark_below(line, up) else 0))
+                for line, up, low in zip(lines, sizes, sizes[1:])]
         height = sum(m.height for m in masks) + sum(gaps) + offset(sizes[-1])
         return smallest, sizes, masks, gaps, height
 
@@ -143,7 +159,7 @@ def main() -> int:
         num_w = max((width(fn, s) for s in nums), default=0)
         room = col_w - num_w - NUMBER_GAP * t
         shown, cut = [], 0
-        for name in tracks:
+        for name in tracks + ([footer] if footer else []):
             s = name
             if width(ft, s) > room:
                 cut += 1
@@ -153,8 +169,8 @@ def main() -> int:
             shown.append(s)
         asc = max((-ft.getbbox(s, anchor='ls')[1] for s in shown), default=t)
         desc = max((ft.getbbox(s, anchor='ls')[3] for s in shown), default=0)
-        height = (n - 1) * ROW_PITCH * t + asc + desc if n else 0
-        return ft, fn, nums, num_w, shown, cut, asc, height
+        height = (len(shown) - 1) * ROW_PITCH * t + asc + desc if shown else 0
+        return ft, fn, nums + [''] * (len(shown) - n), num_w, shown, cut, asc, height
 
     avail = H - 2 * margin
     t_max, t_min = int(spec['track_max_px']), max(1, int(spec['track_min_px']))
@@ -162,9 +178,11 @@ def main() -> int:
     for t in range(t_max, t_min - 1, -1):              # the largest rows that leave the title its room
         r = rows(t)
         gap = TITLE_LIST_GAP * t if n and words else 0
-        room = min(MAX_TITLE_BLOCK_H * H, avail - r[-1] - gap)
+        room = min(block_h * H, avail - r[-1] - gap)
         head = best_title(room) if words and room > 0 else None
         if words and head is None:
+            continue
+        if not words and r[-1] > avail:                 # no title: the list alone has to fit the height
             continue
         plan = (True, t, r, gap, head)
         break
@@ -251,12 +269,15 @@ def main() -> int:
         for i, (num, name) in enumerate(zip(nums, shown)):
             y = list_top + asc + i * ROW_PITCH * t
             draw.text((x0, y), num, font=fn, fill=lime, anchor='ls')
-            draw.text((name_x, y), name, font=ft, fill=white, anchor='ls')
+            draw.text((name_x, y), name, font=ft, fill=white if num else lime, anchor='ls')    # the footer has no number
             right = name_x + width(ft, name)
             box = [min(box[0], x0), min(box[1], round(y - asc)), max(box[2], round(right)), max(box[3], round(y + 0.3 * t))]
 
     Path(spec['out']).parent.mkdir(parents=True, exist_ok=True)
-    img.save(spec['out'])
+    if str(spec['out']).lower().endswith(('.jpg', '.jpeg')):
+        img.save(spec['out'], quality=92, optimize=True)
+    else:
+        img.save(spec['out'])
     print(json.dumps({'ok': True, 'fits': fits, 'title_px': min(sizes) if sizes else 0, 'title_sizes': sizes,
                       'title_lines': list(lines), 'title_font': Path(f_title).name, 'track_px': t, 'tracks': n,
                       'cut': cut, 'contrast': round(low, 2) if low is not None else None,

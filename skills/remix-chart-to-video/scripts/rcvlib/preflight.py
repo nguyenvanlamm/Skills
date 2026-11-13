@@ -26,7 +26,9 @@ FLAGS = {
 ENTRY = {'downloader': 'run.py', 'mixcover': 'main.py', 'visualizer': 'main.py'}
 STEMFORGE_TEXT = {
     'backend/api/auto_remix.py': ('@router.post("/upload")', '@router.post("/{job_id}/retry")',
-                                  '@router.get("/{job_id}/download")', 'target_bpm', 'output_format'),
+                                  '@router.get("/{job_id}/download")', '@router.get("/{job_id}/analysis")',
+                                  'target_bpm', 'output_format', 'class RetryRequest'),
+    'backend/services/remix_job_manager.py': ('option_updates',),
     'backend/main.py': ('STEMFORGE_REMIX_RETENTION_DAYS',),
 }
 PRESET_KEYS = ('background.dim', 'effects.shake.enabled', 'effects.bg_zoom.enabled', 'effects.bg_zoom.amount',
@@ -175,10 +177,15 @@ def run_preflight(cfg: dict, run_dir=None, count: int | None = None, deep: bool 
     # disk, GPU, ports
     target = Path(run_dir) if run_dir else Path(cfg['_workspace'])
     target.mkdir(parents=True, exist_ok=True)
-    need_gb = count * 2.5 + 8
-    free_gb = min(shutil.disk_usage(target).free, shutil.disk_usage(Path.home()).free) / 1e9
-    checks.append(check('disk', 'PASS' if free_gb >= need_gb else 'WARN' if free_gb >= count * 2.5 else 'FAIL',
-                        f'trống {free_gb:.0f} GB, cần khoảng {need_gb:.0f} GB cho {count} bài'))
+    if need_server:                                 # StemForge's job folders (in the home folder), then mix and video
+        need_gb = count * 2.5 + 8
+        free_gb = min(shutil.disk_usage(target).free, shutil.disk_usage(Path.home()).free) / 1e9
+        checks.append(check('disk', 'PASS' if free_gb >= need_gb else 'WARN' if free_gb >= count * 2.5 else 'FAIL',
+                            f'trống {free_gb:.0f} GB, cần khoảng {need_gb:.0f} GB cho {count} bài'))
+    else:                                           # every remix is done: only the mix and the video are written
+        free_gb = shutil.disk_usage(target).free / 1e9
+        checks.append(check('disk', 'PASS' if free_gb >= 8 else 'WARN',
+                            f'trống {free_gb:.0f} GB ở thư mục lượt chạy, cần khoảng 8 GB cho bản mix và video (các bài đã phối xong)'))
     rc, out, _ = run(['nvidia-smi', '--query-gpu=name,memory.total,memory.used', '--format=csv,noheader,nounits'], timeout=30)
     if rc == 0 and out.strip():
         name, total, used = [x.strip() for x in out.strip().splitlines()[0].split(',')]
@@ -215,7 +222,16 @@ def run_preflight(cfg: dict, run_dir=None, count: int | None = None, deep: bool 
     checks.append(check('youtube_limits', 'WARN' if unverified or not items else 'PASS',
                         f'chưa xác minh: {unverified}' if unverified else
                         f'{len(items)} giới hạn đã xác minh ({limits.get("checked_on")})' if items else 'thiếu youtube_limits.json'))
+    if not need_server:
+        # Every remix is done: a StemForge that is moved, mid-sync or without its models no
+        # longer stands between this run and its mix, cover and video.
+        for c in checks:
+            if c['status'] == 'FAIL' and c['name'] in STEMFORGE_CHECKS:
+                c.update(status='WARN', detail=c['detail'] + ' — lượt này đã phối xong, không cần StemForge nữa')
     return checks
+
+
+STEMFORGE_CHECKS = ('repo_stemforge', 'flags_stemforge', 'stemforge_env', 'stemforge_models')
 
 
 def _models(sf: Path, deep: bool) -> dict:

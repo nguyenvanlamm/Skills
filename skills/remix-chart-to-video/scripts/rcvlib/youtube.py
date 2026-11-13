@@ -22,7 +22,11 @@ VOLUME_TEXT = re.compile(
     r'\d[\d.,]*\s*(k|nghìn|ngàn|triệu|tr|m)?\s*(lượt\s*tìm|lượt\s*tra|searches|search(es)?\s*/|tìm\s*kiếm\s*(/|mỗi|một|hàng)\s*tháng)'
     r'|search\s*volume|lượng\s*tìm\s*kiếm\s*[:=]?\s*\d', re.IGNORECASE)
 COUNT_CLAIM = re.compile(r'(?<![\d:.,])(\d{1,3})\s*(bài|ca khúc|bản|track|tracks|songs?|hits?)\b', re.IGNORECASE)
-TOP_CLAIM = re.compile(r'\btop\s*(\d{1,3})\b', re.IGNORECASE)
+TOP_CLAIM = re.compile(r'(?<![a-z])top\s*(\d{1,3})(?!\d)', re.IGNORECASE)       # also "#top12remix"
+AI_WORD = re.compile(r'\bAI\b')
+AI_DENIED = re.compile(r'\b(không|chưa|chẳng|chả|ko|no|not|without|zero)\b(\s+\S+){0,3}?\s+AI\b', re.IGNORECASE)
+YES = ('co', 'yes')                     # form.altered_content: "Có" (or "Yes"), folded
+VIDEO_HOSTS = ('youtube.com', 'youtu.be')
 
 
 def load_limits() -> dict:
@@ -30,8 +34,14 @@ def load_limits() -> dict:
     return data.get('limits') or {}
 
 
-def load_rules() -> dict:
-    return read_json(SKILL_DIR / 'assets' / 'metadata_rules.json') or {'banned_phrases': []}
+def load_rules() -> dict | None:
+    """The banned phrases; None when the file is missing (the check then fails, it never passes empty)."""
+    return read_json(SKILL_DIR / 'assets' / 'metadata_rules.json')
+
+
+def _word(needle: str, text: str) -> bool:
+    """`needle` in `text` as whole words (both already folded)."""
+    return bool(needle) and re.search(r'(?<!\w)' + re.escape(needle) + r'(?!\w)', text) is not None
 
 
 def chapter_lines(run_dir) -> list[str]:
@@ -129,10 +139,18 @@ def validate(run_dir) -> list[dict]:
                         'từ khoá chính ' + ('có' if primary and primary in fold(opening) else 'không có') + ' trong hai dòng đầu của mô tả'))
 
     # honest numbers
+    # "Top N" is checked everywhere a viewer or the search reads it; the chart's own name
+    # ("Top 50 Nhạc Remix Việt") is a name, not a claim about this video.
+    chart_name = (manifest.get('chart') or {}).get('title') or ''
+    plain = lambda text: re.sub(re.escape(chart_name), ' ', text, flags=re.IGNORECASE) if chart_name else text  # noqa: E731
     wrong = []
-    for label, text in (('tiêu đề', '\n'.join(t['text'] for t in titles)), ('mô tả (5 dòng đầu)', '\n'.join(desc.splitlines()[:5])),
-                        ('bình luận ghim', meta.get('pinned_comment', '')), ('playlist', meta.get('playlist', ''))):
-        for m in COUNT_CLAIM.finditer(text):
+    for label, text, counts in (('tiêu đề', '\n'.join(t['text'] for t in titles), True),
+                                ('mô tả (5 dòng đầu)', '\n'.join(desc.splitlines()[:5]), True),
+                                ('mô tả', '\n'.join(desc.splitlines()[5:]), False),
+                                ('tags', ' , '.join(tags), True), ('hashtag', ' '.join(hashtags), False),
+                                ('bình luận ghim', meta.get('pinned_comment', ''), True), ('playlist', meta.get('playlist', ''), True)):
+        text = plain(text)
+        for m in COUNT_CLAIM.finditer(text) if counts else ():
             if int(m.group(1)) != n:
                 wrong.append(f'{label}: "{m.group(0)}" nhưng mix có {n} bài')
         for m in TOP_CLAIM.finditer(text):
@@ -157,31 +175,40 @@ def validate(run_dir) -> list[dict]:
         if marks[0] != 0:
             problems.append('mốc đầu không phải 00:00')
         cap, ok = _limit(limits, 'chapters_min_count')
-        if ok and len(marks) < cap:
-            problems.append(f'chỉ có {len(marks)} mốc, YouTube cần ít nhất {int(cap)}')
+        few = ok and len(marks) < cap                   # a short mix: no chapters on YouTube, nothing to fix
         cap2, ok2 = _limit(limits, 'chapter_min_seconds')
         gaps = [b - a for a, b in zip(marks, marks[1:] + [total])]
         if ok2 and min(gaps) < cap2:
             problems.append(f'có chapter dài {min(gaps)}s, ngắn hơn {int(cap2)}s')
         if marks != sorted(set(marks)):
             problems.append('các mốc không tăng dần')
-        status = 'FAIL' if problems else 'PASS' if ok and ok2 else 'SKIP'
+        status = 'FAIL' if problems else 'WARN' if few else 'PASS' if ok and ok2 else 'SKIP'
         checks.append(check('chapter_rules', status, '; '.join(problems) if problems else
+                            f'bản mix chỉ có {len(marks)} mốc, YouTube cần ít nhất {int(cap)} mới tạo chapter: các mốc trong mô tả '
+                            'vẫn bấm được nhưng thanh thời gian không chia đoạn' if few else
                             f'{len(marks)} mốc, bắt đầu 00:00' if status == 'PASS' else 'quy tắc chapter chưa được xác minh'))
 
     # credits and disclosure
-    low = fold(desc)
+    # A credit is a line that names the song and its artists together. A title alone is not
+    # one: a short title ("Em") is in almost any Vietnamese sentence.
+    folded = [fold(line) for line in desc.splitlines()]
     uncredited = []
     for tr in tracks:
-        if fold(tr['title']) not in low:
-            uncredited.append(tr['title'])
-        for artist in re.split(r'\s*[,&]\s*', tr['artist'] or ''):
-            if artist and fold(artist) not in low:
-                uncredited.append(f'{artist} ({tr["title"]})')
+        title = fold(tr['title'])
+        artists = [fold(a) for a in re.split(r'\s*[,&]\s*', tr['artist'] or '') if a]
+        if not any(_word(title, line) and all(_word(a, line) for a in artists) for line in folded):
+            uncredited.append(f'{tr["title"]} – {tr["artist"]}' if tr['artist'] else tr['title'])
     checks.append(check('description_credits', 'FAIL' if uncredited else 'PASS',
-                        f'mô tả chưa ghi: {sorted(set(uncredited))[:6]}' if uncredited else 'mô tả ghi đủ tên bài và nghệ sĩ gốc'))
-    checks.append(check('ai_disclosure', 'PASS' if re.search(r'\bAI\b', desc) else 'FAIL',
-                        'mô tả có nói về việc dùng AI' if re.search(r'\bAI\b', desc) else 'mô tả chưa nói bản phối và ảnh DJ có dùng AI'))
+                        f'mô tả chưa có dòng nào ghi cùng lúc tên bài và nghệ sĩ: {sorted(set(uncredited))[:6]}' if uncredited
+                        else 'mô tả ghi đủ tên bài và nghệ sĩ gốc'))
+    said = [line for line in desc.splitlines() if AI_WORD.search(line) and not AI_DENIED.search(line)]
+    denied = [line.strip()[:60] for line in desc.splitlines() if AI_DENIED.search(line)]
+    answer = fold(str(((meta.get('form') or {}).get('altered_content') or {}).get('value') or ''))
+    ai_problems = (['mô tả chưa nói phần nhạc nền do AI tạo'] if not said else []) \
+        + ([f'mô tả phủ nhận việc dùng AI: "{denied[0]}"'] if denied else []) \
+        + ([] if answer.startswith(YES) else ['form.altered_content phải là "Có": nhạc nền do AI tạo là nội dung chính của video'])
+    checks.append(check('ai_disclosure', 'FAIL' if ai_problems else 'PASS',
+                        '; '.join(ai_problems) if ai_problems else 'mô tả nói rõ việc dùng AI, form chọn "Có" ở mục nội dung tổng hợp'))
 
     # tags and hashtags
     seen, dupes = set(), []
@@ -194,7 +221,19 @@ def validate(run_dir) -> list[dict]:
     report = read_json(run_dir / 'nct' / 'report.json') or {}
     in_mix = {fold(a) for tr in tracks for a in re.split(r'\s*[,&]\s*', (tr['artist'] or '') + ',' + (tr.get('chart_artist') or '')) if a}
     others = {fold(a) for s in report.get('songs', []) for a in re.split(r'\s*[,&]\s*', s.get('artist') or '') if a} - in_mix
-    strangers = [t for t in tags + [h.lstrip('#') for h in hashtags] if fold(t) in others or fold(t).replace(' ', '') in {o.replace(' ', '') for o in others}]
+    # A tag that is, or contains, the name of an artist who is not in the mix. Names from the
+    # mix (artists, song titles) are taken out first, so a part of them is not read as a stranger;
+    # only names long enough to be a name are searched inside a longer tag.
+    known = sorted(in_mix | {fold(tr['title']) for tr in tracks}, key=len, reverse=True)
+
+    def stranger(tag: str) -> bool:
+        f = fold(tag)
+        if f in others or f.replace(' ', '') in {o.replace(' ', '') for o in others}:
+            return True
+        for name in known:
+            f = re.sub(r'(?<!\w)' + re.escape(name) + r'(?!\w)', ' ', f)
+        return any((' ' in o or len(o) >= 6) and _word(o, f) for o in others)
+    strangers = [t for t in tags + [h.lstrip('#') for h in hashtags] if stranger(t)]
     checks.append(check('tags_artists', 'FAIL' if strangers else 'PASS',
                         f'tag nhắc nghệ sĩ không có trong mix: {strangers[:5]}' if strangers else 'không gắn tên nghệ sĩ ngoài bản mix'))
     bad_form = [h for h in hashtags if not re.fullmatch(r'#[^\s#]+', h)]
@@ -212,8 +251,8 @@ def validate(run_dir) -> list[dict]:
 
     # claims
     texts = _texts(meta)
-    hits = []
-    for rule in rules.get('banned_phrases', []):
+    hits = [] if rules and rules.get('banned_phrases') else ['không đọc được assets/metadata_rules.json: chưa kiểm được cụm bị cấm']
+    for rule in (rules or {}).get('banned_phrases', []):
         rx = re.compile(rule['pattern'], re.IGNORECASE)
         for field, text in texts.items():
             if rule.get('fields') and field not in rule['fields']:
@@ -235,9 +274,15 @@ def validate(run_dir) -> list[dict]:
     else:
         queries = [q for q in evidence.get('queries', []) if q.get('query') and any(r.get('url') and r.get('title') for r in q.get('results', []))]
         ok_ev = len(queries) >= 3 and bool(evidence.get('collected_on'))
-        checks.append(check('evidence', 'PASS' if ok_ev else 'FAIL',
-                            f'{len(queries)} truy vấn có kết quả kèm URL, ngày {evidence.get("collected_on")}' if ok_ev else
-                            'cần ít nhất 3 truy vấn, mỗi truy vấn có kết quả kèm title + url, và collected_on'))
+        # The keyword is meant to come from titles of videos that rank now. Web pages about
+        # music are a weaker basis: say so instead of calling it the same thing.
+        videos = sum(1 for q in queries for r in q.get('results', []) if any(h in str(r.get('url', '')) for h in VIDEO_HOSTS))
+        thin = ok_ev and videos == 0
+        checks.append(check('evidence', 'FAIL' if not ok_ev else 'WARN' if thin else 'PASS',
+                            'cần ít nhất 3 truy vấn, mỗi truy vấn có kết quả kèm title + url, và collected_on' if not ok_ev else
+                            f'{len(queries)} truy vấn có kết quả, ngày {evidence.get("collected_on")}, nhưng không kết quả nào là video '
+                            'YouTube: từ khoá dựa trên trang web, chưa dựa trên tiêu đề video đang xếp hạng' if thin else
+                            f'{len(queries)} truy vấn có kết quả kèm URL ({videos} video YouTube), ngày {evidence.get("collected_on")}'))
     write_text(ydir / 'validation.json', json.dumps({'worst': worst(checks), 'checks': checks}, ensure_ascii=False, indent=2) + '\n')
     return checks
 

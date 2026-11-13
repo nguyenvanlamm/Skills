@@ -3,11 +3,13 @@
 
   selftest.py [--only NAME[,NAME]] [--root DIR] [--keep]
 
-Tests: help, selection, ask_flow, art_review, mix, trim, cover, video, metadata, resume, pane.
+Tests: help, selection, ask_flow, art_review, mix, trim, cover, video, center, center_render, metadata,
+resume, source_tempo, backing_tempo, stall, decide, set, guards, from_run, pane.
 `cover` and `video` call the real m10-mixcover (--dry-run) and m10-visualizer on a few seconds
-of synthetic audio; they are SKIP when the repos are not found (pass --root DIR, the folder
-that holds the four repos). StemForge is replaced by a fake server. Prints JSON.
-Exit 0 when nothing failed, 1 otherwise, 2 usage.
+of synthetic audio, and the tests that run the pipeline need its preflight to pass; they are
+SKIP when the repos are not found (pass --root DIR, the folder that holds the four repos). StemForge is replaced by a fake server. Prints JSON.
+Exit 0 when every test ran and passed, 1 when one failed, 2 usage, 3 when none failed but
+some were skipped (the summary then says INCOMPLETE and names them).
 """
 from __future__ import annotations
 
@@ -29,10 +31,10 @@ sys.path.insert(0, str(HERE))
 os.environ['RCV_FORBID_NCT'] = '1'
 
 from rcvlib import config as cfgmod  # noqa: E402
-from rcvlib import cover, ffmpeg, mix, nct, preflight, video, youtube  # noqa: E402
+from rcvlib import center, cover, ffmpeg, mix, nct, preflight, video, youtube  # noqa: E402
 from rcvlib.common import read_json, round_half_up, worst, write_json  # noqa: E402
 from rcvlib.fake_stemforge import FakeStemForge  # noqa: E402
-from rcvlib.state import State  # noqa: E402
+from rcvlib.state import STAGE_IDS, RunLock, State  # noqa: E402
 
 RATE = 48000
 LIMITS = {'title_max_chars': {'value': 100, 'unit': 'characters', 'verified': True},
@@ -43,7 +45,7 @@ LIMITS = {'title_max_chars': {'value': 100, 'unit': 'characters', 'verified': Tr
           'hashtags_max_count': {'value': 60, 'unit': 'hashtags', 'verified': True},
           'chapters_min_count': {'value': 3, 'unit': 'timestamps', 'verified': True},
           'chapter_min_seconds': {'value': 10, 'unit': 'seconds', 'verified': True},
-          'thumbnail_max_bytes': {'value': 2097152, 'unit': 'bytes', 'verified': True}}
+          'thumbnail_max_bytes': {'value': 2000000, 'unit': 'bytes', 'verified': True}}
 
 
 class Skip(Exception):
@@ -86,7 +88,8 @@ class Lab:
         repos = {k: str(self.root / v) if self.root else '/nonexistent' for k, v in cfgmod.REPOS.items()}
         base = {'repos': repos, 'nct': {'live_access': False},
                 'selection': {'count': 3, 'min_duration_s': 5},
-                'remix': {'cleanup_jobs': 'keep', 'port': self.fake.port, 'poll_s': 0.2, 'stall_s': 20, 'job_timeout_s': 60},
+                'remix': {'cleanup_jobs': 'keep', 'port': self.fake.port, 'poll_s': 0.2, 'stall_s': 20, 'job_timeout_s': 60,
+                          'target_bpm': 128},          # one tempo; t_source_tempo tests the default "source"
                 'cover': {'confirmed': True, 'dry_run': True, 'review': False},
                 'video': {'look': 'cover', 'fps': 10, 'size': '640x360'}}
         cfg = cfgmod.deep_merge(cfgmod.deep_merge(cfgmod.DEFAULTS, base), over)
@@ -168,12 +171,22 @@ def t_selection(lab: Lab):
     expect(again[3]['usable'] and again[3]['source']['kind'] == 'manual', 'không nhận file tự đặt cho hạng 3')
     top = nct.select(list(again.values()), 3, 3)
     expect(top['exact_top'] and top['short_by'] == 0, 'đủ hạng 1–3 phải là exact_top')
+    expect(again[3]['artist'] == rep['songs'][2]['artist'], 'mặc định phải ghi ca sĩ theo BXH')
+    tagged = srcdir / '03_bai_tu_dat.flac'                          # the same rank, now with an artist tag
+    (srcdir / '03_bai_tu_dat.wav').unlink()
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(c), '-metadata', 'artist=Ca Sĩ Trong Thẻ', str(tagged)], check=True)
+    expect(nct.classify(rep, cfg, srcdir)[2]['artist'] == rep['songs'][2]['artist'], 'manual_artist=chart vẫn đọc thẻ')
+    cfg_tags = {**cfg, 'selection': {**cfg['selection'], 'manual_artist': 'tags'}}
+    by_tag = {x['rank']: x for x in nct.classify(rep, cfg_tags, srcdir)}
+    expect(by_tag[3]['artist'] == 'Ca Sĩ Trong Thẻ' and by_tag[3]['artist_from'] == 'tags' and by_tag[3]['usable'],
+           f'manual_artist=tags phải ghi ca sĩ theo thẻ, được {by_tag[3].get("artist")}')
+    expect(by_tag[1]['artist'] == cands[1]['artist'], 'manual_artist=tags chỉ đổi file người dùng tự đặt')
     rej = {x['rank']: x for x in nct.classify(rep, cfg, srcdir, {'2': 'remix_failed'})}
     expect(rej[2]['reason'] == 'remix_failed' and not rej[2]['usable'], 'bài bị loại vẫn được chọn')
     man = nct.build_manifest(rep, top, cfg, [1, 2, 1])
     expect([p['track'] for p in man['playlist']] == [1, 2, 1] and not man['exact_top'], 'sequence không vào playlist')
     expect(nct.distributor('Phát hành: 2026-04-29; Nhà phân phối: BELIEVE MUSIC') == 'BELIEVE MUSIC', 'không tách được nhà phân phối')
-    return 'đủ 8 lý do loại bài, file tự đặt, lấy bù, loại bài, sequence'
+    return 'đủ 8 lý do loại bài, file tự đặt, ca sĩ theo thẻ, lấy bù, loại bài, sequence'
 
 
 def t_ask_flow(lab: Lab):
@@ -207,7 +220,14 @@ def t_ask_flow(lab: Lab):
     pipeline('decide', '--run', run3, '--missing', 'manual')
     code, out = pipeline('run', '--run', run3, '--until', 'originals')
     expect(code == 0 and read_json(run3 / 'manifest.json')['exact_top'], 'manual có file phải ra đúng hạng 1–3')
-    return 'dừng hỏi (exit 10), backfill, skip, manual'
+    # another file under the same name is another song: the stage runs again and sees the new file
+    size = read_json(run3 / 'manifest.json')['tracks'][2]['source']['size']
+    shutil.copyfile(lab.source('f3_longer.wav', bars=12), run3 / 'sources' / '03_tu_dat.wav')
+    code, out = pipeline('run', '--run', run3, '--until', 'originals')
+    again = read_json(run3 / 'manifest.json')['tracks'][2]['source']
+    expect(code == 0 and 'originals' in [r['stage'] for r in out.get('ran', [])] and again['size'] != size and 'sha256' not in again,
+           f'thay file cùng tên trong sources/ phải được chọn lại: {out.get("ran")} {again}')
+    return 'dừng hỏi (exit 10), backfill, skip, manual, thay file cùng tên'
 
 
 def t_art_review(lab: Lab):
@@ -312,10 +332,26 @@ def t_mix(lab: Lab):
     expect(got == total == rep['total_samples'], f'độ dài mix {got} != dự tính {total}')
     expect(status_of(checks, 'mix_length') == 'PASS' and status_of(checks, 'true_peak') == 'PASS', f'{checks}')
     expect(rep['loudness']['true_peak_dbtp'] <= cfg['mix']['true_peak_max_dbtp'], 'true peak vượt ngưỡng')
+    # the mix is brought to the target loudness by one gain, as far as the true peak allows
+    loud = next(c for c in checks if c['name'] == 'loudness')
+    at_target = abs(rep['loudness']['integrated_lufs'] - cfg['mix']['target_lufs']) <= 0.2
+    expect(at_target or 'true peak' in loud['detail'], f'bản mix phải về đích loudness hoặc nói rõ vì sao không: {loud} gain {rep["gain_db"]}')
+    expect(rep['gain_db'] == 0 or 'đã chỉnh' in loud['detail'], f'đã chỉnh gain thì phải ghi: {loud}')
     expect((run / 'transitions_preview.mp3').is_file() and len(rep['preview']['index']) == 4, 'thiếu file nghe thử đoạn chuyển')
     man = read_json(run / 'manifest.json')
     expect(man['playlist'][1]['chapter'] == rep['chapters'][1]['stamp'], 'manifest không có mốc chapter')
-    return f'5 bài, mốc {[c["stamp"] for c in rep["chapters"]]}, dài {got} mẫu đúng dự tính'
+    stamps = [c["stamp"] for c in rep["chapters"]]
+
+    # "cut": back to back, with a few milliseconds of overlap so the join does not click
+    cut = {**cfg, 'mix': {**cfg['mix'], 'transition': 'cut'}}
+    mix.build(run, cut, None, manifest)
+    rep = read_json(run / 'mix' / 'mix_report.json')
+    ns = round(cfg['mix']['cut_fade_ms'] * RATE / 1000)
+    expect(all(t['mode'] == 'cut' and t['ns'] == ns for t in rep['transitions']), f'nối thẳng phải chồng {ns} mẫu: {rep["transitions"]}')
+    got = ffmpeg.probe(run / 'mix.wav')['audio']['samples']
+    expect(got == sum(t['samples'] for t in rep['tracks']) - ns * len(rep['transitions']) == rep['total_samples'],
+           f'độ dài mix nối thẳng {got} != dự tính {rep["total_samples"]}')
+    return f'5 bài, mốc {stamps}, dài đúng dự tính; nối thẳng chồng {cfg["mix"]["cut_fade_ms"]} ms'
 
 
 def t_trim(lab: Lab):
@@ -362,7 +398,14 @@ def t_trim(lab: Lab):
     rep2 = read_json(run2 / 'mix' / 'mix_report.json')
     expect(status_of(checks2, 'vocal_data') == 'WARN' and rep2['tracks'][1]['cut_from_start_s'] == 7.5
            and rep2['tracks'][0]['trim_basis'] == 'dj_sections', f'thiếu dữ liệu giọng hát phải cắt theo đoạn DJ và báo WARN: {rep2["tracks"]}')
-    return f'cắt quanh giọng hát: chờ đầu {rep["waits"]["start_s"]}s, giữa các bài {rep["waits"]["gaps_s"]}s; thiếu dữ liệu thì cắt theo đoạn DJ'
+    # no lead-in, no tail: straight into the voice, but a pickup bar and a last-note bar stay
+    edge = [0.0] * 8 + [0.05, 0.2] + [1.0] * 6 + [0.3, 0.05] + [0.0] * 6
+    ents = [{'bar_samples': 1000, 'samples': 24000, 'head': 0, 'end': 24000,
+             'vocals': {'total_bars': 24, 'bar_activity': edge}} for _ in range(2)]
+    mix.apply_trims(ents, {**cfg['mix'], 'lead_in_bars': 0, 'tail_bars': 0})
+    expect((ents[0]['head'], ents[0]['end']) == (9000, 17000),
+           f'không lead-in, không đuôi: phải giữ ô nhịp có tiếng hát lấn vào (9) và nốt cuối (16): {ents[0]}')
+    return f'cắt quanh giọng hát: chờ đầu {rep["waits"]["start_s"]}s, giữa các bài {rep["waits"]["gaps_s"]}s; thiếu dữ liệu thì cắt theo đoạn DJ; giữ ô nhịp lấn và nốt cuối'
 
 
 def t_cover(lab: Lab):
@@ -375,6 +418,18 @@ def t_cover(lab: Lab):
     for name in ('cover.png', 'cover_thumb.jpg', 'chapters_match', 'thumbnail_bytes', 'thumbnail_width', 'video_background', 'side_column_clear'):
         expect(status_of(checks, name) == 'PASS', f'{name}: {[c for c in checks if c["name"] == name]}')
     expect((run / 'thumbnail.jpg').is_file() and (run / 'cover.png').is_file(), 'không chép cover/thumbnail ra thư mục lượt chạy')
+    # the thumbnail is the poster (large title, first songs), not the cover scaled down
+    expect(status_of(checks, 'thumbnail_poster') == 'PASS' and ffmpeg.image_size(run / 'thumbnail.jpg') == (1280, 720)
+           and (run / 'thumbnail.jpg').read_bytes() == (run / 'cover' / 'thumb_poster.jpg').read_bytes(),
+           f'thumbnail phải là bản poster: {[c for c in checks if c["name"].startswith("thumbnail")]}')
+    plain = cfgmod.deep_merge(cfg, {'cover': {'thumb_style': 'tracklist'}})
+    checks_t, _ = cover.make_cover(run, plain, manifest, read_json(run / 'mix' / 'mix_report.json'), LIMITS)
+    expect(status_of(checks_t, 'thumbnail_poster') is None
+           and (run / 'thumbnail.jpg').read_bytes() == (run / 'cover' / 'cover_thumb.jpg').read_bytes(), 'thumb_style tracklist phải dùng thumbnail của mixcover')
+    long = cfgmod.deep_merge(cfg, {'cover': {'title': 'một tiêu đề dài quá mức cho một thumbnail nhỏ ' * 3, 'title_inexact': 'x'}})
+    checks_l, _ = cover.make_cover(run, long, manifest, read_json(run / 'mix' / 'mix_report.json'), LIMITS)
+    expect(status_of(checks_l, 'thumbnail_poster') == 'FAIL', f'tiêu đề không vừa thumbnail phải FAIL: {[c for c in checks_l if c["name"] == "thumbnail_poster"]}')
+    checks, info = cover.make_cover(run, cfg, manifest, read_json(run / 'mix' / 'mix_report.json'), LIMITS)
     expect((run / 'video' / 'background.png').is_file() and read_json(run / 'video' / 'background.json')['geometry']['clear_px'] >= 0,
            'thiếu nền video có danh sách bài ở mép, hoặc vòng phổ chạm được cột bài')
     bg_json = read_json(run / 'video' / 'background.json')
@@ -428,6 +483,12 @@ def t_video(lab: Lab):
                                run / 'logs' / 'negative.log', start=30.0, duration=3.0)
     expect(got['code'] == 0, f'không render được đối chứng: {got["stderr"][-200:]}')
     checks, info = video.check_video(cfg, clip, 3.0, 'cover', run / 'cover' / 'cover.png', run / 'video' / 'neg_frames', at=1.5)
+    heard = ffmpeg.loudness(clip)                              # the encoded sound track is measured against the mix
+    same, _ = video.check_video(cfg, clip, 3.0, 'cover', run / 'cover' / 'cover.png', run / 'video' / 'neg_frames', at=1.5, mix_loudness=heard)
+    off, _ = video.check_video(cfg, clip, 3.0, 'cover', run / 'cover' / 'cover.png', run / 'video' / 'neg_frames', at=1.5,
+                               mix_loudness={**heard, 'integrated_lufs': heard['integrated_lufs'] - 3})
+    expect(status_of(same, 'video_loudness') == 'PASS' and status_of(off, 'video_loudness') == 'WARN',
+           f'tiếng trong video phải được đo và so với bản mix: {[c for c in same + off if c["name"] == "video_loudness"]}')
     expect(status_of(checks, 'cover_readable') == 'FAIL', f'lớp phủ mặc định phải làm phép kiểm FAIL: SSIM {info.get("cover_ssim")}')
     # the same for the side column: a ring blown up over it must fail the check
     args, _ = video.look_args(cfg, run, 'visualizer')
@@ -443,14 +504,165 @@ def t_video(lab: Lab):
             f'cột chữ lệch nền {res["looks"]["visualizer"]["side_diff"]} (đối chứng vòng phổ đè lên {info2["side_diff"]}, ngưỡng {cfg["video"]["max_side_diff"]})')
 
 
+def _png(path: Path, pixels: list[tuple[int, int, int, int]]) -> Path:
+    """A one-row RGBA PNG written with the standard library."""
+    import struct
+    import zlib
+    raw = b'\x00' + bytes(c for px in pixels for c in px)
+    chunk = lambda kind, data: struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))  # noqa: E731
+    path.write_bytes(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', len(pixels), 1, 8, 6, 0, 0, 0))
+                     + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b''))
+    return path
+
+
+def _simulate(cfg: dict, n: int, history: dict | None = None) -> list[dict]:
+    history = history or {'entries': []}
+    out = []
+    for i in range(n):
+        got = center.choose(cfg, f'sim{i:03d}', history)
+        out.append(got)
+        history['entries'].append({'run': f'sim{i:03d}', **{a: got[a] for a in center.AXES}, 'at': 1000 + i})
+    return out
+
+
+def t_center(lab: Lab):
+    """The video's centre rotates: no combination twice before all 210 were used, and two videos
+    close together differ in palette, colour family, ring shape and particles."""
+    cfg = cfgmod.deep_merge(cfgmod.DEFAULTS, {})
+    seq = _simulate(cfg, 210)
+    keys = [c['key'] for c in seq]
+    expect(len(set(keys)) == len(center.all_keys()) == 210, f'210 video đầu phải là 210 tổ hợp khác nhau: {len(set(keys))}')
+    vid = cfg['video']
+    for i, c in enumerate(seq):
+        for a in center.AXES:
+            gap = vid[f'center_{a}_gap']
+            expect(c[a] not in {seq[j][a] for j in range(max(0, i - gap), i)}, f'video {i}: {a} {c[a]} lặp lại trong {gap} video gần nhất')
+        fams = {center.family(seq[j]['palette']) for j in range(max(0, i - vid['center_family_gap']), i)}
+        expect(center.family(c['palette']) not in fams, f'video {i}: họ màu {center.family(c["palette"])} lặp lại quá gần')
+        expect(not c['notes'], f'video {i}: không được phải nới luật trong chu kỳ đầu: {c["notes"]}')
+    expect(_simulate(cfg, 3)[2]['key'] == seq[2]['key'], 'cùng lịch sử, cùng tên lượt thì phải ra cùng kiểu')
+    hist = {'entries': [{'run': f'sim{i:03d}', **{a: seq[i][a] for a in center.AXES}, 'at': i} for i in range(5)]}
+    first = center.choose(cfg, 'x', hist)
+    again = center.choose(cfg, 'x', hist, rejected=[first])
+    expect(again['palette'] != first['palette'] and again['shape'] != first['shape'], f'"đổi kiểu khác" phải đổi cả màu lẫn dáng: {first["key"]} -> {again["key"]}')
+    pinned = cfgmod.deep_merge(cfg, {'video': {'center_palette': 'trang-do'}})
+    expect(all(c['palette'] == 'trang-do' for c in _simulate(pinned, 8)), 'ghim màu thì mọi video dùng màu đó')
+    carry = {'palette': 'cam-tim', 'shape': 'tron-vong', 'particles': 'xoay'}
+    expect(center.choose(cfg, 'y', hist, carry=carry)['key'] == center.key(carry), 'lượt làm lại từ lượt cũ phải giữ kiểu của lượt cũ')
+    expect(center.choose(cfg, 'y', hist, rejected=[carry], carry=carry)['key'] != center.key(carry), 'đã bảo đổi thì không giữ kiểu cũ nữa')
+    # a ring the colour of the picture behind it goes last
+    picture = (30, 200, 230)                                  # a strongly cyan picture
+    got = center.choose(cfg, 'z', {'entries': []}, picture_rgb=picture)
+    expect(not center.clashes(center.primary(got), picture, center.catalog()['rules']), f'màu trùng tông ảnh nền phải xếp sau: {got["key"]}')
+    expect(center.clashes('#22D3EE', picture, center.catalog()['rules']) and not center.clashes('#FFFFFF', picture, center.catalog()['rules']),
+           'cyan trên ảnh cyan là trùng tông; trắng thì không')
+    # the history: the videos made before this feature count as the classic centre
+    ws = Path(lab.config('centerws')['_workspace'])
+    wcfg = cfgmod.load(ws / 'config.json')
+    for name, age in (('old-a', 200), ('old-b', 100)):
+        (ws / name / 'art').mkdir(parents=True)
+        (ws / name / 'video.mp4').write_bytes(b'x')
+        os.utime(ws / name / 'video.mp4', (time.time() - age, time.time() - age))
+    hist = center.load_history(wcfg)
+    expect([e['run'] for e in hist['entries']] == ['old-a', 'old-b'] and all(center.key(e) == center.key(center.CLASSIC) for e in hist['entries']),
+           f'video cũ phải được ghi là kiểu cổ điển: {hist}')
+    nxt = center.choose(wcfg, 'new', hist)
+    expect(nxt['palette'] != 'chanh-hong' and nxt['shape'] != 'co-dien', f'video kế tiếp phải khác kiểu cổ điển: {nxt["key"]}')
+    center.reserve(wcfg, 'new', nxt)
+    center.reserve(wcfg, 'new', nxt)
+    entries = read_json(ws / 'center_history.json')['entries']
+    expect([e['run'] for e in entries] == ['old-a', 'old-b', 'new'] and entries[-1]['status'] == 'chosen', f'sổ ghi sai: {entries}')
+    center.mark_rendered(wcfg, 'new')
+    expect(read_json(ws / 'center_history.json')['entries'][-1]['status'] == 'rendered', 'render xong phải ghi rendered')
+    center.release(wcfg, 'new')
+    expect([e['run'] for e in read_json(ws / 'center_history.json')['entries']] == ['old-a', 'old-b'], 'release phải bỏ mục của lượt')
+    # pipeline set: the names come from the catalogue
+    path = wcfg['_path']
+    for key, value in (('video.center_palette', 'tim'), ('video.center', 'random'), ('video.center_shape_gap', '1.5')):
+        code, out = pipeline('set', key, value, '--config', path)
+        expect(code == 2, f'set {key} {value} phải bị từ chối: {code} {out}')
+    for key, value in (('video.center_palette', 'cyan-tim'), ('video.center_palette', 'null'), ('video.center', 'fixed')):
+        code, out = pipeline('set', key, value, '--config', path)
+        expect(code == 0, f'set {key} {value} phải được nhận: {code} {out}')
+    return (f'210 tổ hợp không lặp trong một chu kỳ; màu, họ màu, dáng, hạt không lặp quá gần; đổi kiểu đổi cả màu lẫn dáng; '
+            f'ghim, giữ kiểu lượt gốc, tránh màu trùng ảnh; sổ ghi video cũ là kiểu cổ điển')
+
+
+def t_center_render(lab: Lab):
+    """The centre reaches m10-visualizer: a preset it reads without a warning, a ring that never
+    reaches farther than the default one, a logo in the ring's colour, a frame at the picture
+    stop, and "decide --center redo" for another one."""
+    if not lab.root:
+        raise Skip('cần repo m10-visualizer và m10-mixcover (--root)')
+    # the logo: lime parts take the colour, white and transparency stay
+    src = _png(lab.tmp / 'mark.png', [(198, 255, 0, 255), (255, 255, 255, 255), (0, 0, 0, 0), (198, 255, 0, 128)])
+    out = center.tint_logo(src, lab.tmp / 'mark_red.png', '#FF3355')
+    done = subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-i', str(out), '-f', 'rawvideo', '-pix_fmt', 'rgba', '-'],
+                          capture_output=True, check=True)
+    px = [tuple(done.stdout[i:i + 4]) for i in range(0, 16, 4)]
+    near = lambda a, b: all(abs(x - y) <= 1 for x, y in zip(a, b))  # noqa: E731
+    expect(near(px[0], (255, 51, 85, 255)) and near(px[1], (255, 255, 255, 255)) and px[2][3] == 0 and px[3][3] == 128,
+           f'logo tô màu sai: {px}')
+    # every shape: no unknown key, a ring no wider than the default one
+    cfg = lab.config('centerrender', cover={'review': True}, video={'look': 'visualizer'})
+    vz = Path(cfg['repos']['visualizer'])
+    probe = ('import json, sys, warnings\nwarnings.simplefilter("error")\nfrom visualizer.preset import load_preset\n'
+             'def reach(c): return c["radius"]*(1+c.get("ring_pulse",0))+c["inner_ring"]["gap"]+c["min_length"]+c["max_length"]*(1+c.get("peak_cap",0))\n'
+             'print(json.dumps([reach(load_preset(p)["effects"]["circular_spectrum"]) for p in sys.argv[1:]]))')
+    files = []
+    for i, shape in enumerate(center.names('shape')):
+        combo = {'palette': center.names('palette')[i % 10], 'shape': shape, 'particles': center.names('particles')[i % 3]}
+        files.append(lab.tmp / f'shape_{shape}.yaml')
+        files[-1].write_text(json.dumps(center.preset_data(cfg, combo)), encoding='utf-8')
+    done = subprocess.run([str(vz / '.venv' / 'bin' / 'python'), '-c', probe, cfg['video']['preset'], *map(str, files)],
+                          cwd=str(vz), capture_output=True, text=True)
+    expect(done.returncode == 0, f'visualizer không đọc được preset phần giữa hoặc báo khoá lạ: {done.stderr[-300:]}')
+    base, *each = json.loads(done.stdout)
+    wide = [f.stem for f, r in zip(files, each) if r > base + 1e-9]
+    expect(not wide, f'dáng vòng vươn xa hơn preset gốc ({base:.4f}): {wide}')
+    # the picture stop shows the centre, and "redo" gives another one
+    a, b = lab.source('cr1.wav'), lab.source('cr2.wav')
+    run = lab.run_dir(cfg, lab.report({1: ('file', a), 2: ('file', b)}), 2, 'center-run')
+    code, out = pipeline('run', '--run', run, '--until', 'remix')
+    first = read_json(run / 'art' / 'center.json')
+    expect(code == 10 and out.get('stage') == 'art' and first and 'Phần giữa video' in out['waiting'] and '--center redo' in out['waiting'],
+           f'S3 phải nêu phần giữa và cách đổi: {code} {str(out)[:300]}')
+    expect((run / 'art' / 'provisional_center.png').is_file() and str(run / 'art' / 'provisional_center.png') in out['waiting'],
+           'S3 phải có khung hình phần giữa')
+    art_checks = State.load(run).stage('art')['checks']
+    expect(status_of(art_checks, 'center') == 'PASS' and status_of(art_checks, 'center_preview') == 'PASS',
+           f'phép kiểm phần giữa: {[c for c in art_checks if c["name"].startswith("center")]}')
+    args, _ = video.look_args(cfgmod.load(cfg['_path']), run, 'visualizer', provisional=True)
+    expect(args[args.index('--preset') + 1] == str(run / 'art' / 'center_preset.yaml') and args[args.index('--logo') + 1] == str(run / 'art' / 'center_logo.png')
+           and args[args.index('--seed') + 1] == str(first['seed']), f'look_args phải dùng file phần giữa của lượt: {args}')
+    ledger = read_json(Path(cfg['_workspace']) / 'center_history.json')
+    expect([e['run'] for e in ledger['entries']] == ['center-run'] and ledger['entries'][0]['status'] == 'chosen', f'sổ phải ghi lượt này: {ledger}')
+    code, out = pipeline('decide', '--run', run, '--center', 'redo')
+    expect(code == 0, f'decide --center redo: {code} {out}')
+    code, out = pipeline('run', '--run', run, '--until', 'remix')
+    second = read_json(run / 'art' / 'center.json')
+    expect(code == 10 and second['palette'] != first['palette'] and second['shape'] != first['shape'],
+           f'redo phải cho kiểu khác cả màu lẫn dáng: {first["key"]} -> {second["key"]} ({code})')
+    pipeline('decide', '--run', run, '--art', 'ok')
+    code, out = pipeline('run', '--run', run, '--until', 'remix')
+    expect(code == 0, f'duyệt xong phải chạy tiếp: {code} {str(out)[:300]}')
+    # fixed: the visualizer's own preset and logo, nothing recorded
+    fixed = cfgmod.deep_merge(cfgmod.load(cfg['_path']), {'video': {'center': 'fixed'}})
+    args, _ = video.look_args(fixed, run, 'visualizer')
+    expect('--preset' not in args and '--seed' not in args and args[args.index('--logo') + 1] == str(vz / 'assets' / 'M10-logo-mark.png'),
+           f'video.center fixed phải dùng logo và preset gốc: {args}')
+    return (f'preset đọc được, {len(each)} dáng không vươn xa hơn {base:.4f}; logo tô màu đúng; S3 có khung hình và dòng phần giữa; '
+            f'redo {first["key"]} -> {second["key"]}; fixed giữ hành vi cũ')
+
+
 def good_meta(run: Path) -> dict:
     lines = youtube.chapter_lines(run)
     man = read_json(run / 'manifest.json')
     credits = '\n'.join(f'{i}. {t["title"]} – {t["artist"]}' for i, t in enumerate(cover.playlist_tracks(man), 1))
     desc = ('Nhạc remix Việt phối lại kiểu vinahouse, nghe liền mạch một lèo.\nBật loa và nghe trọn bản mix nhạc remix của M10 Music.\n\n'
             'Tracklist:\n' + '\n'.join(lines) + '\n\nBài gốc và nghệ sĩ:\n' + credits +
-            '\n\nĐây là bản phối vinahouse của M10 Music, có dùng công cụ AI. Ảnh DJ do AI tạo, không phải người thật.\n\n#nhacremix #vinahouse')
-    form = {k: {'value': 'x', 'why': 'y'} for k in youtube.FORM_KEYS}
+            '\n\nĐây là bản phối vinahouse của M10 Music, phần nhạc nền có dùng công cụ AI.\n\n#nhacremix #vinahouse')
+    form = {k: {'value': 'Có' if k == 'altered_content' else 'x', 'why': 'y'} for k in youtube.FORM_KEYS}
     scores = {k: 4 for k in youtube.SCORE_KEYS}
     return {'primary_keyword': 'nhạc remix', 'secondary_keywords': ['vinahouse remix'],
             'titles': [{'text': '5 Bài Nhạc Remix Việt Phối Vinahouse Nghe Là Nghiện | M10 Music', 'angle': 'số bài', 'scores': scores, 'why': 'rõ'},
@@ -518,12 +730,33 @@ def t_metadata(lab: Lab):
             ('description_credits', lambda m: m.update(description=m['description'].replace('Ca sĩ 3', 'ai đó')), None),
             ('description_chapters', lambda m: m.update(description=m['description'].replace('00:00 ', '00:01 ')), None),
             ('ai_disclosure', lambda m: m.update(description=m['description'].replace('AI', 'máy')), None),
+            ('ai_disclosure', lambda m: m.update(description=m['description'].replace('có dùng công cụ AI', 'không dùng AI')), None),
+            ('ai_disclosure', lambda m: m['form']['altered_content'].update(value='Không'), None),
+            ('count_claims', lambda m: m['tags'].append('top 12 remix việt'), None),
+            ('count_claims', lambda m: m['hashtags'].append('#top12remix'), None),
+            ('count_claims', lambda m: m.update(description=m['description'] + '\nTop 12 bài hot nhất tuần'), None),
+            ('tags_artists', lambda m: m['tags'].append('Nguyễn Vĩ remix'), None),
+            ('description_credits', lambda m: m.update(description=m['description'].replace('Bài 2 – Ca sĩ 2', 'Bài 2').replace('Ca sĩ 2 - Bài 2', 'Bài 2')), None),
             ('tags_unique', lambda m: m['tags'].append('NHẠC REMIX'), None),
             ('title_keyword', lambda m: m['titles'][0].update(text='5 Bài Vinahouse Việt Nghe Là Nghiện'), None),
         ]
         for name, change, mixinfo in cases:
             got = verdict(change, mixinfo)
             expect(status_of(got, name) == 'FAIL', f'mẫu sai phải FAIL ở {name}: {[c for c in got if c["name"] == name]}')
+        named = verdict(lambda m: m.update(description=m['description'] + '\nDanh sách dựa theo BXH Top 50 Nhạc Remix Việt của NhacCuaTui.'))
+        expect(status_of(named, 'count_claims') == 'PASS', f'tên BXH "Top 50 Nhạc Remix Việt" không phải lời tự nhận Top N: {named}')
+        two = copy.deepcopy(base_mix)
+        two['chapters'] = two['chapters'][:2]
+        expect(status_of(verdict(None, two), 'chapter_rules') == 'WARN', 'mix dưới 3 mốc: YouTube không tạo chapter, là WARN chứ không FAIL')
+        expect(status_of(good, 'evidence') == 'WARN', 'bằng chứng không có video YouTube nào phải là WARN')
+        tube = {**evidence, 'queries': [{'query': f'q{i}', 'results': [{'title': 't', 'url': 'https://www.youtube.com/watch?v=x'}]} for i in range(3)]}
+        expect(status_of(verdict(ev=tube), 'evidence') == 'PASS', 'bằng chứng có video YouTube phải PASS')
+        rules = youtube.load_rules
+        youtube.load_rules = lambda: None
+        try:
+            expect(status_of(verdict(), 'banned_phrases') == 'FAIL', 'thiếu metadata_rules.json thì không được PASS rỗng')
+        finally:
+            youtube.load_rules = rules
         inexact = copy.deepcopy(read_json(run / 'manifest.json'))
         inexact['exact_top'] = False
         write_json(run / 'manifest.json', inexact)
@@ -584,6 +817,10 @@ def t_resume(lab: Lab):
     code, out = pipeline('run', '--run', run2, '--until', 'remix')
     expect(code == 10 and 'hạng 2' in out.get('waiting', ''), f'bài phối lỗi phải dừng hỏi: {code} {out}')
     expect(sum(1 for p in (run2 / 'remix').glob('*/verify.json')) == 2, 'các bài tốt phải vẫn được phối xong')
+    tries = sum(j['runs'] for j in lab.fake.jobs.values())
+    code, out = pipeline('run', '--run', run2, '--until', 'remix')
+    expect(code == 10 and 'hạng 2' in out.get('waiting', '') and sum(j['runs'] for j in lab.fake.jobs.values()) == tries,
+           f'chạy lại khi chưa trả lời phải hỏi lại, không tự thử lại: {code} {out}')
     pipeline('decide', '--run', run2, '--remix-failed', 'skip')
     code, out = pipeline('run', '--run', run2, '--until', 'mix')
     man = read_json(run2 / 'manifest.json')
@@ -604,6 +841,234 @@ def t_resume(lab: Lab):
     code, out = pipeline('run', '--run', run3, '--until', 'remix')
     expect(code == 0 and lab.fake.created == before + 2, f'chạy tiếp phải dùng lại job đang dở: tạo {lab.fake.created - before} job')
     return 'bỏ qua chặng đã đạt, làm lại khi đầu vào đổi, thử lại bài flaky, dừng hỏi khi phối lỗi, ngắt rồi chạy tiếp'
+
+
+def t_source_tempo(lab: Lab):
+    """remix.target_bpm = "source": StemForge measures each song, the job is switched to the
+    song's own tempo (doubled or halved towards source_center_bpm), nothing is stretched, and
+    two tempos meet in a planned crossfade."""
+    if not lab.root:
+        raise Skip('cần --root (preflight, preset StemForge, mixcover thật)')
+    from rcvlib import stemforge
+    expect(stemforge.pick_target(171.995, 128) == 172.0 and stemforge.pick_target(89.524, 128) == 179.05
+           and stemforge.pick_target(240, 128) == 120.0, 'pick_target chọn sai bội số')
+    a, b = lab.source('st1_bpm100.wav'), lab.source('st2_bpm172.wav')
+    cfg = lab.config('srcws', remix={'target_bpm': 'source'})
+    run = lab.run_dir(cfg, lab.report({1: ('file', a), 2: ('file', b)}), 2, 'source-run')
+    made = lab.fake.created
+    code, out = pipeline('run', '--run', run, '--until', 'mix')
+    expect(code == 0, f'chế độ giữ tốc độ gốc phải chạy tới mix: {code} {out}')
+    expect(lab.fake.created == made + 2 and lab.fake.create_targets[-2:] == ['auto', 'auto'],
+           f'mỗi bài một job, bắt đầu ở auto để đo tempo: {lab.fake.create_targets[-2:]}')
+    jobs = {p.parent.name[:3]: read_json(p) for p in (run / 'remix').glob('*/job.json')}
+    expect(jobs['r01']['target_bpm'] == 100.0 and jobs['r02']['target_bpm'] == 172.0,
+           f'nhịp nền phải là tempo gốc: {[(k, v.get("target_bpm")) for k, v in sorted(jobs.items())]}')
+    for p in (run / 'remix').glob('*/remix_report.json'):
+        expect(abs(read_json(p)['tempo']['tempo_ratio'] - 1.0) < 1e-3, f'{p.parent.name}: giọng bị co giãn')
+        expect(read_json(p.parent / 'source_tempo.json')['bpm'] in (100.0, 172.0), 'thiếu source_tempo.json')
+    st = State.load(run)
+    rchecks = {c['name']: c for c in st.stage('remix')['checks']}
+    expect(all('vocal_stretch' not in c['detail'] for c in rchecks.values()), 'không được có WARN vocal_stretch')
+    expect(rchecks['source_tempo_range']['status'] == 'WARN' and '172' in rchecks['source_tempo_range']['detail'],
+           f'phải nêu bài ngoài khoảng tempo của preset: {rchecks.get("source_tempo_range")}')
+    tr = {c['name']: c for c in st.stage('mix')['checks']}['transition_1_2']
+    expect(tr['status'] == 'PASS' and 'giữ tempo gốc' in tr['detail'], f'hai tempo phải nối bằng crossfade đã định: {tr}')
+
+    # a known tempo (an earlier measurement, or the report a --from-run copied) skips the "auto" start
+    cfg['remix']['source_center_bpm'] = 150
+    cfgmod.save(cfg)
+    made = lab.fake.created
+    code, out = pipeline('run', '--run', run, '--until', 'remix')
+    expect(code == 0 and lab.fake.create_targets[-2:] == [200.0, 172.0],
+           f'tempo đã biết phải tạo job thẳng ở nhịp gốc: {code} {lab.fake.create_targets[-2:]}')
+    tdir = lab.tmp / 'carried'
+    tdir.mkdir()
+    write_json(tdir / 'remix_report.json', {'source': {'bpm': 171.995, 'duration': 293.2}})
+    expect(stemforge.known_source_bpm(tdir, {'source': {'sha256': 'x', 'duration': 293.19}}) == 171.995
+           and stemforge.known_source_bpm(tdir, {'source': {'sha256': 'x', 'duration': 250.0}}) is None,
+           'tempo trong remix_report.json chép sang chỉ dùng khi độ dài bài nguồn khớp')
+    return 'đo tempo rồi đổi job sang nhịp gốc, không co giãn, crossfade giữa hai tempo, nêu bài ngoài khoảng preset, dùng lại tempo đã đo'
+
+
+def t_backing_tempo(lab: Lab):
+    """A backing StemForge generated off the requested tempo is a FAIL. In "source" mode the job
+    is re-queued at the song's own tempo one octave over; a remix verified before the check is
+    checked again and redone; when every octave misses, the run stops for the human."""
+    if not lab.root:
+        raise Skip('cần --root (preflight, preset StemForge, mixcover thật)')
+    from rcvlib import stemforge
+    expect(stemforge.pick_target(89.524, 128, avoid=[179.05]) == 89.52, 'pick_target phải bỏ tempo đã trượt')
+    rep = {'tempo': {'target_bpm': 179.05},
+           'generation': {'chosen': {'strategy': 'cover', 'validation': {'measured_bpm': 134.26, 'bpm_ok': False}}}}
+    expect(stemforge.backing_tempo_check(rep)['status'] == 'FAIL', 'nhạc nền trượt tempo phải FAIL')
+    rep['generation']['chosen']['strategy'] = 'text2music'
+    expect(stemforge.backing_tempo_check(rep)['status'] == 'PASS', 'text2music được StemForge co giãn về đúng tempo')
+    expect(stemforge.backing_tempo_check({})['status'] == 'SKIP', 'không có số đo thì SKIP')
+
+    a, b = lab.source('bk1_bpm90_miss150.wav'), lab.source('bk2_bpm90_miss80.wav')
+    cfg = lab.config('bkws', remix={'target_bpm': 'source'})
+    run = lab.run_dir(cfg, lab.report({1: ('file', a), 2: ('file', b)}), 2, 'backing-run')
+    made = lab.fake.created
+    code, out = pipeline('run', '--run', run, '--until', 'remix')
+    expect(code == 10 and 'hạng 2' in out.get('waiting', ''), f'trượt cả hai quãng tám phải dừng hỏi: {code} {out}')
+    expect(lab.fake.created == made + 2, f'đổi quãng tám phải dùng lại job: tạo {lab.fake.created - made} job')
+    d1, d2 = sorted(p for p in (run / 'remix').iterdir() if p.is_dir())
+    j1, j2 = read_json(d1 / 'job.json'), read_json(d2 / 'job.json')
+    expect(j1['status'] == 'verified' and j1['target_bpm'] == 90.0 and j1.get('tried_bpm') == [180.0],
+           f'180 BPM trượt thì phải phối ở 90 BPM, vẫn tốc độ gốc: {j1}')
+    v1 = {c['name']: c for c in read_json(d1 / 'verify.json')['checks']}
+    expect(v1['backing_tempo']['status'] == 'PASS' and v1['source_tempo']['status'] == 'PASS', f'{v1.get("backing_tempo")}')
+    expect(j2['status'] == 'failed' and sorted(j2.get('tried_bpm') or []) == [90.0, 180.0] and 'đã thử' in j2.get('error', ''),
+           f'bài trượt cả hai quãng tám phải ghi đã thử những tempo nào: {j2}')
+
+    # a remix verified by a skill without this check (here: at 180 BPM, backing off) is redone
+    runs = lab.fake.jobs[j1['job_id']]['runs']
+    old = read_json(d1 / 'remix_report.json')
+    old['tempo']['target_bpm'] = 180.0
+    old['generation']['chosen']['validation'].update(bpm_ok=False, measured_bpm=135.0)
+    write_json(d1 / 'remix_report.json', old)
+    write_json(d1 / 'job.json', {k: v for k, v in {**j1, 'target_bpm': 180.0}.items() if k != 'tried_bpm'})
+    pipeline('decide', '--run', run, '--remix-failed', 'skip')
+    code, out = pipeline('run', '--run', run, '--until', 'remix')
+    j1 = read_json(d1 / 'job.json')
+    expect(code == 0 and j1['status'] == 'verified' and j1['target_bpm'] == 90.0 and j1.get('tried_bpm') == [180.0]
+           and lab.fake.jobs[j1['job_id']]['runs'] == runs + 1 and lab.fake.created == made + 2,
+           f'bản phối cũ có nhạc nền trượt tempo phải được phối lại ở quãng tám kia, cùng job: {code} {j1}')
+    # "retry" for a remix that finished but failed its checks: a new job, not the same file again
+    c = lab.source('bk3_bpm100_miss120.wav')
+    cfg2 = lab.config('bkfixed', remix={'target_bpm': 128})
+    run2 = lab.run_dir(cfg2, lab.report({1: ('file', c)}), 1, 'fixed-run')
+    code, out = pipeline('run', '--run', run2, '--until', 'remix')
+    expect(code == 10 and 'backing_tempo' in out.get('waiting', ''), f'nhạc nền trượt ở tempo cố định phải dừng hỏi: {code} {out}')
+    made = lab.fake.created
+    code, out = pipeline('decide', '--run', run2, '--remix-failed', 'retry')
+    expect(code == 0, f'decide retry: {code} {out}')
+    code, out = pipeline('run', '--run', run2, '--until', 'remix')
+    expect(code == 10 and lab.fake.created == made + 1, f'retry sau khi bản phối trượt phép kiểm phải tạo job mới: tạo {lab.fake.created - made}')
+    return 'nhạc nền trượt tempo là FAIL, tự thử quãng tám kia, phối lại bản cũ chưa được kiểm, dừng hỏi khi trượt cả hai, retry tạo job mới'
+
+
+def t_stall(lab: Lab):
+    """A job that stops moving is cancelled, waited for and retried; one that never stops
+    becomes a failed remix the human decides about. The other songs are still remixed."""
+    if not lab.root:
+        raise Skip('cần --root (preflight thật)')
+    a, b, c = lab.source('q1.wav'), lab.source('q2_stuck.wav'), lab.source('q3_hung.wav')
+    cfg = lab.config('stallws', remix={'stall_s': 1.5, 'cancel_wait_s': 2.5})
+    run = lab.run_dir(cfg, lab.report({1: ('file', a), 2: ('file', b), 3: ('file', c)}), 3, 'stall-run')
+    code, out = pipeline('run', '--run', run, '--until', 'remix')
+    jobs = [read_json(p) for p in sorted((run / 'remix').glob('*/job.json'))]
+    expect(code == 10 and 'hạng 3' in out.get('waiting', '') and 'hạng 2' not in out['waiting'].splitlines()[0],
+           f'job đứng không dừng được phải thành bài phối lỗi (exit 10), không làm hỏng cả chặng: {code} {out}')
+    expect([j['status'] for j in jobs] == ['verified', 'verified', 'failed'] and jobs[1]['attempts'] == 2
+           and jobs[2]['error_type'] == 'stalled', f'bài đứng phải được huỷ, chờ dừng rồi thử lại: {jobs}')
+    return 'job đứng: huỷ, chờ dừng hẳn, thử lại; job không dừng: thành bài phối lỗi, các bài khác vẫn xong'
+
+
+def t_decide(lab: Lab):
+    """`decide` answers a question the run is waiting with. It never changes a finished run,
+    never answers a question nobody asked, and never writes while a stage is running."""
+    cfg = lab.config('decidews')
+    run = lab.run_dir(cfg, lab.report({}), 2, 'decide-run')
+    code, out = pipeline('decide', '--run', run, '--missing', 'skip')
+    st = State.load(run)
+    expect(code == 2 and st.data['decisions'] == {} and st.stage('originals')['status'] == 'todo', f'không có gì đang chờ thì decide phải từ chối: {code} {out}')
+    st.start('originals')
+    st.wait('originals', 'thiếu bài')
+    with RunLock(run):                                       # a stage is running
+        code, out = pipeline('decide', '--run', run, '--missing', 'skip')
+    expect(code == 2 and State.load(run).data['decisions'] == {}, f'đang có tiến trình chạy thì decide phải từ chối: {code} {out}')
+    code, out = pipeline('decide', '--run', run, '--missing', 'skip')
+    expect(code == 0 and State.load(run).data['decisions'].get('missing_action') == 'skip', f'đang chờ thì decide phải ghi: {code} {out}')
+    st = State.load(run)
+    for sid in STAGE_IDS:
+        st.start(sid)
+        st.finish(sid, [])
+    code, out = pipeline('decide', '--run', run, '--art', 'redo')
+    expect(code == 2 and State.load(run).finished() and '--from-run' in out.get('error', ''), f'lượt đã xong không được sửa: {code} {out}')
+    return 'từ chối khi không có gì chờ, khi đang chạy, khi lượt đã xong; ghi khi đang chờ'
+
+
+def t_set(lab: Lab):
+    """`set` refuses a value of the wrong type instead of saving a config no command can load."""
+    cfg = lab.config('setws')
+    path = cfg['_path']
+    for key, value in (('nct.interval_s', '60s'), ('nct.interval_s', '5'), ('nct.live_access', 'True'), ('remix.target_bpm', '300'),
+                       ('remix.source_center_bpm', '0'), ('video.look', 'both'), ('mix', '{}'), ('no.such', '1')):
+        code, out = pipeline('set', key, value, '--config', path)
+        expect(code == 2, f'set {key} {value} phải bị từ chối: {code} {out}')
+    expect(cfgmod.load(path)['nct']['interval_s'] == 60, 'config phải còn đọc được sau các lần set sai')
+    for key, value in (('cover.image', '/tmp/x.png'), ('cover.dry_run', 'false'), ('cover.title', '2026'), ('mix.lead_in_bars', 'null'),
+                       ('remix.target_bpm', 'source'), ('nct.live_access', 'true')):
+        code, out = pipeline('set', key, value, '--config', path)
+        expect(code == 0, f'set {key} {value} phải được nhận: {code} {out}')
+    got = cfgmod.load(path)
+    expect(got['cover']['title'] == '2026' and got['cover']['image'] == '/tmp/x.png' and got['mix']['lead_in_bars'] is None
+           and got['nct']['live_access'] is True and got['cover']['dry_run'] is False, f'giá trị lưu sai: {got["cover"]}')
+    return 'từ chối sai kiểu, sai khoảng, khoá lạ; nhận cover.image, cover.dry_run, chữ, null'
+
+
+def t_guards(lab: Lab):
+    """Small guards: a timed-out tool, an interrupt in the mix, a fade that would reach a voice."""
+    from rcvlib import stemforge
+    from rcvlib.common import run as run_cmd
+    rc, out, err = run_cmd(['sh', '-c', 'echo hi; echo oops >&2; sleep 5'], timeout=0.5)
+    expect(rc == 124 and isinstance(out, str) and isinstance(err, str) and 'timeout' in err, f'lệnh quá hạn phải trả 124 và chữ: {rc} {out!r} {err!r}')
+
+    class Stopped:
+        children: list = []
+
+        def should_stop(self):
+            return True
+    try:
+        mix.render([{'path': str(lab.tmp / 'gone.wav'), 'head': 0, 'end': 10, 'samples': 10}], [], lab.tmp / 'never.wav', Stopped())
+        expect(False, 'ffmpeg bị dừng giữa chừng phải là Interrupted')
+    except stemforge.Interrupted:
+        pass
+
+    def song(pos, bpm, lead_s, tail_s):
+        n = 20 * RATE
+        return {'position': pos, 'path': 'x', 'bpm': bpm, 'samples': n, 'head': 0, 'end': n, 'basis': 'vocals',
+                'voice_start': int(lead_s * RATE), 'voice_stop': n - int(tail_s * RATE)}
+    mx = cfgmod.DEFAULTS['mix']
+    full = mix.plan_transition(song(1, 172, 6, 6), song(2, 130, 6, 6), mx, own_tempo=True)
+    short = mix.plan_transition(song(1, 172, 6, 6), song(2, 130, 2.8, 6), mx, own_tempo=True)
+    none = mix.plan_transition(song(1, 172, 6, 0), song(2, 130, 6, 6), mx, own_tempo=True)
+    expect(full['mode'] == 'crossfade' and full['ns'] == 4 * RATE, f'đủ chỗ thì crossfade 4 s: {full}')
+    expect(short['mode'] == 'crossfade' and short['ns'] == int(2.8 * RATE) and 'rút còn' in short['detail'], f'crossfade không được phủ câu hát đầu: {short}')
+    expect(none['mode'] == 'cut' and none['ns'] == 960, f'không còn đoạn không lời thì nối thẳng: {none}')
+    same = mix.plan_transition(song(1, 128, 6, 0), song(2, 128, 6, 6), dict(mx, tail_bars=0), own_tempo=False)
+    expect(same['mode'] == 'cut' and same['status'] == 'PASS', f'cùng tempo, không giữ ô nhịp không lời: nối thẳng, không crossfade qua giọng: {same}')
+    return 'lệnh quá hạn trả 124; ngắt giữa lúc ghép là Interrupted; fade không bao giờ phủ giọng hát'
+
+
+def t_from_run(lab: Lab):
+    """A run made from a finished one keeps its own copy of the human's picture, carries the
+    old answers, and is marked as a run that sends nothing to NCT."""
+    if not lab.root:
+        raise Skip('cần --root (preflight thật)')
+    a, b = lab.source('c1.wav'), lab.source('c2.wav')
+    cfg = lab.config('carryws')
+    old = lab.run_dir(cfg, lab.report({1: ('file', a), 2: ('file', b)}), 2, 'old-run')
+    (old / 'art').mkdir()
+    subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x334455:s=640x360',
+                    '-frames:v', '1', str(old / 'art' / 'raw.png')], check=True)
+    write_json(old / 'art' / 'center.json', {'palette': 'cam-tim', 'shape': 'tron-vong', 'particles': 'xoay', 'seed': 1})
+    st = State.load(old)
+    st.data['decisions'] = {'art_image': str(lab.tmp / 'deleted-run' / 'art' / 'own_picture.png'), 'retry_token': 1.0}
+    st.save()
+    code, out = pipeline('init', '--from-run', old, '--config', cfg['_path'], '--name', 'new-run')
+    expect(code == 0 and not out.get('resumed'), f'init --from-run: {code} {out}')
+    new = Path(out['run'])
+    dec = State.load(new).data['decisions']
+    pic = Path(dec.get('art_image', ''))
+    expect(pic.is_file() and pic.parent == new / 'art' and dec.get('carried_from') == str(old) and 'retry_token' not in dec,
+           f'lượt mới phải giữ bản sao ảnh của riêng nó: {dec}')
+    expect(dec.get('center_carry') == {'palette': 'cam-tim', 'shape': 'tron-vong', 'particles': 'xoay'}, f'lượt mới phải giữ phần giữa của lượt cũ: {dec}')
+    shutil.rmtree(old)
+    code, out = pipeline('run', '--run', new, '--until', 'originals')
+    expect(code == 0 and Path(State.load(new).data['decisions']['art_image']).is_file(), f'xoá lượt cũ rồi lượt mới vẫn phải chạy: {code} {out}')
+    return 'chép ảnh của người dùng sang lượt mới, mang theo câu trả lời cũ và phần giữa, không phụ thuộc thư mục lượt cũ'
 
 
 def t_pane(lab: Lab):
@@ -650,7 +1115,10 @@ def t_pane(lab: Lab):
 
 
 TESTS = {'help': t_help, 'selection': t_selection, 'ask_flow': t_ask_flow, 'art_review': t_art_review, 'mix': t_mix, 'trim': t_trim, 'cover': t_cover, 'video': t_video,
-         'metadata': t_metadata, 'resume': t_resume, 'pane': t_pane}
+         'center': t_center, 'center_render': t_center_render,
+         'metadata': t_metadata, 'resume': t_resume, 'source_tempo': t_source_tempo,
+         'backing_tempo': t_backing_tempo, 'stall': t_stall, 'decide': t_decide, 'set': t_set, 'guards': t_guards,
+         'from_run': t_from_run, 'pane': t_pane}
 
 
 def main(argv=None) -> int:
@@ -685,9 +1153,12 @@ def main(argv=None) -> int:
         if not args.keep:
             shutil.rmtree(tmp, ignore_errors=True)
     failed = [r for r in results if r['status'] == 'FAIL']
-    print(json.dumps({'worst': 'FAIL' if failed else 'PASS', 'root': str(root) if root else None,
-                      'kept': str(tmp) if args.keep else None, 'tests': results}, ensure_ascii=False, indent=2))
-    return 1 if failed else 0
+    skipped = [r['test'] for r in results if r['status'] == 'SKIP']
+    # A skipped test verified nothing: the summary says INCOMPLETE and the exit code is not 0.
+    print(json.dumps({'worst': 'FAIL' if failed else 'INCOMPLETE' if skipped else 'PASS', 'skipped': skipped,
+                      'root': str(root) if root else None, 'kept': str(tmp) if args.keep else None, 'tests': results},
+                     ensure_ascii=False, indent=2))
+    return 1 if failed else 3 if skipped else 0
 
 
 if __name__ == '__main__':

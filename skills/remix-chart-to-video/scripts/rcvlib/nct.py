@@ -97,6 +97,17 @@ class Downloader:
         while it runs would not be safe."""
         interval = max(60, int(self.cfg['nct']['interval_s']))
         args = ['originals', '--run-id', str(run_id), '--limit', str(limit), '--interval', str(interval)]
+        self._env(True)                                 # refuse before any waiting when NCT is off
+        # The downloader keeps the interval inside one command and forgets it between two. A
+        # second command (a wider window) must not download right after the first one's last song.
+        last = max((c['at'] for c in (self.state.data['nct_commands'] if self.state is not None else [])
+                    if c.get('live') and str(c.get('command', '')).startswith('originals')), default=0)
+        while time.time() < last + interval:
+            if should_stop and should_stop():
+                return 130
+            if on_progress:
+                on_progress(0, limit, f'chờ {int(last + interval - time.time())}s trước lệnh tải kế tiếp (cách nhau {interval}s)')
+            time.sleep(min(2, max(0.1, last + interval - time.time())))
         log = self.home / 'logs' / 'app.jsonl'
         offset = log.stat().st_size if log.is_file() else 0
         proc = subprocess.Popen(self._cmd(args), env=self._env(True), stdout=subprocess.DEVNULL,
@@ -109,7 +120,11 @@ class Downloader:
                     break
                 offset = self._tail(log, offset, seen, limit, on_progress)
                 time.sleep(2)
-            proc.wait(timeout=30)
+            try:
+                proc.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
             self._tail(log, offset, seen, limit, on_progress)
         finally:
             if proc.poll() is None:
@@ -171,10 +186,14 @@ def expected_manual_name(rank: int, title: str) -> str:
     return f'{rank:02d}_{slugify(base_title(title), 40)}.mp3'
 
 
-def classify(report: dict, cfg: dict, sources_dir, rejected: dict | None = None, probe=ffmpeg.probe) -> list[dict]:
-    """One record per chart song, in rank order: usable or not, and why."""
+def classify(report: dict, cfg: dict, sources_dir, rejected: dict | None = None, probe=ffmpeg.probe,
+             rejected_at: dict | None = None) -> list[dict]:
+    """One record per chart song, in rank order: usable or not, and why. A rank the human
+    rejected (its remix failed) stays out, unless they put a file for it into sources/ after
+    the rejection (`rejected_at`): another file is another try."""
     sel = cfg['selection']
     rejected = {int(k): v for k, v in (rejected or {}).items()}
+    rejected_at = {int(k): float(v) for k, v in (rejected_at or {}).items()}
     seen: dict[str, int] = {}
     out = []
     for song in sorted(report.get('songs', []), key=lambda s: s['position']):
@@ -188,10 +207,10 @@ def classify(report: dict, cfg: dict, sources_dir, rejected: dict | None = None,
             'usable': False, 'reason': None, 'detail': None,
         }
         out.append(cand)
-        if rank in rejected:
+        manual = manual_file(sources_dir, rank)
+        if rank in rejected and not (manual and rank in rejected_at and manual.stat().st_mtime > rejected_at[rank]):
             cand.update(reason=rejected[rank], detail=REASONS.get(rejected[rank], rejected[rank]))
             continue
-        manual = manual_file(sources_dir, rank)
         if manual:
             path, kind = manual, 'manual'
             title = orig.get('title') if orig.get('decision') == 'matched' else (orig.get('base_title') or base_title(song.get('title')))
@@ -225,8 +244,12 @@ def classify(report: dict, cfg: dict, sources_dir, rejected: dict | None = None,
         if not info.get('audio'):
             cand.update(reason='undecodable', detail='không có luồng âm thanh')
             continue
+        tagged = (info.get('tags') or {}).get('artist') or (info.get('tags') or {}).get('album_artist')
+        if kind == 'manual' and sel.get('manual_artist') == 'tags' and tagged:
+            cand.update(artist=tagged, artist_from='tags')               # the human's file names its own singer
+            dedupe = fold(f'{title}|{tagged.split(",")[0]}')
         dur = info['duration']
-        cand['source'].update(duration=round(dur, 3), size=info['size'])
+        cand['source'].update(duration=round(dur, 3), size=info['size'], mtime_ns=path.stat().st_mtime_ns)
         if dur < sel['min_duration_s']:
             cand.update(reason='too_short', detail=f'{dur:.0f}s < {sel["min_duration_s"]}s')
         elif dur > sel['max_duration_s']:
@@ -278,8 +301,9 @@ def build_manifest(report: dict, selection: dict, cfg: dict, sequence: list[int]
     }
 
 
-def missing_message(selection: dict, sources_dir, live: bool) -> str:
+def missing_message(selection: dict, sources_dir, live: bool, rejected: dict | None = None) -> str:
     """What the human reads when the run stops for missing songs."""
+    rejected = {int(k) for k in (rejected or {})}
     ranks = ', '.join(str(c['rank']) for c in selection['missing'])
     # the first line stands alone: it is all the steps pane shows
     lines = [f'Thiếu {selection["short_by"]} bài trong {selection["count"]} bài đầu BXH (hạng {ranks} không dùng được): '
@@ -287,7 +311,8 @@ def missing_message(selection: dict, sources_dir, live: bool) -> str:
     for c in selection['missing']:
         lines.append(f'  hạng {c["rank"]}: {c["chart_title"]} — {c["chart_artist"]}: {c["detail"] or c["reason"]}'
                      + (f'\n    tìm tay: {c["manual_search_url"]}' if c.get('manual_search_url') else '')
-                     + f'\n    tự đặt file: {Path(sources_dir) / expected_manual_name(c["rank"], c["chart_title"])}')
+                     + f'\n    tự đặt file{" khác (file cũ đã phối lỗi)" if c["rank"] in rejected else ""}: '
+                       f'{Path(sources_dir) / expected_manual_name(c["rank"], c["chart_title"])}')
     lines.append('Chọn: backfill (lấy bù hạng kế tiếp' + ('' if live else '; NCT đang tắt nên bạn phải tự đặt file')
                  + '), skip (bỏ qua, mix ít bài hơn), manual (bạn tự đặt file rồi chạy tiếp).')
     return '\n'.join(lines)

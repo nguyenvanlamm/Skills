@@ -3,8 +3,8 @@ name: remix-chart-to-video
 description: >-
   Turn NhacCuaTui's "Top 50 Nhạc Remix Việt" chart into a ready-to-upload YouTube mix for the
   M10 Music channel: pick the top N songs (default 12) with tiktok-nct-downloader and fetch their
-  originals, remix each to Vinahouse with StemForge Auto Remix (vinahouse), join them on the beat
-  into one long mix, draw cover and thumbnail with m10-mixcover, render the video with
+  originals, remix each to Vinahouse with StemForge Auto Remix (vinahouse) at the song's own
+  tempo, join them into one long mix at −14 LUFS, draw cover and thumbnail with m10-mixcover, render the video with
   m10-visualizer, and draft the YouTube title, description, tags and chapters with hard checks.
   Resumable, with a herdr steps pane; drafts only, never uploads. Use whenever the user wants
   this chain or one stage of it, even without naming the skill: "làm video top 12 remix", "chạy
@@ -14,7 +14,7 @@ description: >-
   websites and app stores (search-optimizer, aso-marketing).
 license: MIT
 metadata:
-  version: 1.6.0
+  version: 1.9.0
   author: "Nguyen Van Lam"
 ---
 
@@ -44,6 +44,8 @@ Talk to the human in Vietnamese. YouTube text is Vietnamese with diacritics.
 4. **Never choose for the human at a stop.** A top-N song with no usable original, the
    picture after stage S3, and a song StemForge could not remix each stop the run with exit 10.
    Show what the run shows, ask once per stop, then record the answer with `pipeline.py decide`.
+   `decide` only answers a question the run is waiting with: it exits 2 when nothing is
+   waiting, when a stage is still running, and for a finished run.
 5. **A stage is done when its checks pass, not when a command returns.** Statuses come from the
    scripts (`PASS`, `WARN`, `FAIL`, `SKIP`). Never edit `state.json` by hand and never report a
    `SKIP` or an unverified item as passed.
@@ -55,8 +57,9 @@ Talk to the human in Vietnamese. YouTube text is Vietnamese with diacritics.
 8. **Stop only what the skill started.** The pipeline stops its own StemForge server and
    deletes only its own job folders, and those only when `remix.cleanup_jobs` allows it.
 9. **Every limit and threshold lives in a file.** YouTube limits are in
-   `references/youtube_limits.json` (each with an official source); thresholds are config keys
-   (`references/design_notes.md` lists them). Never hard-code one in a message or a script.
+   `references/youtube_limits.json` (each with an official source); the thresholds a human may
+   want to change are config keys (`references/design_notes.md` lists them, and the fixed
+   measuring tolerances the scripts use). Never state one from memory in a message.
 
 ## Scripts
 
@@ -69,20 +72,21 @@ Pillow, fonts and colours.
 | Script | Does |
 |---|---|
 | `pipeline.py init-config` | writes `<root>/mixes/config.json` with the four repo paths, lists the first-run questions |
-| `pipeline.py set KEY VALUE` | saves one answer or setting (`set video.look cover`) |
+| `pipeline.py set KEY VALUE` | saves one answer or setting (`set video.look cover`); refuses an unknown key, a wrong type or a value out of range (exit 2) |
 | `pipeline.py init` | preflight + chart, then creates a run folder or resumes the unfinished one of the same chart date |
-| `pipeline.py init --from-run OLD` | a new run folder that reuses a finished run's songs and remixes, to redo the mix, cover and video with other settings |
+| `pipeline.py init --from-run OLD` | a new run folder that reuses a finished run's songs, remixes and chosen picture (its own copies), to redo the mix, cover and video with other settings; it never sends a request to NCT |
 | `pipeline.py run --run RUN [--until S] [--only S]` | runs the stages that are not done: `preflight chart originals art remix mix cover video youtube report` |
-| `pipeline.py decide --run RUN …` | records the human's answer: `--missing backfill\|skip\|manual`, `--art ok\|redo\|image --path FILE`, `--remix-failed retry\|skip\|backfill` |
+| `pipeline.py decide --run RUN …` | records the human's answer: `--missing backfill\|skip\|manual`, `--art ok\|redo\|image --path FILE`, `--center redo`, `--remix-failed retry\|skip\|backfill` |
 | `pipeline.py status --run RUN` | one JSON summary: stages, progress, what the run waits for |
 | `pipeline.py stop --run RUN` | stops a StemForge server this run started (after a crash) |
 | `preflight.py [--deep]` | checks tools, repos, flags, StemForge's venv and models, disk, GPU, ports |
 | `steps_pane.py open\|once\|close RUN` | the steps pane in herdr; `once` prints the block for the chat |
 | `render_video.py preview --run RUN` | short clips and one frame of each video look, for the first-run choice |
 | `youtube_meta.py facts\|validate --run RUN` | the facts metadata may use; hard checks, then `youtube.md` |
-| `selftest.py [--root DIR]` | offline tests of all of the above, with a fake StemForge |
+| `selftest.py [--root DIR]` | offline tests of all of the above, with a fake StemForge; exit 3 and `INCOMPLETE` when tests were skipped (no `--root`) |
 
-Exit codes of `pipeline.py`: `0` done, `1` a stage failed, `2` usage, `10` waiting for the human,
+Exit codes of `pipeline.py`: `0` done, `1` a stage failed, `2` usage (also: another pipeline
+process holds the run, or `decide` has nothing to answer), `10` waiting for the human,
 `20` waiting for you (look preview or metadata), `130` interrupted.
 
 ## Step 0: config and first-run questions
@@ -148,9 +152,15 @@ It prints one JSON object. Act on `exit`:
 search link, and the file name the run expects if the human supplies the song. Options:
 
 - `backfill`: take the next ranks until there are N songs. Offline, the wider window needs files
-  from the human too.
+  from the human too. Live, each wider window is one more downloader command; the pipeline
+  waits `nct.interval_s` (60 s) between two of them, so the pane may show "chờ … trước lệnh
+  tải kế tiếp".
 - `skip`: go on with fewer songs.
 - `manual`: the human puts files into `RUN/sources/` (name starts with the rank: `05_….mp3`).
+  Read each file's artist tag (`ffprobe`) and compare it with the chart's artist; name every
+  mismatch in one line. The credits follow the chart unless the human asks for the tags:
+  `pipeline.py set selection.manual_artist tags` (the title stays the chart's). A file
+  replaced under the same name counts as a new song and is remixed again.
 
 `python3 <skill-dir>/scripts/pipeline.py decide --run RUN --missing backfill|skip|manual`, then
 run again. While the human thinks, nothing else can proceed at this stage; later stages keep the
@@ -159,10 +169,21 @@ songs that are fine.
 **The picture** (`art`, S3). Every run stops here, before the long remix stage, so the human
 sees the picture while it is still cheap to change. The text names the files: the provisional
 cover (the picture with the title, the subtitle and the song list; the times come later, from
-the finished mix), the video background (the same picture with a column at the side away
+the finished mix), the thumbnail (a poster: the cover's title in large letters above the
+first `cover.poster_tracks` songs and "+ N bài khác", made to be read at the small size
+YouTube shows it), the video background (the same picture with a column at the side away
 from the DJ: the title `video.side_title`, "REMIX NHẠC HOT TIKTOK" by default, in big slanted
 poster letters, above the song list numbered in playing order, no artist, no time; the logo and ring go in the
-centre) and the picture without text.
+centre), the picture without text, and the video's centre: the colours and shape of the ring
+and the particles chosen for this video (below), with one frame of it on the video background
+when `video.look` is `visualizer`.
+
+**The centre** differs from one video to the next. The M10 logo stays; the ring's colours,
+its shape and the particles rotate through 210 combinations (`assets/center_styles.json`),
+none twice before all were used, and never the same palette, colour family, ring shape or
+particle style as the videos just before (`center_history.json` beside the config remembers
+them). The stop names the combination and the frame `art/provisional_center.png`. A
+`center_preview` `WARN` means the ring came near the side column in that frame: say so.
 
 1. Look at the provisional pictures yourself first, so you can say in one line what they show
    and point out anything plainly wrong (a distorted face or hands, text running over the DJ,
@@ -174,20 +195,46 @@ centre) and the picture without text.
    - another picture: `decide --run RUN --art redo` (a new seed; one picture of the provider's
      free daily quota);
    - their own picture: `decide --run RUN --art image --path FILE`;
-   - other text: `pipeline.py set cover.title "…"` (or `cover.title_inexact`, `cover.subtitle`).
+   - another centre (ring colours and shape, particles; the picture stays):
+     `decide --run RUN --center redo`; one axis kept for every video:
+     `pipeline.py set video.center_palette NAME` (`center_shape`, `center_particles`; `null` frees it);
+     the old fixed centre: `pipeline.py set video.center fixed`;
+   - other text: `pipeline.py set cover.title "…"` (or `cover.title_inexact`, `cover.subtitle`);
+   - the old thumbnail (the cover scaled down, with the full tracklist):
+     `pipeline.py set cover.thumb_style tracklist`; more or fewer songs on the poster:
+     `pipeline.py set cover.poster_tracks N`.
 
-   After `redo`, an own picture or new text the run stops at S3 again with the new result, until
-   the human says `ok`. Never answer `ok` for them.
+   After `redo`, another centre, an own picture or new text the run stops at S3 again with the new result, until
+   the human says `ok`. Never answer `ok` for them. When the text of the stop has a line
+   "LỖI cần sửa trước khi duyệt" (the title and list do not fit the column), fix that first:
+   an `ok` would only fail the stage. When it says the title on the video background differs
+   from the cover's, tell the human and ask which one they want on both.
 4. On a first run `video.look` is still unset: render the look previews now (Step 3) and ask
    both things in the same message, so the human is interrupted once.
 
 `cover.review: false` turns the stop off for unattended runs; the human sets it, not you.
 
 **Failed remixes** (`remix`). Every other song is finished first, then the run stops once:
-`decide --run RUN --remix-failed retry|skip|backfill`.
+`decide --run RUN --remix-failed retry|skip|backfill`. Running again without an answer asks
+again and starts nothing. `retry` makes a new StemForge job for a remix that finished but
+failed its checks (retrying that job would return the same file) and resumes a job that
+failed on the way. A job that stands still for `remix.stall_s` is cancelled, waited for and
+retried by the pipeline itself; one that does not stop within `remix.cancel_wait_s` becomes a
+failed remix (`stalled`). After `skip` or `backfill` the rank stays out, unless the human puts
+another file for it into `RUN/sources/` afterwards.
 
-A song remixed with a `vocal_stretch` warning was sped up or slowed down a lot to reach the
-common tempo. It is not a failure; name it in your final message so the human listens to it.
+**Tempo.** By default every song keeps its own tempo (`remix.target_bpm: "source"`): the voice
+is never sped up or slowed down, the backing runs at the song's BPM (doubled or halved towards
+`remix.source_center_bpm`), and two songs of different tempo hand over with a crossfade. The
+`source_tempo_range` check names, in one `WARN`, the songs whose backing lies outside the
+preset's range (124–140 BPM); name them in your final message so the human listens to them.
+StemForge sometimes cannot generate a backing at a fast tempo and keeps its best attempt anyway;
+`backing_tempo` measures that (`FAIL`: the drums drift against the voice), and the pipeline asks
+again at the song's tempo one octave over (an 89.5 BPM song goes to 179 first, then to 89.5).
+When both octaves miss, the song stops as a failed remix.
+`pipeline.py set remix.target_bpm 128` gives one tempo for the whole mix and beat-matched
+overlaps instead, at the cost of stretching the voice; a song with a `vocal_stretch` warning was
+then sped up or slowed down a lot. It is not a failure; name it so the human listens to it.
 
 ## Step 3: the look (first run only)
 
@@ -198,7 +245,8 @@ When `video.look` is unset (the run exits 20 before `remix`, or it has just stop
 2. Look at both frames yourself, then show the human the two paths with one line each.
    Propose `visualizer` first: it is the channel's look in m10-visualizer's own output.
    - `visualizer`: the DJ picture with the logo in the centre, growing and shrinking on the
-     beat, the spectrum ring and particles around it, and at the far side, away from the DJ,
+     beat, the spectrum ring and particles around it (their colours and shape differ per
+     video, see "The centre" above), and at the far side, away from the DJ,
      a column with the title `video.side_title` above the numbered song list
      (`video.tracklist: side`; `none` leaves the picture bare).
    - `cover`: the cover with the wide tracklist, readable, no logo; a still picture.
@@ -229,7 +277,8 @@ cut with "…" (`video_background_warnings`); a title and list that only fit bel
 2. While it renders, write the YouTube package as `references/youtube_metadata.md` describes:
    `youtube_meta.py facts --run RUN`, evidence from live web searches, `RUN/youtube/youtube.json`
    and `RUN/youtube/evidence.json`, then `youtube_meta.py validate --run RUN` until nothing is
-   `FAIL`. `validate` never writes `state.json`, so it is safe while the video renders.
+   `FAIL`. `validate` never writes `state.json`, so it is safe while the video renders;
+   `pipeline.py decide` is not, and is refused until the render has ended.
 3. Have a fresh-context subagent review the package against the rubric in that reference, apply
    its concrete edits, validate again. Two rounds at most.
 
@@ -246,6 +295,9 @@ It runs `youtube` (the same validation) and `report`, and prints `finished: true
 
 - the paths of `video.mp4`, `thumbnail.jpg`, `youtube.md` and `REPORT.md`;
 - every `WARN`, in one line each, and anything `SKIP` (not verified);
+- the loudness the scripts measured: of the mix (`loudness`: brought to `mix.target_lufs`
+  by one gain; when the true peak kept it below the target, the check says so) and of the
+  sound track inside the video (`video_loudness`);
 - what only they can judge: `transitions_preview.mp3` (the handovers between songs), the video
   frame, the thumbnail; give the wait before the first sung line and between songs in seconds, and say
   that `mix.lead_in_bars`, `mix.tail_bars` and `mix.overlap_bars` change them;
@@ -265,11 +317,20 @@ bars, using the per-bar vocal activity StemForge measured. Three config keys set
 |---|---|---|
 | `mix.lead_in_bars` | 4 | bars kept before a song's first sung bar; also how the mix starts |
 | `mix.tail_bars` | 4 | bars kept after a song's last sung bar (the last song keeps its whole ending) |
-| `mix.overlap_bars` | 4 | bars over which one song fades into the next |
+| `mix.overlap_bars` | 4 | bars over which one song fades into the next, when both share a tempo |
+| `mix.crossfade_s` | 4.0 | seconds of crossfade between two songs of different tempo; never longer than the voiceless part kept at that join, so no voice is under it |
+| `mix.transition` | `overlap` | `cut` joins the songs back to back, nothing of the two beats sounds together; the voiceless time is then `lead_in + tail` bars |
+| `mix.edge_activity_min` | 0.1 | a bar right before the first sung bar (a pickup) or right after the last (the last note) with this much voice is kept even at `lead_in_bars: 0` / `tail_bars: 0` |
 
-The time without a voice between two songs is `lead_in + tail − overlap` bars; `REPORT.md` and
-the `mix` checks state it in seconds, with the wait before the first sung line. `null` for the
-first two keys keeps whole songs; use `overlap_bars: 8` with that.
+Bars are counted at each song's own tempo. The time without a voice between two songs is
+`lead_in + tail − overlap` bars when they overlap on the beat, and `lead_in + tail` bars minus
+the crossfade when their tempos differ (the usual case with `remix.target_bpm: "source"`);
+`REPORT.md` and the `mix` checks state it in seconds, with the wait before the first sung
+line. `null` for the first two keys keeps whole songs; use `overlap_bars: 8` with that.
+A fade never reaches into a voice: with a lead-in or tail shorter than `crossfade_s` the
+crossfade is shortened to it (the check says "rút còn"), and with none kept the two songs are
+joined straight, as with `cut`. A handover whose check is `WARN` with "hai giọng hát chồng
+nhau" has two voices at once; name it so the human listens to it.
 
 When the human finds the start or the handovers too long or too short, change the keys and make
 a new run from the finished one (a finished run is never changed):
@@ -301,7 +362,8 @@ RUN/
   state.json            stages, progress, checks, what the run waits for (drives the pane)
   nct/report.json       the chart as the downloader reported it
   sources/              songs the human supplies: NN_name.mp3|wav|flac
-  art/                  the text-free AI picture, a provisional cover and video background
+  art/                  the text-free AI picture, a provisional cover and video background,
+                        the video's centre (center.json, center_preset.yaml, center_logo.png)
   remix/rNN_title/      final.wav, remix_report.json, verify.json per song
   mix/                  mix_plan.json, mix_report.json (transitions, chapters, loudness)
   video/background.png  the picture with the side column: title and song list (`visualizer` look)
@@ -315,7 +377,7 @@ RUN/
 | `references/youtube_metadata.md` | writing or reviewing the YouTube package (Step 4) |
 | `references/youtube_limits.json` | a check cites a limit; each entry has its official source and date |
 | `references/keywords_vi.md` | no web search tool is available for evidence |
-| `references/design_notes.md` | a question about the join, the chapter times, the looks or a threshold |
+| `references/design_notes.md` | a question about the join, the chapter times, the looks, the centre's rotation or a threshold |
 | `references/repo_contracts.md` | a repo's command, flag or route fails, or preflight reports one missing |
 | `references/troubleshooting.md` | a stage exits 1 |
 | `assets/config.example.json` | you need the full list of config keys and defaults |

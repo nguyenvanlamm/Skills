@@ -18,10 +18,12 @@
     "max_duration_s": 600,
     "max_size_mb": 200,
     "on_missing": "ask",
-    "max_rank": 50
+    "max_rank": 50,
+    "manual_artist": "chart"
   },
   "remix": {
-    "target_bpm": 128,
+    "target_bpm": "source",
+    "source_center_bpm": 128,
     "target_key": "auto",
     "quality": "high",
     "host": "127.0.0.1",
@@ -34,6 +36,7 @@
     "stall_s": 600,
     "start_timeout_s": 180,
     "poll_s": 3,
+    "cancel_wait_s": 120,
     "cleanup_jobs": null
   },
   "mix": {
@@ -42,15 +45,19 @@
     "lead_in_bars": 4,
     "tail_bars": 4,
     "vocal_activity_min": 0.5,
+    "edge_activity_min": 0.1,
     "dj_bars": 8,
     "start_fade_s": 1.0,
     "curve": "tri",
     "crossfade_s": 4.0,
+    "cut_fade_ms": 20,
     "max_beat_offset_ms": 60,
     "min_beat_correlation": 0.25,
     "target_lufs": -14.0,
     "lufs_tolerance": 1.5,
     "true_peak_max_dbtp": -1.0,
+    "normalize": true,
+    "normalize_min_db": 0.1,
     "silence_db": -50,
     "silence_min_s": 1.5,
     "preview_pad_s": 10
@@ -62,9 +69,17 @@
     "confirmed": false,
     "review": true,
     "preset": "m10",
+    "thumb_style": "poster",
     "thumb_tracks": 10,
+    "poster_tracks": 3,
+    "poster_column_width": 0.44,
+    "poster_title_min_size": 0.10,
+    "poster_track_max": 0.054,
+    "poster_track_min": 0.044,
     "seed": null,
     "seed_retries": 1,
+    "image": null,
+    "dry_run": false,
     "label": "{artist} - {title}"
   },
   "video": {
@@ -83,7 +98,18 @@
     "max_side_diff": 20,
     "cover_zoom_amount": 0.008,
     "min_cover_ssim": 0.8,
-    "duration_tolerance_s": 0.1
+    "duration_tolerance_s": 0.1,
+    "loudness_tolerance_lu": 0.5,
+    "true_peak_max_dbtp": 0.0,
+    "center": "rotate",
+    "center_palette": null,
+    "center_shape": null,
+    "center_particles": null,
+    "center_tint_logo": true,
+    "center_palette_gap": 4,
+    "center_family_gap": 2,
+    "center_shape_gap": 2,
+    "center_particles_gap": 1
   },
   "panel": {
     "stall_warn_s": 300

@@ -18,8 +18,12 @@ def probe(path) -> dict:
     data = json.loads(out)
     fmt = data.get('format', {})
     info = {'format': fmt.get('format_name'), 'duration': float(fmt.get('duration') or 0),
-            'size': int(fmt.get('size') or 0), 'audio': None, 'video': None}
+            'size': int(fmt.get('size') or 0), 'audio': None, 'video': None,
+            'tags': {str(k).lower(): str(v).strip() for k, v in (fmt.get('tags') or {}).items()}}   # ID3, RIFF INFO, Vorbis
     for stream in data.get('streams', []):
+        if stream.get('codec_type') == 'audio':
+            for key, value in (stream.get('tags') or {}).items():
+                info['tags'].setdefault(str(key).lower(), str(value).strip())
         kind = stream.get('codec_type')
         if kind == 'audio' and info['audio'] is None:
             rate = int(stream.get('sample_rate') or 0)

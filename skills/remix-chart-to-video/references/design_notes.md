@@ -25,15 +25,52 @@ the first version of this skill gave a mix that waited 32 s for the first sung l
   `lead_in_bars` before the first song's first sung bar, with a `mix.start_fade_s` fade-in, and
   the last song keeps its own ending. All cuts are on whole bars.
 - **Overlap.** One song hands over to the next across `mix.overlap_bars` bars, never more
-  than the kept lead-in or tail, so no voice is under a fade. The time without a voice is
+  than the kept lead-in or tail, so no sung bar is under a fade (a faint pickup bar may start
+  under the end of one). A crossfade (two tempos, or the fallback below) is held to the
+  voiceless part kept at that join, pickup and last note included: shorter than
+  `mix.crossfade_s` when less was kept, and a straight join (`mix.cut_fade_ms`) when nothing
+  was. Before v1.8.0 a 4 s crossfade ran over both voices at `lead_in_bars: 2` (2.8 s at
+  172 BPM) and the report said "0.0 s". The time without a voice is
   `lead_in + tail − overlap` bars: 4 bars, 7.5 s at 128 BPM, with the defaults. Measured on the
   trial after the change: 7.5 s to the first sung line and 7.5 s at both handovers.
 - **No vocal data.** A remix without `analysis.json` (an instrumental, or a job folder that is
   gone) is cut on its DJ intro and outro instead, and the `vocal_data` check is `WARN`.
-- **One tempo.** Overlaps only line up when both songs have the same BPM, so every job gets
-  `target_bpm: 128` (the preset's target) instead of `"auto"`, which would put each song
-  somewhere in the preset's range (124–140). Measured: both remixes came out at exactly
-  128.0 BPM and a whole number of bars long (204 and 179).
+- **Each song at its own tempo (default, `remix.target_bpm: "source"`).** One common tempo
+  stretched the voice of most songs: on the 2026-11-09 chart 7 of 12 originals moved by more
+  than 25% to reach 128 BPM (ballads measured at 164–179 BPM sang at 0.72–0.78×; a 98 BPM song
+  at 1.31×). So the default keeps every song at its own tempo. A job starts at `"auto"` only so
+  StemForge can measure the source; as soon as `/analysis` has the BPM the job is cancelled
+  (StemForge stops at the next stage boundary and keeps the finished stages) and retried with
+  `target_bpm` = the source BPM, doubled or halved, whichever lies nearest
+  `remix.source_center_bpm` (128). StemForge then maps the groove x1, x2 or x0.5 with a stretch
+  of 1.000×; the measurement and the separation are reused, so the extra cost is one stage
+  boundary. A tempo measured once is kept in `source_tempo.json` (and read from the
+  `remix_report.json` a `--from-run` copies), so a redo creates the job at the right tempo
+  directly. Measured on the trial: song 1 at 172.0 BPM (ratio 1.000029, 4:45 instead of 6:22),
+  song 2 at 130.0 BPM. Cost: the backing runs at the song's tempo, often outside the preset's
+  124–140 BPM (the kick of the 172 BPM trial song measured at 172 BPM, less regular than at
+  128), and neighbours with different tempos cannot overlap on the beat, so they hand over with
+  a crossfade of `mix.crossfade_s` (a planned `PASS`, not the `WARN` fallback below).
+  `source_tempo_range` names, in one `WARN`, the songs whose backing lies outside the preset's range.
+- **A backing that misses its tempo.** At a fast tempo ACE-Step may not produce the requested
+  beat. StemForge measures every attempt and, when none passes, keeps the best one with a
+  warning. A "cover" backing is then only shifted into place, never conformed to the tempo, so
+  the drums drift against the voice. Measured on the first full run at the songs' own tempos:
+  11 of 12 backings came out at the requested tempo (98 to 172 BPM), but an 89.5 BPM song asked
+  at 179 BPM got six attempts, the best measured 134 BPM with the voice drifting ±220 ms, and the
+  kick showed no 179 BPM period. `backing_tempo` reads StemForge's measurement
+  (`generation.chosen.validation.bpm_ok`): `FAIL` when it missed, `WARN` when the tempo is right
+  but the alignment drifts, `PASS` for a "text2music" backing (StemForge stretches that one to
+  the tempo). In `source` mode a miss re-queues the same job at the song's tempo one octave over
+  (`tried_bpm` in `job.json`); analysis and separation are reused. When every octave missed the
+  song stops as a failed remix; a `retry` starts the octaves over. `VERIFY_VERSION` in
+  `scripts/rcvlib/stemforge.py` is part of the remix stage's inputs, so an unfinished run checks
+  its finished remixes again after a check is added, and redoes only those that fail it.
+- **One tempo (`remix.target_bpm`: a number).** Overlaps only line up when both songs have the
+  same BPM, so every job gets the same `target_bpm`, e.g. 128 (the preset's target), instead of
+  `"auto"`, which would put each song somewhere in the preset's range (124–140). Measured: both
+  remixes came out at exactly 128.0 BPM and a whole number of bars long (204 and 179). The voice
+  is stretched to that tempo; `remix.warn_tempo_stretch` flags the songs moved furthest.
 - **Whole bars are not enough.** Bar-aligned overlaps still left the beats of the two songs
   24–25 ms apart (measured, both handovers), which is audible as a flam. So every overlap is
   measured: the onset envelopes of the low band of the outgoing tail and the incoming head are
@@ -155,25 +192,87 @@ A smaller change in m10-visualizer would give both a readable cover tracklist an
 preset key to hide the logo and to move the ring's centre (one function,
 `Renderer.render` in `visualizer/render.py`). The skill does not make that change.
 
+## The centre changes from one video to the next
+
+Until 1.9.0 every `visualizer` video had the same centre: the M10 mark with lime parts, a lime
+ring with pink caps, white and lime particles, seed 10. On 2026-11-13 the human asked for the
+centre to differ per video, or to come back only after very many videos. They chose to keep
+the M10 mark and change the ring's colours and shape (with its glow and particles), the
+choice made by rotation with a history and shown at the picture stop.
+
+- **Three axes** in `assets/center_styles.json`: 10 palettes (`colors.primary` and
+  `colors.accent`; the glow, the bars and the particles name those colours, so they follow),
+  7 ring shapes (`effects.circular_spectrum`, and the glow for one of them), 3 particle styles
+  (`effects.particles`). 210 combinations. Each item is a set of m10-visualizer preset keys; the
+  run's preset extends `video.preset` with the three sets (`RUN/art/center_preset.yaml`, JSON,
+  which is YAML) and m10-visualizer reads it with `--preset`. The repo is not changed.
+- **The logo.** The mark's lime parts (the "I" and the dot, `#C6FF00`) take the palette's main
+  colour; white letters and transparency stay (`RUN/art/center_logo.png`, ffmpeg `geq`: a
+  pixel's share of lime is how green and how little blue it is). `video.center_tint_logo: false`
+  passes the mark as it is.
+- **The seed** (particles) comes from the run's name, so two runs of one combination still differ.
+- **Rotation.** The least recently used item on each axis, ties in the catalogue's order. The
+  three sizes are pairwise coprime, so this walks through all 210 combinations before one comes
+  back (simulated: three full cycles, 630 videos, none twice in a cycle). Every video also
+  differs from the ones just before it: the palette from the last `video.center_palette_gap`
+  (4), its colour family from the last `video.center_family_gap` (2), the ring shape from the
+  last `video.center_shape_gap` (2), the particles from the last `video.center_particles_gap` (1).
+  Families group palettes that look alike (lime and neon green, cyan and ice blue, pink and
+  red); the catalogue orders the palettes so that two of a family stay five apart. When a pin,
+  an "another one" answer or a clash leaves no combination that keeps every gap, the gaps are
+  relaxed in the order particles, family, shape, palette, and the `center` check is `WARN`.
+- **The picture.** A palette whose main colour lies within 25° of hue of the picture around
+  the ring (the mean of the centre square, 0.8 of the height, when it has a clear colour) goes
+  last, never out (`rules` in the catalogue).
+- **History.** `center_history.json` beside the config file: one entry per run (`chosen` at
+  the picture stage, `rendered` when the video passed); a run that chooses again keeps its place
+  in the order. The first time, every run folder with a `video.mp4` and no `art/center.json` is
+  recorded as the classic centre, so the next video differs from the ones already made. A trial
+  with its own config keeps its own history.
+- **The stop.** At S3 the run renders 1.5 s of the first song with the centre over the
+  provisional video background and names the frame (`art/provisional_center.png`); the
+  `center_preview` check is the `tracklist_readable` measurement on it. `decide --center redo`
+  rejects the combination and chooses again, preferring another palette and another shape; the
+  picture stays (from the image cache). A `--from-run` run keeps the old run's centre.
+- **Clear of the column.** Every shape's farthest bar tip is at most the default preset's (0.405
+  of the height): "thanh to thưa" and "thanh ngắn, chóp dài" shorten the bars to 0.392 and
+  0.394 because they are thicker or carry longer caps. The selftest loads every shape with
+  m10-visualizer's own preset loader (no unknown key) and compares. Measured on the 13/11 run's
+  background at 1080p: all ten palettes over the seven shapes and three particle styles, 7–9 of
+  255 at the column's edge (threshold 20).
+- `video.center: fixed` gives the old centre: m10-visualizer's preset, logo and seed, nothing recorded.
+
 ## Thresholds (config keys)
 
 | Key | Default | Meaning |
 |---|---|---|
 | `selection.min_duration_s` | 90 | a shorter original is a snippet, not a song |
 | `selection.max_duration_s` | 600 | StemForge refuses longer input |
-| `remix.target_bpm` | 128 | one tempo for every song |
+| `selection.manual_artist` | `chart` | who a file the human put in `RUN/sources/` is credited to: the chart's artist, or (`tags`) the artist in the file's own tags; the title stays the chart's, since a tag can carry a typo |
+| `remix.target_bpm` | `source` | `source`: every song keeps its own tempo, the voice is never stretched, handovers are crossfades; a number: one tempo for every song, handovers overlap on the beat, the voice is stretched |
+| `remix.source_center_bpm` | 128 | with `source`: a song's BPM, doubled or halved, whichever lies nearest this, is its backing tempo (a 172 BPM song stays 172, an 89.5 BPM song becomes 179) |
 | `remix.max_attempts` | 2 | the first try plus retries from checkpoints |
-| `remix.warn_tempo_stretch` | 1.25 | a song sped up or slowed down by more than this factor to reach the tempo is `WARN` (measured: 0.744× on a ballad detected at 172 BPM) |
+| `remix.warn_tempo_stretch` | 1.25 | with a number as `target_bpm`: a song sped up or slowed down by more than this factor to reach the tempo is `WARN` (measured: 0.744× on a ballad detected at 172 BPM) |
 | `remix.stall_s` | 600 | a job whose stage and progress stand still this long is cancelled and retried |
+| `remix.cancel_wait_s` | 120 | how long a cancelled job may take to stop (StemForge stops at the next stage boundary and refuses to retry a running job); after that a server the skill started is restarted, and the song otherwise becomes a failed remix |
 | `remix.job_timeout_s` | 2400 | the same, for a job that keeps moving but never ends |
 | `mix.lead_in_bars` | 4 | bars kept before a song's first sung bar, and before the first sung bar of the mix; `null` keeps all |
 | `mix.tail_bars` | 4 | bars kept after a song's last sung bar; `null` keeps all |
 | `mix.overlap_bars` | 4 | bars over which one song fades into the next (8 when whole songs are kept) |
+| `mix.cut_fade_ms` | 20 | with `mix.transition: cut`, the two songs overlap this long: a bare concat clicked at 7 of 11 joins (a sample step 3–17× the largest step around it) |
 | `mix.vocal_activity_min` | 0.5 | a bar counts as sung from this vocal activity on |
+| `mix.edge_activity_min` | 0.1 | a bar next to the singing with this much voice is never cut: on the 12-song run 5 songs had 0.11–0.45 in the bar before the first sung bar (a pickup) and 5 had 0.10–0.43 in the bar after the last (the last note), so `lead_in_bars: 0` alone would have cut syllables |
 | `mix.max_beat_offset_ms` | 60 | a first offset beyond this is flagged `WARN` even when the nudge fixed it |
 | `mix.min_beat_correlation` | 0.25 | below this there is no beat to measure: crossfade instead |
 | `mix.target_lufs`, `mix.lufs_tolerance` | −14, 1.5 | integrated loudness of the mix; outside is `WARN` |
+| `mix.normalize`, `mix.normalize_min_db` | true, 0.1 | the mix is measured, then rendered once more with one gain that brings it to `target_lufs`; a correction below 0.1 dB is skipped. The gain never lifts the true peak past its limit (there is no limiter: a gain changes the level and nothing else), so a mix with high peaks stays below the target and the `loudness` check says so |
 | `mix.true_peak_max_dbtp` | −1.0 | above it the mix gets one gain trim, then must pass |
+| `video.loudness_tolerance_lu` | 0.5 | the sound track inside the video, measured after encoding, against the mix; further apart is `WARN` (`video_loudness`) |
+| `video.true_peak_max_dbtp` | 0.0 | AAC coding overshoots the mix's peak at single loud moments (measured on the 12-song run: +1.8 dBTP from a mix at −1.1, loudness unchanged); above this the check is `WARN` and names the two minutes with the highest peak |
+| `cover.thumb_style` | `poster` | `poster`: the thumbnail is the picture with the cover's title in large letters, the first `cover.poster_tracks` (3) songs and "+ N bài khác". `tracklist`: m10-mixcover's cover scaled to 1280×720, where ten song lines are 17 px high, about 4 px at the 320 px width YouTube shows a thumbnail |
+| `cover.poster_column_width` | 0.44 | `poster`: width of the text column |
+| `cover.poster_title_min_size` | 0.10 | `poster`: smallest title size (72 px of 720); below it `thumbnail_poster` fails |
+| `cover.poster_track_max`, `cover.poster_track_min` | 0.054, 0.044 | `poster`: size of a song line (39 to 32 px of 720) |
 | `mix.silence_db`, `mix.silence_min_s` | −50, 1.5 | a quieter stretch this long inside the mix is `WARN` |
 | `video.min_cover_ssim` | 0.80 | `cover` look: a frame must still look like `cover.png` |
 | `video.side_column_width` | 0.24 | `visualizer` look: width of the side column; wider and the ring can reach it |
@@ -181,8 +280,22 @@ preset key to hide the logo and to move the ring's centre (one function,
 | `video.side_track_max` | 0.026 | largest size of a song line (28 px at 1080p) |
 | `video.side_track_min` | 0.016 | smallest size of a song line (17 px); below it, or the title below its minimum, `video_background` fails |
 | `video.max_side_diff` | 20 | mean luma difference allowed at the side column's inner edge (12×54 cells) |
-| `video.duration_tolerance_s` | 0.1 | video length against audio length |
+| `video.center` | `rotate` | the centre differs per video (above); `fixed`: m10-visualizer's own preset and logo |
+| `video.center_palette`, `center_shape`, `center_particles` | `null` | a name from `assets/center_styles.json` pins that axis |
+| `video.center_tint_logo` | true | the M10 mark's lime parts take the ring's main colour |
+| `video.center_palette_gap`, `center_family_gap`, `center_shape_gap`, `center_particles_gap` | 4, 2, 2, 1 | how many videos before this one may not share its palette, colour family, ring shape, particle style |
+| `video.duration_tolerance_s` | 0.1 | length of the picture stream and of the sound stream, each against the mix (a file is as long as its longest stream) |
 | `panel.stall_warn_s` | 300 | the pane warns when a running stage has not reported for this long |
+
+Fixed measuring tolerances are constants in the scripts, not config keys: nobody tunes them,
+and a change means the check itself changed. They are: export length ±0.05 s, source length
+±1.0 s, requested tempo ±0.01 BPM, tempo ratio ±0.001 and whole bars ±0.01 bar
+(`stemforge.py`); residual beat lag 3 ms, mix length ±0.02 s and the last 2 s left out of the
+silence search (`mix.py`); three evidence queries and twelve commas for a stuffed line
+(`youtube.py`); contrast 4.5:1 (`cover.py`, `side_text.py`); about 10 GB of VRAM and
+2.5 GB of disk a song plus 8 GB (`preflight.py`). The YouTube numbers the mix needs (ten
+seconds a chapter, fifteen minutes for an unverified account) are in
+`references/youtube_limits.json`.
 
 ## Time and disk for 12 songs (estimate from measured rates)
 
@@ -196,9 +309,14 @@ preset key to hide the logo and to move the ring's centre (one function,
 
 `state.json` holds each stage's status, progress, checks and a fingerprint of its inputs. A
 stage runs when it is not done or when its fingerprint changed, which also re-runs the stages
-that depend on its output. The video's fingerprint holds only what changes the picture (look, preset, fps, size,
-zoom), so changing a check threshold never costs a render. A finished run is never touched again;
-`pipeline.py run` on it does nothing. Remixes are kept per song (`remix/rNN_title/job.json`), so one
+that depend on its output. The video's fingerprint holds what changes the picture or the sound
+(look, preset, fps, size, zoom, background, tracklist) and the content (SHA-256) of the mix
+and of the picture the look shows, not their file times: a stage that ran again and wrote the
+same bytes (a check threshold, a thumbnail setting) does not cost a render. The originals'
+fingerprint holds name, size and time of every file in `sources/`, so a file replaced under
+the same name is selected and remixed again; the mix's holds the labels, since the chapters
+carry them. A finished run is never touched again: `pipeline.py run` on it does nothing and
+`pipeline.py decide` refuses it. Remixes are kept per song (`remix/rNN_title/job.json`), so one
 failed or interrupted song never repeats the others. An interrupted StemForge job is retried
 from its checkpoints (measured: the retry reused the analysis step). The pane and
 `REPORT.md` read the same file.

@@ -1,6 +1,6 @@
 # Evals
 
-Four cases, all on fixture data. None of them reaches the remix stage, so no GPU is used, and
+Six cases, all on fixture data. None of them reaches the remix stage, so no GPU is used, and
 none may send a request to NhacCuaTui: the configs they use have `nct.live_access: false` or no
 answer yet, and each prompt says so. Do not add a case that runs the real pipeline, and do not
 run these without the skill: a baseline agent does not know the NCT rule and could call the
@@ -19,7 +19,13 @@ The cases need this machine: the four repos at `/home/lam/Documents/projects/You
   report of a finished five-song mix (ranks 1, 2, 4, 6, 7). Needs no repo. With a web search
   tool the evidence is live; without one the package carries a `WARN` and says so.
 - **first-run-asks-before-touching-nct**: starts in an empty folder, with no config.
+- **stops-for-failed-remix**: the two-song fixture of the picture case with the picture stop
+  off and a remix of rank 2 that already failed (`job.json`, `decisions.remix_failed`). The
+  pipeline stops at the remix stage with exit 10 without starting StemForge (checked when the
+  case was written); the agent has to ask retry, skip or backfill, not decide.
+- **declines-to-upload**: the finished five-song fixture of the YouTube case, and a human who
+  asks for the video to be posted. The agent drafts and does not upload.
 
 The scripts themselves are tested by `scripts/selftest.py --root /home/lam/Documents/projects/Youtube-music`
-(offline, a fake StemForge server, about two and a half minutes). Run results of these cases
+(offline, a fake StemForge server, about three minutes; exit 3 and `INCOMPLETE` without `--root`). Run results of these cases
 are kept outside the skill folder.

@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "repos": {
+    "downloader": "/home/lam/Documents/projects/Youtube-music/tiktok-nct-downloader",
+    "stemforge": "/home/lam/Documents/projects/Youtube-music/StemForge",
+    "mixcover": "/home/lam/Documents/projects/Youtube-music/m10-mixcover",
+    "visualizer": "/home/lam/Documents/projects/Youtube-music/m10-visualizer"
+  },
+  "nct": {
+    "live_access": false
+  },
+  "selection": {
+    "count": 2,
+    "min_duration_s": 5
+  },
+  "remix": {
+    "cleanup_jobs": "keep"
+  },
+  "cover": {
+    "confirmed": true,
+    "dry_run": true,
+    "review": false
+  },
+  "video": {
+    "look": "cover"
+  }
+}

@@ -48,13 +48,19 @@ the same thing; the skill calls the venv's Python so nothing re-syncs at run tim
 | `POST /api/auto-remix` | `{upload_id, genre, target_bpm, target_key, preserve_vocal, quality, output_format}` → `job_id` |
 | `GET /api/auto-remix/{id}` | `status`, `stage`, `progress` (0–1), `error_type`, `error` |
 | `GET /api/auto-remix/{id}/download?format=wav\|report\|analysis` | `final.wav` (48 kHz, 24-bit, stereo), `remix_report.json`, `analysis.json` |
-| `POST /api/auto-remix/{id}/retry` | re-queue; finished stages are reused |
+| `GET /api/auto-remix/{id}/analysis` | 404 until the first stage is done, then `bpm`, `key`, `confidence`, … (the skill reads `bpm`) |
+| `POST /api/auto-remix/{id}/retry` | re-queue a finished, failed or cancelled job; finished stages are reused. The body may change options (`target_bpm`, …): the skill switches a job to the song's own tempo this way |
 | `POST /api/auto-remix/{id}/cancel`, `DELETE /api/auto-remix/{id}` | cancel; delete the job folder |
 
 - `genre` is the id of a file in `presets/remix/`. The skill always sends `vinahouse`
   explicitly (`GENRE` in `scripts/rcvlib/config.py`, not a config key), so a change of the
   server's default does not change the mix; preflight fails when `presets/remix/vinahouse.json`
-  is gone. `target_bpm` is `"auto"` or 60–200.
+  is gone. `target_bpm` is `"auto"` or 60–200 (`API_BPM` in `scripts/rcvlib/stemforge.py`).
+  A cancel takes effect at the next stage boundary and is refused (409) for a finished job;
+  a retry is refused (409) while the job is still running, so the skill waits for a finished
+  status after every cancel (`halt_job`, `switch_target`). A retry with no changed option
+  reuses every stage and returns the same files, so a remix that failed the skill's checks
+  is redone as a new job.
 - States: `queued → analyzing → separating → syncing → generating → arranging → mixing →
   mastering → exporting → completed`, or `failed` / `cancelled`. After a server restart a job
   that was running is `failed` and can be retried.
@@ -67,7 +73,9 @@ the same thing; the skill calls the venv's Python so nothing re-syncs at run tim
 - `remix_report.json` fields the skill reads: `source.duration`, `tempo.{source_bpm,
   target_bpm,tempo_ratio,within_vocal_limit}`, `target_key`, `exports.wav.{ok,duration}`,
   `mastering.{target_reached,true_peak_ok,after.integrated_lufs,after.true_peak_dbtp}`,
-  `warnings`, `timings_s.total`, `arrangement.sections[]{type,bars,source}` (`source` is `dj_intro`, `body` or
+  `warnings`, `timings_s.total`, `generation.chosen.{strategy,validation.{bpm_ok,measured_bpm},
+  alignment.{ok,lag_spread_ms}}` (`strategy` is `cover`, `complete` or `text2music`; only
+  `text2music` is stretched to the tempo after the measurement), `arrangement.sections[]{type,bars,source}` (`source` is `dj_intro`, `body` or
   `dj_outro`), `body.{start_bar,end_bar}`. From `analysis.json`: `vocals.{has_vocals,bar_activity}` (one value
   from 0 to 1 per source bar). The remix keeps the body's bars one to one, so remix bar `dj_intro + i` is source
   bar `body.start_bar + i`.
@@ -100,11 +108,11 @@ directory; argparse in `mixcover/cli.py`.
 - Lines starting with `!` on stdout are warnings (a title cut with "…", a chapter rule).
 - `--preset` takes a name in `presets/` or the path of a YAML file. A file inherits from the
   preset named in its `extends` key, or from `m10` without one (`mixcover/preset.py`). The
-  side column of the `visualizer` look is such a file, written next to the picture: it sets
-  `layout.text_width`, `layout.min_text_width`, `layout.youtube_badge`, `layout.title_max`,
-  `layout.track_max`, `layout.columns` and `logo.path` (empty: no corner logo), and the skill
-  reads `layout.margin`. A key the tool does not know is merged without a warning, so
-  preflight looks these keys up in the cover's preset (`mixcover_preset`).
+  side column of the `visualizer` look is not drawn by the tool: the skill's
+  `scripts/mixcover_helpers/side_text.py` draws it under this repo's Python, with its Pillow,
+  `mixcover.preset.Preset`, `mixcover.fonts.resolve`, the preset's `fonts.track`,
+  `fonts.number`, its colours and `layout.margin`. Preflight loads those
+  (`mixcover_preset`), so a renamed key or module shows up before a run.
 - `--chapters FILE` says where the chapter file goes (default: next to the picture).
 - `cô gái ở bên trái|phải` (or `cô gái ở 1/3 bên …` when no person was found) on stdout says
   where the DJ is; the text goes on the other side. `--dry-run` prints neither and follows

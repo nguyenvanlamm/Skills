@@ -83,6 +83,32 @@ def file_sig(path) -> dict | None:
     return {'path': str(path), 'size': st.st_size, 'mtime_ns': st.st_mtime_ns}
 
 
+_CONTENT: dict[str, dict] = {}
+
+
+def content_sig(path, cache_file=None) -> str | None:
+    """Identity of a file by what is in it (SHA-256); None when it is missing. A file written
+    again with the same bytes keeps its identity, unlike `file_sig`. The hash of a large file is
+    remembered by size and time, in memory and in `cache_file`, so it is computed once."""
+    sig = file_sig(path)
+    if sig is None:
+        return None
+    key = str(path)
+    if not _CONTENT and cache_file is not None:
+        _CONTENT.update(read_json(cache_file, {}) or {})
+    hit = _CONTENT.get(key)
+    if hit and hit.get('size') == sig['size'] and hit.get('mtime_ns') == sig['mtime_ns']:
+        return hit['sha256']
+    sha = sha256_file(path)
+    _CONTENT[key] = {'size': sig['size'], 'mtime_ns': sig['mtime_ns'], 'sha256': sha}
+    if cache_file is not None:
+        try:
+            write_json(cache_file, _CONTENT)
+        except OSError:
+            pass
+    return sha
+
+
 def slugify(text: str, maxlen: int = 48) -> str:
     text = (text or '').replace('đ', 'd').replace('Đ', 'D')
     text = unicodedata.normalize('NFKD', text)
@@ -157,7 +183,10 @@ def run(cmd, cwd=None, env=None, timeout=None, stdin=None) -> tuple[int, str, st
     except FileNotFoundError as exc:
         return 127, '', str(exc)
     except subprocess.TimeoutExpired as exc:
-        return 124, exc.stdout or '', (exc.stderr or '') + f'\ntimeout after {timeout}s'
+        # What was captured before the timeout comes back as bytes, even with text=True.
+        def text(value) -> str:
+            return value.decode(errors='replace') if isinstance(value, bytes) else (value or '')
+        return 124, text(exc.stdout), text(exc.stderr) + f'\ntimeout after {timeout}s'
 
 
 def die(message: str, code: int = EXIT_FAIL) -> 'NoReturn':  # noqa: F821

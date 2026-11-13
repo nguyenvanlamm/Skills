@@ -182,7 +182,8 @@ class RunLock:
             fcntl.flock(self.fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
             self.fh.close()
-            raise RcvError(f'Một tiến trình pipeline khác đang chạy trên {self.path.parent}', 1)
+            raise RcvError(f'Một tiến trình pipeline khác đang chạy trên {self.path.parent}: đợi nó xong '
+                           '(`pipeline.py status --run RUN`) rồi chạy lại lệnh này.', 2)
         self.fh.write(str(os.getpid()))
         self.fh.flush()
         return self

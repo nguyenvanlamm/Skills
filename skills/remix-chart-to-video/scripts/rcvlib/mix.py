@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from . import ffmpeg
@@ -56,7 +57,17 @@ def sung_bars(entry: dict, mx: dict) -> dict | None:
     act = voc.get('bar_activity')
     strong = [i for i, a in enumerate(act or []) if a >= mx['vocal_activity_min']]
     if strong:
-        return {'first': strong[0], 'last_end': strong[-1] + 1, 'total': total, 'basis': 'vocals'}
+        # A weaker bar right before the first sung bar holds a pickup, one right after the last
+        # holds the end of the last note: never cut those, even with no lead-in or tail.
+        lo, hi = strong[0], strong[-1] + 1
+        edge = mx.get('edge_activity_min')
+        if edge is not None:
+            while lo > 0 and act[lo - 1] >= edge:
+                lo -= 1
+            while hi < len(act) and act[hi] >= edge:
+                hi += 1
+        return {'first': strong[0], 'last_end': strong[-1] + 1, 'voice_first': lo, 'voice_end': hi,
+                'total': total, 'basis': 'vocals'}
     dj_in = voc.get('dj_intro_bars') if voc.get('dj_intro_bars') is not None else mx['dj_bars']
     dj_out = voc.get('dj_outro_bars') if voc.get('dj_outro_bars') is not None else mx['dj_bars']
     if dj_in + dj_out >= total:
@@ -75,34 +86,65 @@ def apply_trims(entries: list[dict], mx: dict) -> None:
         e['basis'] = b['basis']
         e['first_sung'] = round(b['first'] * e['bar_samples'])
         e['last_sung_end'] = round(b['last_end'] * e['bar_samples'])
+        # where any voice starts and stops, pickup and last note included: no fade may reach in
+        e['voice_start'] = round(b.get('voice_first', b['first']) * e['bar_samples'])
+        e['voice_stop'] = min(e['samples'], round(b.get('voice_end', b['last_end']) * e['bar_samples']))
         if mx.get('lead_in_bars') is not None:
-            e['head'] = round(max(0, b['first'] - mx['lead_in_bars']) * e['bar_samples'])
+            first = min(b['first'] - mx['lead_in_bars'], b.get('voice_first', b['first']))
+            e['head'] = round(max(0, first) * e['bar_samples'])
         if mx.get('tail_bars') is not None and i < len(entries) - 1:        # the last song keeps its own ending
-            e['end'] = min(e['samples'], round(min(b['total'], b['last_end'] + mx['tail_bars']) * e['bar_samples']))
+            end = max(b['last_end'] + mx['tail_bars'], b.get('voice_end', b['last_end']))
+            e['end'] = min(e['samples'], round(min(b['total'], end) * e['bar_samples']))
 
 
-def plan_transition(a: dict, b: dict, mx: dict) -> dict:
-    """Decide how song A hands over to song B, and measure it."""
+def plan_transition(a: dict, b: dict, mx: dict, own_tempo: bool = False) -> dict:
+    """Decide how song A hands over to song B, and measure it. With `own_tempo` (every song at
+    its own tempo, remix.target_bpm = "source") two tempos meet by design, so their crossfade is
+    the plan, not a fallback."""
     fallback = round(mx['crossfade_s'] * RATE)
     limit = min(a['end'] - a['head'], b['end'] - b['head']) // 2
     out = {'from': a['position'], 'to': b['position'], 'curve': mx['curve']}
+    cut_ms = mx.get('cut_fade_ms') or 0
+    cut_ns = min(round(cut_ms * RATE / 1000), limit)
+    cut_text = f'nối thẳng (chồng {cut_ms:g} ms để chỗ nối không kêu)' if cut_ns else 'nối thẳng'
     if mx['transition'] == 'cut':
-        return dict(out, mode='cut', ns=0, status='PASS', detail='nối thẳng')
+        # A bare concat joins two waveforms at unrelated values: an audible click. A few
+        # milliseconds of overlap are too short to hear as a fade and remove the step.
+        return dict(out, mode='cut', ns=cut_ns, status='PASS', detail=cut_text)
+    # Never fade a voice. A fade may use only what was kept without a voice: the end of A after
+    # its last note and the start of B before its first. None = the songs are whole (no trim).
+    room = None
+    if a['basis'] != 'none' and b['basis'] != 'none':
+        room = max(0, min(a['end'] - a['voice_stop'], b['voice_start'] - b['head']))
+
+    def crossfade(status: str, why: str) -> dict:
+        ns = min(fallback, limit)
+        if room is None or ns <= room:
+            return dict(out, mode='crossfade', ns=ns, status=status, detail=f'{why}crossfade {ns / RATE:g}s')
+        if room > cut_ns:
+            return dict(out, mode='crossfade', ns=room, status=status,
+                        detail=f'{why}crossfade rút còn {room / RATE:.1f}s (đoạn không lời giữ lại ngắn hơn {mx["crossfade_s"]}s)')
+        return dict(out, mode='cut', ns=cut_ns, status=status,
+                    detail=f'{why}{cut_text}: không giữ đoạn không lời nào để crossfade (mix.lead_in_bars / mix.tail_bars)')
+
     if mx['transition'] == 'crossfade':
-        return dict(out, mode='crossfade', ns=min(fallback, limit), status='PASS', detail=f'crossfade {mx["crossfade_s"]}s')
+        return crossfade('PASS', '')
 
     def fall(reason: str) -> dict:
-        return dict(out, mode='crossfade', ns=min(fallback, limit), status='WARN',
-                    detail=f'{reason}; dùng crossfade {mx["crossfade_s"]}s thay cho đoạn chồng')
+        return crossfade('WARN', f'{reason}; thay cho đoạn chồng: ')
 
     if not a['bpm'] or not b['bpm'] or abs(a['bpm'] - b['bpm']) > 0.01:
+        if own_tempo and a['bpm'] and b['bpm']:
+            return crossfade('PASS', f'mỗi bài giữ tempo gốc ({a["bpm"]:g} → {b["bpm"]:g} BPM): ')
         return fall(f'hai bài khác tempo ({a["bpm"]} và {b["bpm"]} BPM)')
     bars = mx['overlap_bars']
-    if a['basis'] != 'none' and b['basis'] != 'none':        # never fade a voice: stay inside the kept lead-in and tail
-        bars = min(bars, *(x for x in (mx.get('lead_in_bars'), mx.get('tail_bars')) if x is not None))
     beat_s = 60.0 / a['bpm']
+    if room is not None:                                     # stay inside the kept lead-in and tail
+        bars = min(bars, *(x for x in (mx.get('lead_in_bars'), mx.get('tail_bars')) if x is not None))
     ns = round(bars * 4 * beat_s * RATE)
-    if ns <= 0 or ns >= limit:
+    if ns <= 0:
+        return crossfade('PASS', 'không giữ ô nhịp không lời nào để chồng (mix.lead_in_bars / mix.tail_bars): ')
+    if ns >= limit:
         return fall('bài quá ngắn so với đoạn chồng')
     window = int(beat_s * 1000 / 4)                           # search a quarter beat either side
 
@@ -156,28 +198,29 @@ def waits(entries: list[dict], lay: dict) -> dict:
     gaps = []
     for i in range(len(entries) - 1):
         a, b = sung_at(i, 'last_sung_end'), sung_at(i + 1, 'first_sung')
-        gaps.append(round((b - a) / RATE, 1) if a is not None and b is not None else None)
+        gaps.append(round((b - a) / RATE, 1) + 0.0 if a is not None and b is not None else None)   # + 0.0: a cut's few ms are 0.0, not -0.0
     return {'start_s': round(first / RATE, 1) if first is not None else None, 'gaps_s': gaps}
 
 
 def _ffmpeg(cmd: list[str], ctx, on_time=None) -> tuple[int, str]:
-    proc = subprocess.Popen(cmd + ['-progress', 'pipe:1', '-nostats'], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                            text=True, start_new_session=True)
-    if ctx is not None:
-        ctx.children.append(proc)
-    try:
-        for line in proc.stdout:
-            if on_time and line.startswith('out_time_us='):
-                try:
-                    on_time(int(line.split('=', 1)[1]) / 1e6)
-                except ValueError:
-                    pass
-        err = proc.stderr.read()
-        proc.wait()
-    finally:
-        if ctx is not None and proc in ctx.children:
-            ctx.children.remove(proc)
-    return proc.returncode, err
+    with tempfile.TemporaryFile('w+', errors='replace') as errors:      # a file, so a long error text cannot fill a pipe
+        proc = subprocess.Popen(cmd + ['-progress', 'pipe:1', '-nostats'], stdout=subprocess.PIPE, stderr=errors,
+                                text=True, start_new_session=True)
+        if ctx is not None:
+            ctx.children.append(proc)
+        try:
+            for line in proc.stdout:
+                if on_time and line.startswith('out_time_us='):
+                    try:
+                        on_time(int(line.split('=', 1)[1]) / 1e6)
+                    except ValueError:
+                        pass
+            proc.wait()
+        finally:
+            if ctx is not None and proc in ctx.children:
+                ctx.children.remove(proc)
+        errors.seek(0)
+        return proc.returncode, errors.read()
 
 
 def render(entries: list[dict], transitions: list[dict], out: Path, ctx=None, on_time=None, gain_db: float = 0.0,
@@ -206,6 +249,10 @@ def render(entries: list[dict], transitions: list[dict], out: Path, ctx=None, on
         last = 'g'
     cmd += ['-filter_complex', ';'.join(graph), '-map', f'[{last}]', '-c:a', 'pcm_s24le', '-ar', str(RATE), str(out)]
     rc, err = _ffmpeg(cmd, ctx, on_time)
+    if ctx is not None and ctx.should_stop():               # the stop killed ffmpeg: an interrupt, not a failure
+        Path(out).unlink(missing_ok=True)
+        from .stemforge import Interrupted
+        raise Interrupted()
     if rc != 0:
         raise RcvError(f'ffmpeg ghép mix lỗi (mã {rc}): {err.strip()[-400:]}')
 
@@ -250,12 +297,15 @@ def build(run_dir, cfg: dict, state, manifest: dict, ctx=None):
     transitions = []
     for i in range(len(entries) - 1):
         progress(f'đo đoạn chuyển {i + 1}/{len(entries) - 1}', 30.0 * i / max(1, len(entries) - 1))
-        transitions.append(plan_transition(entries[i], entries[i + 1], mx))
+        transitions.append(plan_transition(entries[i], entries[i + 1], mx, own_tempo=cfg['remix'].get('target_bpm') == 'source'))
     lay = layout(entries, transitions)
     wait = waits(entries, lay)
     for tr, gap in zip(transitions, wait['gaps_s']):
         tr['voice_gap_s'] = gap
-        if gap is not None:
+        if gap is not None and gap < 0:                      # never hidden: two voices at once is the thing to hear
+            tr['status'] = 'WARN'
+            tr['detail'] += f'; hai giọng hát chồng nhau {-gap:.1f}s'
+        elif gap is not None:
             tr['detail'] += f'; không lời giữa hai bài {gap:.1f}s'
         checks.append(check(f'transition_{tr["from"]}_{tr["to"]}', tr['status'], tr['detail']))
     trimmed = mx.get('lead_in_bars') is not None or mx.get('tail_bars') is not None
@@ -283,9 +333,17 @@ def build(run_dir, cfg: dict, state, manifest: dict, ctx=None):
 
     progress('đo loudness', 82)
     loud = ffmpeg.loudness(partial)
-    gain = 0.0
-    if loud['true_peak_dbtp'] > mx['true_peak_max_dbtp']:
-        gain = mx['true_peak_max_dbtp'] - loud['true_peak_dbtp'] - 0.1      # one global trim, then measure again
+    # One gain for the whole mix: to the target loudness, but never past the true-peak limit
+    # (no limiter: a gain changes nothing but the level). A peak over the limit is trimmed
+    # even with normalize off.
+    headroom = mx['true_peak_max_dbtp'] - loud['true_peak_dbtp'] - 0.1
+    wanted = mx['target_lufs'] - loud['integrated_lufs'] if mx.get('normalize', True) else 0.0
+    gain = round(min(wanted, headroom), 2)
+    held = gain < wanted - 0.05                                  # the peak kept it below the target
+    if abs(gain) < mx.get('normalize_min_db', 0.1) and headroom >= -0.1:
+        gain = 0.0
+    first = dict(loud)
+    if gain:
         render(entries, transitions, partial, ctx, None, gain_db=gain, start_fade_s=fade)
         loud = ffmpeg.loudness(partial)
     info = ffmpeg.probe(partial)
@@ -293,11 +351,14 @@ def build(run_dir, cfg: dict, state, manifest: dict, ctx=None):
     checks.append(check('mix_length', 'PASS' if got is not None and abs(got - lay['total_samples']) <= 0.02 * RATE else 'FAIL',
                         f'{got} mẫu, dự tính {lay["total_samples"]} ({total_s:.3f}s)'))
     off = abs(loud['integrated_lufs'] - mx['target_lufs'])
+    how = '' if not gain else (f'; đã chỉnh {gain:+.2f} dB từ {first["integrated_lufs"]:.1f} LUFS'
+                               + (f', không nâng thêm được vì true peak phải ở dưới {mx["true_peak_max_dbtp"]} dBTP' if held and gain < wanted else ''))
+    if not gain and held:
+        how = f'; không nâng lên đích được vì true peak đã ở {first["true_peak_dbtp"]:.2f} dBTP'
     checks.append(check('loudness', 'PASS' if off <= mx['lufs_tolerance'] else 'WARN',
-                        f'{loud["integrated_lufs"]:.1f} LUFS (đích {mx["target_lufs"]} ± {mx["lufs_tolerance"]})'))
+                        f'{loud["integrated_lufs"]:.1f} LUFS (đích {mx["target_lufs"]} ± {mx["lufs_tolerance"]}){how}'))
     checks.append(check('true_peak', 'PASS' if loud['true_peak_dbtp'] <= mx['true_peak_max_dbtp'] else 'FAIL',
-                        f'{loud["true_peak_dbtp"]:.2f} dBTP (tối đa {mx["true_peak_max_dbtp"]})'
-                        + (f', đã giảm gain {gain:.2f} dB' if gain else '')))
+                        f'{loud["true_peak_dbtp"]:.2f} dBTP (tối đa {mx["true_peak_max_dbtp"]})'))
     progress('tìm khoảng lặng', 90)
     quiet = [(a, b) for a, b in ffmpeg.silences(partial, mx['silence_db'], mx['silence_min_s']) if a < total_s - 2.0]
     checks.append(check('silence', 'WARN' if quiet else 'PASS',

@@ -12,6 +12,8 @@ sits on top of the tracklist that m10-mixcover draws on the cover. Two looks dea
                logo, so the text stays readable.
 
 In both the background stands still (`video.background_still`): no shake and no beat zoom.
+In `visualizer` the centre differs from one video to the next (`center.py`): the run's own
+preset (ring colours and shape, particles), the logo in the ring's colour and a seed.
 """
 from __future__ import annotations
 
@@ -23,9 +25,10 @@ import threading
 import time
 from pathlib import Path
 
+from . import center
 from . import config as cfgmod
 from . import ffmpeg
-from .common import SKILL_DIR, RcvError, check, read_json
+from .common import SKILL_DIR, RcvError, check, fmt_ts, read_json
 
 LOOKS = ('cover', 'visualizer')
 TQDM = re.compile(r'(\d+)%\|.*?(\d+)/(\d+)\s+\[([^<\]]+)<([^,\]]+)')
@@ -67,6 +70,10 @@ def look_args(cfg: dict, run_dir: Path, look: str, provisional: bool = False) ->
             notes.append('không có ảnh DJ gốc: dùng nền mặc định của visualizer')
         if '--bg' in args and args[args.index('--bg') + 1] != str(raw):
             sets += ['background.dim=0', 'effects.vignette.enabled=false']     # keep the text at the contrast mixcover gave it
+        own = center.run_files(run_dir, cfg)               # this video's centre: ring colours and shape, particles, seed
+        if own:
+            args += ['--preset', own['preset'], '--seed', str(own['seed'])]
+            logo = Path(own['logo']) if own['logo'] else logo
         if logo.is_file():
             args += ['--logo', str(logo)]
     else:
@@ -80,7 +87,8 @@ def run_visualizer(cfg: dict, audio: Path, out: Path, extra: list[str], log: Pat
                    duration: float | None = None, on_progress=None, ctx=None) -> dict:
     vz = cfgmod.repo(cfg, 'visualizer')
     vid = cfg['video']
-    cmd = [str(vz / '.venv' / 'bin' / 'python'), str(vz / 'main.py'), str(audio), '--preset', vid['preset'],
+    preset = [] if '--preset' in extra else ['--preset', vid['preset']]     # look_args may name the run's own preset
+    cmd = [str(vz / '.venv' / 'bin' / 'python'), str(vz / 'main.py'), str(audio), *preset,
            '--fps', str(vid['fps']), '--size', vid['size'], '-o', str(out), *extra]
     if vid.get('workers'):
         cmd += ['--workers', str(vid['workers'])]
@@ -133,7 +141,7 @@ def run_visualizer(cfg: dict, audio: Path, out: Path, extra: list[str], log: Pat
 
 def check_video(cfg: dict, video: Path, expect_duration: float, look: str, cover_png: Path | None,
                 frames_dir: Path, at: float | None = None, text_side: str | None = None,
-                column_inner: float | None = None) -> tuple[list[dict], dict]:
+                column_inner: float | None = None, mix_loudness: dict | None = None) -> tuple[list[dict], dict]:
     vid = cfg['video']
     checks = []
     info = ffmpeg.probe(video)
@@ -144,11 +152,45 @@ def check_video(cfg: dict, video: Path, expect_duration: float, look: str, cover
                         f'{v and v["codec"]} {v and v["width"]}x{v and v["height"]} @ {v and round(v["fps"], 2)} fps'))
     checks.append(check('audio_stream', 'PASS' if a and a['codec'] == 'aac' else 'FAIL',
                         f'{a and a["codec"]} {a and a["sample_rate"]} Hz' if a else 'không có luồng âm thanh'))
-    diff = abs(info['duration'] - expect_duration)
-    checks.append(check('video_length', 'PASS' if diff <= vid['duration_tolerance_s'] else 'FAIL',
-                        f'video {info["duration"]:.3f}s, âm thanh {expect_duration:.3f}s, lệch {diff:.3f}s'))
+    # Each stream against the mix, not the container: a file is as long as its longest stream,
+    # so a picture that stopped early would hide behind a complete sound track.
+    tol = vid['duration_tolerance_s']
+    lens = {'hình': v['duration'] if v else None, 'tiếng': a['duration'] if a else None}
+    off = {k: None if d is None else abs(d - expect_duration) for k, d in lens.items()}
+    good = all(d is not None and d <= tol for d in off.values())
+    checks.append(check('video_length', 'PASS' if good else 'FAIL',
+                        f'bản mix {expect_duration:.3f}s; ' + ', '.join(
+                            f'luồng {k} {lens[k]:.3f}s (lệch {off[k]:.3f}s)' if lens[k] is not None else f'không có luồng {k}'
+                            for k in lens) + f'; cho phép lệch {tol}s'))
     frame = ffmpeg.extract_frame(video, at if at is not None else info['duration'] / 2, frames_dir / f'frame_{look}.png')
     extra = {'frame': str(frame), 'duration': info['duration'], 'size_bytes': info['size']}
+    if mix_loudness and a:
+        # What people hear is the encoded track, not mix.wav: measure it, against the mix.
+        got = ffmpeg.loudness(video)
+        extra['loudness'] = got
+        drift = abs(got['integrated_lufs'] - mix_loudness['integrated_lufs'])
+        notes = []
+        if drift > vid['loudness_tolerance_lu']:
+            notes.append(f'lệch bản mix {drift:.1f} LU (cho phép {vid["loudness_tolerance_lu"]})')
+        if got['true_peak_dbtp'] > vid['true_peak_max_dbtp']:
+            # AAC coding overshoots at single loud moments. Say where the worst one is, so the
+            # human can listen there instead of guessing whether it matters.
+            step, worst_at, worst = 120.0, 0.0, float('-inf')
+            t = 0.0
+            while t < info['duration']:
+                try:
+                    peak = ffmpeg.loudness(video, t, step)['true_peak_dbtp']
+                except RcvError:
+                    peak = float('-inf')
+                if peak > worst:
+                    worst_at, worst = t, peak
+                t += step
+            notes.append(f'sau khi nén AAC, true peak vượt {vid["true_peak_max_dbtp"]} dBTP ở vài chỗ (cao nhất trong đoạn '
+                         f'{fmt_ts(worst_at)}–{fmt_ts(min(info["duration"], worst_at + step))}): nghe đoạn đó xem có vỡ tiếng không')
+        checks.append(check('video_loudness', 'WARN' if notes else 'PASS',
+                            f'tiếng trong video {got["integrated_lufs"]:.1f} LUFS, true peak {got["true_peak_dbtp"]:.2f} dBTP '
+                            f'(bản mix {mix_loudness["integrated_lufs"]:.1f} LUFS, {mix_loudness["true_peak_dbtp"]:.2f} dBTP)'
+                            + ('; ' + '; '.join(notes) if notes else '')))
     if look == 'cover' and cover_png and cover_png.is_file():
         score = ffmpeg.ssim(frame, cover_png, '640:360')     # coarse scale: the slight zoom barely moves it, an overlay does
         extra['cover_ssim'] = round(score, 4)
@@ -198,18 +240,22 @@ def render_final(run_dir, cfg: dict, state, ctx=None):
     with_text = bg if bg and bg.name != 'raw.png' else None                  # the background the frame is compared with
     bginfo = read_json(run_dir / 'video' / 'background.json') or {}
     checks, info = check_video(cfg, out, mixinfo['duration'], look, with_text, run_dir / 'video' / 'frames',
-                               text_side=bginfo.get('text_side'), column_inner=(bginfo.get('geometry') or {}).get('column_inner_frac'))
+                               text_side=bginfo.get('text_side'), column_inner=(bginfo.get('geometry') or {}).get('column_inner_frac'),
+                               mix_loudness=mixinfo.get('loudness'))
     if res['warnings']:
         checks.append(check('visualizer_warnings', 'WARN', '; '.join(res['warnings'][:3])))
     for note in notes:
         checks.append(check('look_substitution', 'WARN', note))
+    own = center.run_files(run_dir, cfg) if look == 'visualizer' else None
+    if own:
+        checks.append(check('center', 'PASS', f'phần giữa: {own["labels"]}'))
     top = run_dir / 'video.mp4'
     top.unlink(missing_ok=True)
     try:
         os.link(out, top)
     except OSError:
         shutil.copyfile(out, top)
-    info.update(look=look, render_seconds=res['seconds'], video=str(top))
+    info.update(look=look, render_seconds=res['seconds'], video=str(top), center=own and own['key'])
     return checks, info
 
 

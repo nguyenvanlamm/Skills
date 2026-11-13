@@ -29,7 +29,9 @@ you can observe on the day of the run:
 - titles of videos that currently rank for a few seed queries. Use the session's web search
   tool with 3 to 5 queries such as `nhạc remix tiktok <tháng>/<năm>`, `top nhạc remix việt
   <năm>`, `nhạc remix vinahouse`, `nonstop nhạc remix`, plus one built from the strongest song
-  title. Record what you saw, not what you assume.
+  title. Add `site:youtube.com` (or `youtube`) to the queries: the titles that count are
+  those of videos, and a package whose evidence holds no `youtube.com` or `youtu.be` result
+  at all gets a `WARN`. Record what you saw, not what you assume.
 
 From the observed titles, pick one primary keyword (the phrase most of them share and that
 describes this video truthfully) and three to five secondary ones.
@@ -173,7 +175,7 @@ verified is not something the skill can see.
 | `title_keyword`, `description_opening` | the primary keyword is not in the chosen title, or not in the first two lines | rewrite, or pick the keyword the text really uses |
 | `count_claims` | a number of songs differs from the mix, or "Top N" without `may_say_top_n` | use the real count; "N bài remix hot" |
 | `description_chapters` | the timestamp lines differ from `chapter_lines` | paste them again, unchanged |
-| `chapter_rules` | first mark not 00:00, fewer marks than YouTube needs, a chapter under the minimum | a mix problem: report it, do not edit the times |
+| `chapter_rules` | first mark not 00:00, a chapter under the minimum (`FAIL`); fewer marks than YouTube needs for chapters (`WARN`: a mix of one or two songs) | a mix problem: report it, do not edit the times |
 | `description_credits` | a song title or an original artist is not named | add the credit |
 | `ai_disclosure` | the description never says AI | add the two sentences of section 5 |
 | `tags_unique`, `tags_artists` | a repeated tag; a tag naming an artist outside the mix | remove it |

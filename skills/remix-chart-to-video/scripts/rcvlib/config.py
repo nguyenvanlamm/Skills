@@ -7,10 +7,11 @@ of the real config.
 from __future__ import annotations
 
 import copy
+import json
 import os
 from pathlib import Path
 
-from .common import RcvError, read_json, write_json
+from .common import SKILL_DIR, RcvError, read_json, write_json
 
 REPOS = {'downloader': 'tiktok-nct-downloader', 'stemforge': 'StemForge',
          'mixcover': 'm10-mixcover', 'visualizer': 'm10-visualizer'}
@@ -36,9 +37,14 @@ DEFAULTS = {
         'max_size_mb': 200,
         'on_missing': 'ask',        # ask | backfill | skip
         'max_rank': 50,
+        'manual_artist': 'chart',   # chart | tags: credit a file the human put in sources/ to the chart's
+                                    # artist, or to the artist written in the file's own tags
     },
     'remix': {
-        'target_bpm': 128,          # one tempo for every song, so outros and intros line up
+        'target_bpm': 'source',     # "source": every song keeps its own tempo, the voice is never stretched
+                                    # and songs hand over with a crossfade; a number (e.g. 128): one tempo
+                                    # for every song, so outros and intros overlap on the beat
+        'source_center_bpm': 128,   # "source": a song's BPM, doubled or halved, whichever lies nearest this
         'target_key': 'auto',
         'quality': 'high',
         'host': '127.0.0.1',
@@ -51,6 +57,7 @@ DEFAULTS = {
         'stall_s': 600,             # a job whose stage and progress stand still this long is stuck
         'start_timeout_s': 180,
         'poll_s': 3,
+        'cancel_wait_s': 120,       # a cancelled job stops at its next stage boundary; one that takes longer is hung
         'cleanup_jobs': None,       # first-run question: "keep" | "delete_after_copy"
     },
     'mix': {
@@ -59,15 +66,19 @@ DEFAULTS = {
         'lead_in_bars': 4,          # bars kept before a song's first sung bar (also at the start of the mix); None = keep all
         'tail_bars': 4,             # bars kept after a song's last sung bar; None = keep all
         'vocal_activity_min': 0.5,  # a bar counts as sung when StemForge's vocal activity for it reaches this
+        'edge_activity_min': 0.1,   # a bar next to the singing with this much voice (a pickup, the last note) is never cut
         'dj_bars': 8,               # StemForge's DJ intro/outro length, used when a remix has no vocal data
         'start_fade_s': 1.0,        # fade-in when the mix starts inside a song
         'curve': 'tri',             # linear gains sum to 1: an overlap can never clip
         'crossfade_s': 4.0,         # used by "crossfade" and as the fallback of "overlap"
+        'cut_fade_ms': 20,          # "cut": the two songs overlap this long, so the join has no click
         'max_beat_offset_ms': 60,   # every overlap is nudged onto the beat; a first offset beyond this is flagged
         'min_beat_correlation': 0.25,
         'target_lufs': -14.0,
         'lufs_tolerance': 1.5,
         'true_peak_max_dbtp': -1.0,
+        'normalize': True,          # one gain for the whole mix brings it to target_lufs, as far as the true peak allows
+        'normalize_min_db': 0.1,    # a smaller correction than this is not worth a second render
         'silence_db': -50,
         'silence_min_s': 1.5,
         'preview_pad_s': 10,
@@ -79,9 +90,18 @@ DEFAULTS = {
         'confirmed': False,         # first-run question: the human saw and accepted the two lines
         'review': True,             # every run stops after the picture stage until the human approves the picture
         'preset': 'm10',
-        'thumb_tracks': 10,
+        'thumb_style': 'poster',    # poster: a large title and the first few songs, readable at the size YouTube
+                                    # shows a thumbnail; tracklist: m10-mixcover's cover scaled down
+        'thumb_tracks': 10,         # "tracklist": song lines on the thumbnail
+        'poster_tracks': 3,         # "poster": songs named under the title; the rest become "+ N bài khác"
+        'poster_column_width': 0.44,    # "poster": width of the text column (fraction of the thumbnail)
+        'poster_title_min_size': 0.10,  # "poster": smallest title size (fraction of the height, 72 px of 720)
+        'poster_track_max': 0.054,  # "poster": largest size of a song line (39 px of 720)
+        'poster_track_min': 0.044,  # "poster": smallest (33 px); below it, or the title below its minimum, the check fails
         'seed': None,               # None = derived from the chart date
         'seed_retries': 1,
+        'image': None,              # a picture file used for every run instead of asking the image provider
+        'dry_run': False,           # True: a gradient cover, no picture and no image provider (trials, a spent quota)
         'label': '{artist} - {title}',
     },
     'video': {
@@ -101,6 +121,18 @@ DEFAULTS = {
         'cover_zoom_amount': 0.008, # "cover" look only, when background_still is false
         'min_cover_ssim': 0.80,     # "cover" look, at 640x360: measured 0.89 clean; 0.42 to 0.70 with logo + ring on top
         'duration_tolerance_s': 0.1,
+        'loudness_tolerance_lu': 0.5,   # the video's sound track against the mix it was encoded from
+        'true_peak_max_dbtp': 0.0,  # the encoded (AAC) sound track: lossy coding overshoots the mix's peak a little; above this it can clip
+        # "visualizer" look: the centre (ring colours and shape, particles) differs per video, from assets/center_styles.json
+        'center': 'rotate',         # "rotate": a combination not used in the current cycle; "fixed": m10-visualizer's own preset and logo
+        'center_palette': None,     # a palette name pins that axis; None = rotate it
+        'center_shape': None,       # a ring shape name pins that axis; None = rotate it
+        'center_particles': None,   # a particle style name pins that axis; None = rotate it
+        'center_tint_logo': True,   # the lime parts of the M10 mark take the ring's main colour; False = the mark as it is
+        'center_palette_gap': 4,    # the palette differs from those of this many videos before
+        'center_family_gap': 2,     # its colour family (lime/green, cyan, pink/red...) differs from those of this many videos before
+        'center_shape_gap': 2,      # the ring shape differs from those of this many videos before
+        'center_particles_gap': 1,  # the particle style differs from those of this many videos before
     },
     'panel': {'stall_warn_s': 300},
     'youtube': {'language': 'vi', 'channel': 'M10 Music', 'max_review_rounds': 2},
@@ -171,9 +203,99 @@ def load(path=None, must_exist: bool = True) -> dict:
     cfg = deep_merge(DEFAULTS, raw)
     cfg['_path'] = str(path)
     cfg['_workspace'] = str(path.parent)
-    if cfg['nct']['interval_s'] < 60:
+    gap = cfg['nct']['interval_s']
+    if isinstance(gap, bool) or not isinstance(gap, (int, float)) or gap < 60:
         cfg['nct']['interval_s'] = 60      # the human asked for one minute between downloads
     return cfg
+
+
+# What `pipeline.py set` accepts, for keys whose default does not tell (a None default) or
+# whose values are a closed set. Every other key takes a value of its default's type.
+NUMBER, TEXT = (int, float), (str,)
+CHOICES = {
+    'nct.live_access': (True, False),
+    'remix.cleanup_jobs': ('keep', 'delete_after_copy'),
+    'video.look': ('cover', 'visualizer'),
+    'cover.thumb_style': ('poster', 'tracklist'),
+    'video.tracklist': ('side', 'none'),
+    'selection.on_missing': ('ask', 'backfill', 'skip'),
+    'selection.manual_artist': ('chart', 'tags'),
+    'mix.transition': ('overlap', 'crossfade', 'cut'),
+    'video.center': ('rotate', 'fixed'),
+}
+CENTER_PICKS = {'video.center_palette': 'palette', 'video.center_shape': 'shape', 'video.center_particles': 'particles'}
+NULLABLE = {'nct.home': TEXT, 'remix.separator': TEXT, 'cover.seed': (int,), 'cover.image': TEXT,
+            'mix.lead_in_bars': NUMBER, 'mix.tail_bars': NUMBER, 'mix.edge_activity_min': NUMBER}
+MINIMUM = {'nct.interval_s': 60, 'selection.count': 1, 'selection.max_rank': 1, 'remix.max_attempts': 1,
+           'mix.lead_in_bars': 0, 'mix.tail_bars': 0, 'mix.overlap_bars': 0, 'mix.crossfade_s': 0, 'mix.cut_fade_ms': 0,
+           'video.center_palette_gap': 0, 'video.center_family_gap': 0, 'video.center_shape_gap': 0, 'video.center_particles_gap': 0}
+POSITIVE = ('remix.source_center_bpm', 'remix.poll_s', 'remix.stall_s', 'remix.job_timeout_s', 'remix.start_timeout_s',
+            'remix.cancel_wait_s', 'remix.port', 'remix.acestep_port', 'video.fps', 'video.side_column_width')
+
+
+def validate(key: str, value):
+    """The value `set KEY VALUE` may store, or a usage error that says what the key takes. A
+    wrong type saved here would only surface as a crash in a later stage, or lock the config."""
+    def refuse(wants: str):
+        raise RcvError(f'{key} nhận {wants}; không nhận {value!r}', 2)
+
+    def is_a(v, kinds) -> bool:
+        return isinstance(v, kinds) and not (isinstance(v, bool) and bool not in kinds)
+
+    if key.startswith('_') or key == 'version' or isinstance(get(DEFAULTS, key) if key.split('.')[0] in DEFAULTS and
+                                                           _has(DEFAULTS, key) else None, dict):
+        refuse('một khoá con (ví dụ video.look), không phải cả một mục')
+    if key in CHOICES:
+        if not any(value is c or (not isinstance(c, bool) and value == c) for c in CHOICES[key]):
+            refuse('một trong ' + ', '.join(json_text(c) for c in CHOICES[key]))
+        return value
+    if key in CENTER_PICKS:
+        if value is None:
+            return None
+        allowed = [it['name'] for it in (read_json(SKILL_DIR / 'assets' / 'center_styles.json') or {}).get(CENTER_PICKS[key], [])]
+        if value not in allowed:
+            refuse('null hoặc một trong ' + ', '.join(allowed))
+        return value
+    if key == 'remix.target_bpm':
+        if value != 'source' and not (is_a(value, NUMBER) and 60 <= value <= 200):
+            refuse('"source" hoặc một số từ 60 tới 200')
+        return value
+    if key in NULLABLE:
+        if value is None:
+            return None
+        if NULLABLE[key] is TEXT:
+            value = value if isinstance(value, str) else json_text(value)
+        elif not is_a(value, NULLABLE[key]):
+            refuse('một số hoặc null')
+    else:
+        default = get(DEFAULTS, key) if _has(DEFAULTS, key) else None
+        if isinstance(default, bool):
+            if not isinstance(value, bool):
+                refuse('true hoặc false')
+        elif isinstance(default, NUMBER):
+            if not is_a(value, NUMBER):
+                refuse('một số')
+            if isinstance(default, int) and key.endswith('_gap') and not isinstance(value, int):
+                refuse('một số nguyên')
+        elif isinstance(default, str):
+            value = value if isinstance(value, str) else json_text(value)      # `set cover.title 2026` is a text
+    if key in MINIMUM and is_a(value, NUMBER) and value < MINIMUM[key]:
+        refuse(f'một số từ {MINIMUM[key]} trở lên')
+    if key in POSITIVE and not (is_a(value, NUMBER) and value > 0):
+        refuse('một số lớn hơn 0')
+    return value
+
+
+def _has(cfg: dict, dotted: str) -> bool:
+    try:
+        get(cfg, dotted)
+        return True
+    except (KeyError, TypeError):
+        return False
+
+
+def json_text(value) -> str:
+    return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
 
 
 def _diff(value, default):

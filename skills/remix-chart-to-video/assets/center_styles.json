@@ -1,0 +1,42 @@
+{
+  "about": "The centre of the visualizer look, different per video: 10 palettes (in 7 colour families: two videos in a row never share one) x 7 ring shapes x 3 particle styles = 210 combinations. Pairwise coprime sizes, so the least recently used item on each axis (ties: the order here) walks through all 210 before one repeats; the palettes are ordered so that two of one family stay five apart. `overrides` are m10-visualizer preset keys (presets/m10.yaml); every shape keeps the ring's farthest bar tip within the default preset's, so the side column drawn at S3 stays clear. Read by scripts/rcvlib/center.py; references/design_notes.md explains the rules.",
+  "rules": {
+    "hue_clash_deg": 25,
+    "picture_min_saturation": 0.25,
+    "picture_min_value": 0.15,
+    "primary_min_saturation": 0.2
+  },
+  "palette": [
+    {"name": "chanh-hong", "family": "xanh-chanh", "label": "chanh – hồng", "overrides": {"colors": {"primary": "#C6FF00", "accent": "#FF2E88"}}},
+    {"name": "cyan-tim", "family": "cyan", "label": "cyan – tím (màu kênh)", "overrides": {"colors": {"primary": "#22D3EE", "accent": "#E879F9"}}},
+    {"name": "hong-cyan", "family": "hong-do", "label": "hồng – cyan", "overrides": {"colors": {"primary": "#FF2E88", "accent": "#22D3EE"}}},
+    {"name": "vang-do", "family": "vang", "label": "vàng – đỏ", "overrides": {"colors": {"primary": "#FFD60A", "accent": "#FF3B30"}}},
+    {"name": "cam-tim", "family": "cam", "label": "cam – tím", "overrides": {"colors": {"primary": "#FF8A00", "accent": "#B14CFF"}}},
+    {"name": "xanhla-vang", "family": "xanh-chanh", "label": "xanh lá – vàng", "overrides": {"colors": {"primary": "#39FF14", "accent": "#FFE600"}}},
+    {"name": "bang-hong", "family": "cyan", "label": "xanh băng – hồng", "overrides": {"colors": {"primary": "#7DF9FF", "accent": "#FF5FD2"}}},
+    {"name": "do-vang", "family": "hong-do", "label": "đỏ – vàng", "overrides": {"colors": {"primary": "#FF3355", "accent": "#FFD60A"}}},
+    {"name": "trang-do", "family": "trang", "label": "trắng – đỏ", "overrides": {"colors": {"primary": "#FFFFFF", "accent": "#FF2E55"}}},
+    {"name": "tim-chanh", "family": "tim", "label": "tím – chanh", "overrides": {"colors": {"primary": "#B14CFF", "accent": "#C6FF00"}}}
+  ],
+  "shape": [
+    {"name": "co-dien", "label": "vòng cổ điển", "overrides": {}},
+    {"name": "day-manh", "label": "thanh mảnh dày đặc",
+     "overrides": {"effects": {"circular_spectrum": {"bars": 192, "bar_width": 0.45, "spatial_smooth": 1.2}}}},
+    {"name": "thanh-to", "label": "thanh to thưa",
+     "overrides": {"effects": {"circular_spectrum": {"bars": 72, "bar_width": 0.7, "curve": 1.4, "max_length": 0.14}}}},
+    {"name": "bass-duoi", "label": "bass ở dưới",
+     "overrides": {"effects": {"circular_spectrum": {"start_angle": 90}}}},
+    {"name": "tron-vong", "label": "phổ chạy trọn vòng",
+     "overrides": {"effects": {"circular_spectrum": {"mirror": false}}}},
+    {"name": "glow-manh", "label": "không vòng trong, glow mạnh",
+     "overrides": {"effects": {"circular_spectrum": {"inner_ring": {"enabled": false}}, "glow": {"base": 0.35, "amount": 0.9}}}},
+    {"name": "ngan-chop", "label": "thanh ngắn, chóp dài",
+     "overrides": {"effects": {"circular_spectrum": {"radius": 0.19, "min_length": 0.01, "max_length": 0.12, "peak_cap": 0.45, "peak_threshold": 0.45}}}}
+  ],
+  "particles": [
+    {"name": "bay-thang", "label": "hạt bay thẳng", "overrides": {}},
+    {"name": "xoay", "label": "hạt xoáy", "overrides": {"effects": {"particles": {"swirl": 0.6, "rate": 40}}}},
+    {"name": "bui-sang", "label": "bụi sáng thưa",
+     "overrides": {"effects": {"particles": {"rate": 14, "rate_bass": 45, "max": 200, "size": [0.0025, 0.006], "opacity": 0.7, "grow": 1.3}}}}
+  ]
+}

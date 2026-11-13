@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .common import check, fmt_hms, read_json, worst, write_text
 from .cover import playlist_tracks
+from .stemforge import JOBS_DIR
 
 DELIVERABLES = ('video.mp4', 'thumbnail.jpg', 'cover.png', 'mix.wav', 'transitions_preview.mp3', 'youtube.md',
                 'youtube.json', 'manifest.json')
@@ -35,9 +36,22 @@ def _waits(mixinfo: dict, cfg: dict) -> list[str]:
                    f'- Không lời giữa hai bài: {gaps[0]:.1f} giây')
     if out:
         mx = cfg['mix']
+        modes = {t.get('mode') for t in mixinfo.get('transitions') or []}
+        join = [f'`mix.transition` = {mx.get("transition")}']             # only the keys that shaped this mix
+        if 'overlap' in modes:
+            join.append(f'`mix.overlap_bars` = {mx.get("overlap_bars")}')
+        if 'crossfade' in modes:
+            join.append(f'`mix.crossfade_s` = {mx.get("crossfade_s")}')
         out.append(f'  (đổi bằng `mix.lead_in_bars` = {mx.get("lead_in_bars")}, `mix.tail_bars` = {mx.get("tail_bars")}, '
-                   f'`mix.overlap_bars` = {mx.get("overlap_bars")}; rồi `pipeline.py init --from-run` để ghép lại)')
+                   + ', '.join(join) + '; rồi `pipeline.py init --from-run` để ghép lại)')
     return out
+
+
+def _verdict(checks: list[dict]) -> str:
+    """A stage's result for the table. A SKIP is something nobody verified: it is named next to
+    the result, never folded into PASS."""
+    skipped = sum(c['status'] == 'SKIP' for c in checks)
+    return worst(checks) + (f' ({skipped} SKIP)' if skipped and worst(checks) != 'SKIP' else '')
 
 
 def build(run_dir, cfg: dict, state):
@@ -82,6 +96,10 @@ def build(run_dir, cfg: dict, state):
             out.append(f'  - {item["at_in_preview"]} trong file nghe thử (≈ {item["at_in_mix"]} trong bản mix): bài {item["from"]} → {item["to"]}: {tr["detail"]}')
     if video.get('frame'):
         out.append(f'- Xem khung hình video (kiểu `{video.get("look")}`): `{video["frame"]}`')
+    own = read_json(run_dir / 'art' / 'center.json') if video.get('center') else None
+    if own:
+        out.append(f'- Phần giữa video: {own["labels"]} ({own["reason"]}; còn {own["unused"]}/{own["total"]} tổ hợp chưa dùng). '
+                   'Sổ các kiểu đã dùng: `center_history.json` cạnh file config')
     out.append(f'- Xem thumbnail: `{run_dir / "thumbnail.jpg"}`')
     warned = [(s['label'], c) for s in stages for c in s.get('checks') or [] if c['status'] == 'WARN']
     for label, c in warned:
@@ -89,7 +107,11 @@ def build(run_dir, cfg: dict, state):
 
     out += ['', '## Các chặng', '', '| Chặng | Trạng thái | Kết quả kiểm | Thời gian |', '|---|---|---|---|']
     for n, s in enumerate(stages):
-        out.append(f'| S{n} {s["label"]} | {s["status"]} | {worst(s.get("checks") or [])} | {fmt_hms(s.get("elapsed_s") or 0)} |')
+        out.append(f'| S{n} {s["label"]} | {s["status"]} | {_verdict(s.get("checks") or [])} | {fmt_hms(s.get("elapsed_s") or 0)} |')
+    carried = (data.get('decisions') or {}).get('carried_from')
+    if carried:
+        out += ['', f'Lượt này dùng lại bài gốc và bản phối của lượt `{Path(carried).name}`, nên thời gian của chặng tải và chặng phối '
+                    'ở trên không phải thời gian đã bỏ ra để làm chúng.']
     out += ['', '## Phép kiểm', '', '| Chặng | Phép kiểm | Kết quả | Chi tiết |', '|---|---|---|---|']
     for s in stages:
         for c in s.get('checks') or []:
@@ -97,6 +119,7 @@ def build(run_dir, cfg: dict, state):
     for c in checks:
         out.append(f'| Báo cáo | {c["name"]} | {c["status"]} | {c["detail"]} |')
     skipped = [f'{s["label"]} · {c["name"]}: {c["detail"]}' for s in stages for c in s.get('checks') or [] if c['status'] == 'SKIP']
+    skipped += [f'Báo cáo · {c["name"]}: {c["detail"]}' for c in checks if c['status'] == 'SKIP']
     if skipped:
         out += ['', '## Chưa xác minh', ''] + [f'- {line}' for line in skipped]
 
@@ -114,11 +137,14 @@ def build(run_dir, cfg: dict, state):
         out += [f'- {time.strftime("%H:%M:%S", time.localtime(c["at"]))} `{c["command"]}` — '
                 f'{"gửi request tới NCT" if c["live"] else "không gửi request"}, mã thoát {c["exit"]}' for c in cmds]
         out.append(f'\nTổng: {sum(1 for c in cmds if c["live"])} lệnh có gửi request, {sum(1 for c in cmds if not c["live"])} lệnh offline.')
+    elif carried:
+        out.append(f'- Lượt này không gửi request nào tới NCT: BXH và bài gốc lấy lại từ lượt `{Path(carried).name}` '
+                   f'(nguồn BXH của lượt đó: {info.get("chart_source")}).')
     else:
         out.append('- Không chạy lệnh NCT nào gửi request (dùng dữ liệu đã lưu).')
 
     out += ['', '## Job StemForge của lượt này', '']
-    root = Path('~/.local/share/stemforge/output/remix/local').expanduser()
+    root = JOBS_DIR
     jobs = []
     for tr in manifest.get('tracks', []):
         rec = read_json(run_dir / 'remix' / tr['slug'] / 'job.json') or {}
@@ -127,7 +153,8 @@ def build(run_dir, cfg: dict, state):
             jobs.append((tr['title'], rec['job_id'], _size(folder) if folder.is_dir() else None))
     policy = cfg['remix'].get('cleanup_jobs')
     for title, job_id, size in jobs:
-        out.append(f'- {title}: job `{job_id}` — ' + (f'còn trên đĩa, {_mb(size)}' if size is not None else 'đã xoá sau khi chép'))
+        gone = 'đã xoá sau khi chép' if policy == 'delete_after_copy' else f'không thấy thư mục job trong `{root}` (skill không xoá nó)'
+        out.append(f'- {title}: job `{job_id}` — ' + (f'còn trên đĩa, {_mb(size)}' if size is not None else gone))
     kept = sum(s for _, _, s in jobs if s)
     out.append(f'\nChính sách dọn: `{policy}`.' + (f' Đang giữ {_mb(kept)}; xoá bằng tay các thư mục trong `{root}` nếu không cần nữa.' if kept else ''))
     path = run_dir / 'REPORT.md'
