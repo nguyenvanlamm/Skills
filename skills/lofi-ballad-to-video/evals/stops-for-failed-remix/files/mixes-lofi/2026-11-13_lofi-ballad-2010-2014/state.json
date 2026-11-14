@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "run": {
+    "name": "2026-11-13_lofi-ballad-2010-2014",
+    "dir": "__WS__/mixes-lofi/2026-11-13_lofi-ballad-2010-2014",
+    "title": "2 bài Ballad Việt 2010–2014 · Lofi Chill",
+    "chart_date": "2026-11-13",
+    "period": "Giai đoạn 2010–2014",
+    "period_label": "2010–2014",
+    "seed": 20261113,
+    "count": 2,
+    "sequence": null,
+    "nct_run_id": 1,
+    "chart_source": "bốc từ danh_sach_nhac_ballad_viet_nam.json: Giai đoạn 2010–2014, seed 20261113 (lượt NCT #1)",
+    "config_path": "__WS__/mixes-lofi/config.json",
+    "created_at": 1794500000.0
+  },
+  "stages": [
+    {
+      "id": "preflight",
+      "label": "Kiểm tra máy",
+      "status": "done",
+      "checks": [],
+      "elapsed_s_prev": 0.0,
+      "started_at": 1794578146.194333,
+      "finished_at": 1794578146.1947618,
+      "error": null,
+      "progress": {},
+      "inputs_hash": null,
+      "elapsed_s": 0.0
+    },
+    {
+      "id": "chart",
+      "label": "Bốc bài",
+      "status": "done",
+      "checks": [],
+      "elapsed_s_prev": 0.0,
+      "started_at": 1794578146.194989,
+      "finished_at": 1794578146.1950479,
+      "error": null,
+      "progress": {},
+      "inputs_hash": null,
+      "elapsed_s": 0.0
+    },
+    {
+      "id": "originals",
+      "label": "Tải bản gốc",
+      "status": "todo",
+      "checks": []
+    },
+    {
+      "id": "art",
+      "label": "Ảnh gốc",
+      "status": "todo",
+      "checks": []
+    },
+    {
+      "id": "remix",
+      "label": "Phối lofi",
+      "status": "waiting",
+      "checks": [],
+      "elapsed_s_prev": 0.0,
+      "started_at": 1794578146.195107,
+      "finished_at": 1794578146.195153,
+      "error": null,
+      "progress": {},
+      "inputs_hash": null,
+      "elapsed_s": 0.0
+    },
+    {
+      "id": "mix",
+      "label": "Ghép mix",
+      "status": "todo",
+      "checks": []
+    },
+    {
+      "id": "cover",
+      "label": "Ảnh bìa",
+      "status": "todo",
+      "checks": []
+    },
+    {
+      "id": "video",
+      "label": "Render video",
+      "status": "todo",
+      "checks": []
+    },
+    {
+      "id": "youtube",
+      "label": "Thông tin YouTube",
+      "status": "todo",
+      "checks": []
+    },
+    {
+      "id": "report",
+      "label": "Báo cáo",
+      "status": "todo",
+      "checks": []
+    }
+  ],
+  "now": "S4 · Phối lofi",
+  "waiting": "StemForge không phối được 1 bài (bài số 2): chọn retry, skip hoặc backfill.",
+  "heartbeat": 1794578146.195153,
+  "nct_commands": [],
+  "decisions": {
+    "remix_failed": [
+      2
+    ]
+  },
+  "result": {},
+  "pids": {}
+}

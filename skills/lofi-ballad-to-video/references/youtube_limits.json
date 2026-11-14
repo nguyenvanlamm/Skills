@@ -1,0 +1,126 @@
+{
+  "checked_on": "2026-11-10",
+  "about": "YouTube limits used by the validators. Every entry quotes an official page (YouTube Help or the YouTube Data API reference) fetched on checked_on. A check whose limit is not verified reports SKIP. Re-check the pages when a number looks stale and update value, quote and checked_on together.",
+  "limits": {
+    "title_max_chars": {
+      "value": 100,
+      "unit": "characters",
+      "verified": true,
+      "source_url": "https://support.google.com/youtube/answer/57407?hl=en",
+      "quote": "Note: Video titles have a character limit of 100 characters and cannot include invalid characters.",
+      "note": "The Data API reference agrees: \"The property value has a maximum length of 100 characters and may contain all valid UTF-8 characters except < and >.\" No page says how a character is counted."
+    },
+    "title_forbidden_chars": {
+      "value": "< and >",
+      "unit": "characters",
+      "verified": true,
+      "source_url": "https://developers.google.com/youtube/data/reference/rest/v3/videos?hl=en#snippet.title",
+      "quote": "The property value has a maximum length of 100 characters and may contain all valid UTF-8 characters except < and >.",
+      "note": "The Data API reference states the same exclusion for snippet.description."
+    },
+    "description_max_chars": {
+      "value": 5000,
+      "unit": "characters",
+      "verified": true,
+      "source_url": "https://support.google.com/youtube/answer/57407?hl=en",
+      "quote": "Video descriptions have a character limit of 5,000 characters and cannot include invalid characters.",
+      "note": "YouTube Help says characters; the Data API reference says bytes (description_max_bytes). The validator enforces both, which satisfies every official page."
+    },
+    "description_max_bytes": {
+      "value": 5000,
+      "unit": "bytes",
+      "verified": true,
+      "source_url": "https://developers.google.com/youtube/data/reference/rest/v3/videos?hl=en#snippet.description",
+      "quote": "The property value has a maximum length of 5000 bytes and may contain all valid UTF-8 characters except < and >.",
+      "note": "Vietnamese letters with diacritics take 2 to 3 bytes in UTF-8, so a Vietnamese description reaches this limit well before 5,000 characters."
+    },
+    "tags_max_chars": {
+      "value": 500,
+      "unit": "characters",
+      "verified": true,
+      "source_url": "https://developers.google.com/youtube/data/reference/rest/v3/videos?hl=en",
+      "quote": "The property value has a maximum length of 500 characters. Note the following rules regarding the way the character limit is calculated: The property value is a list, and commas between items in the list count toward the limit. If a tag contains a space, the API server handles the tag value as though it were wrapped in quotation marks, and the quotation marks count toward the character limit. So, for the purposes of character limits, the tag Foo-Baz contains seven characters, but the tag Foo Baz contains nine characters.",
+      "note": "Counted as: sum of tag lengths + one comma between each pair + 2 for every tag that contains a space. The number appears only in the Data API reference; the Help article on tags gives no number."
+    },
+    "hashtags_max_count": {
+      "value": 60,
+      "unit": "hashtags",
+      "verified": true,
+      "source_url": "https://support.google.com/youtube/answer/6390658?hl=en",
+      "quote": "If a video or playlist has more than 60 hashtags, we'll ignore each hashtag on that content.",
+      "note": "Up to three hashtags from the description appear by the video title. Hashtags contain no spaces. The page does not say whether the 60 is counted across title and description together."
+    },
+    "chapters_first_timestamp": {
+      "value": "00:00",
+      "unit": "timestamp",
+      "verified": true,
+      "source_url": "https://support.google.com/youtube/answer/9884579?hl=en",
+      "quote": "Make sure that the first timestamp you list starts with 00:00.",
+      "note": ""
+    },
+    "chapters_min_count": {
+      "value": 3,
+      "unit": "timestamps",
+      "verified": true,
+      "source_url": "https://support.google.com/youtube/answer/9884579?hl=en",
+      "quote": "Your video should have at least three timestamps listed in ascending order.",
+      "note": ""
+    },
+    "chapter_min_seconds": {
+      "value": 10,
+      "unit": "seconds",
+      "verified": true,
+      "source_url": "https://support.google.com/youtube/answer/9884579?hl=en",
+      "quote": "The minimum length for video chapters is 10 seconds.",
+      "note": "Same page: chapters are unavailable when the channel has an active strike."
+    },
+    "thumbnail_max_bytes": {
+      "value": 2000000,
+      "unit": "bytes",
+      "verified": true,
+      "source_url": "https://support.google.com/youtube/answer/72431?hl=en",
+      "quote": "Mobile: 2 MB for video thumbnails or 10 MB for podcasts.",
+      "note": "The strictest upload path. The same page allows more on desktop: \"Desktop: 50MB for video, Shorts, and podcast thumbnails.\" The Data API raised its limit from 2MB to 50MB on 2026-09-14. No page defines MB in bytes; 2000000 is the decimal reading."
+    },
+    "thumbnail_min_width": {
+      "value": 640,
+      "unit": "pixels",
+      "verified": true,
+      "source_url": "https://support.google.com/youtube/answer/72431?hl=en",
+      "quote": "Have a resolution of 3840 x 2160 pixels for videos and 2160 x 3840 for Shorts, with a minimum width of 640 pixels for videos and a minimum height of 640 pixels for Shorts.",
+      "note": "A recommendation, not a hard rule. The recommended size is 3840x2160, aspect ratio 16:9, JPG or PNG. m10-mixcover writes the thumbnail at 1280x720. A custom thumbnail needs a verified account."
+    },
+    "altered_content_disclosure": {
+      "value": "Disclose AI-generated or altered content that seems realistic, including AI-generated music that is the main focus of the video. AI help with a thumbnail or title needs no disclosure.",
+      "unit": null,
+      "verified": true,
+      "source_url": "https://support.google.com/youtube/answer/14328491?hl=en",
+      "quote": "We require creators to disclose AI-generated or altered content that seems realistic. Creators can make this disclosure during the upload process.",
+      "note": "Listed under \"Creators must disclose GenAI content that:\": \"Creates music that’s the main focus of the video.\" The examples that need disclosure start with \"AI generated music\". Not needed: \"Production assistance, like using generative AI tools to create or improve a video outline, script, thumbnail, title, or infographic\". In Studio: Attributes, \"AI use\" (the upload Help page calls it \"Altered content\")."
+    },
+    "misleading_metadata_policy": {
+      "value": "Misleading titles, thumbnails and descriptions are banned as malicious clickbait; adding excessive tags to the description is against the spam policies.",
+      "unit": null,
+      "verified": true,
+      "source_url": "https://support.google.com/youtube/answer/2801973?hl=en",
+      "quote": "Malicious clickbait: Using maliciously misleading titles, thumbnails, descriptions, or imagery to trick users into clicking on a video that does not deliver what was promised.",
+      "note": "Tags article (answer/146402): \"Adding excessive tags to your video description is against our policies on spam, deceptive practices, and scams.\" Hashtags article: \"adding ordinary descriptive tags or repetitive sentences in the description is (still) prohibited.\""
+    },
+    "long_video_requirement": {
+      "value": "Only verified accounts can upload videos longer than 15 minutes; the maximum is 256 GB or 12 hours, whichever is less.",
+      "unit": null,
+      "verified": true,
+      "source_url": "https://support.google.com/youtube/answer/71673?hl=en",
+      "quote": "By default, you can upload videos that are up to 15 minutes long. Verified accounts can upload videos longer than 15 minutes.",
+      "note": "Same page: \"The maximum file size you can upload is 256 GB or 12 hours, whichever is less.\" Verification is by phone number."
+    },
+    "made_for_kids": {
+      "value": "Every video must be marked as made for kids or not (the Audience field).",
+      "unit": null,
+      "verified": true,
+      "source_url": "https://support.google.com/youtube/answer/57407?hl=en",
+      "quote": "To comply with the Children’s Online Privacy Protection Act (COPPA), you’re required to tell us whether your videos are made for kids.",
+      "note": "A channel-level audience setting can supply it for all videos."
+    }
+  }
+}

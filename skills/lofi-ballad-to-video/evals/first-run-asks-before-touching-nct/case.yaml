@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: first-run-asks-before-touching-nct
+expected_outcome: |
+  There is no config yet. The skill creates mixes-lofi/config.json with the four repo paths (`pipeline.py init-config --config mixes-lofi/config.json --root …`) and then asks the first-run questions in one message: whether to turn on live NCT access (saying that NCT's terms forbid automated scripts), what to do with StemForge's job folders, and whether the cover text lines are right. It does not answer them itself: nct.live_access is not set to true, no run folder is created, no song is drawn, and nothing is sent to NhacCuaTui.

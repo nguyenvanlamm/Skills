@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: writes-honest-youtube-package
+expected_outcome: |
+  run/ holds the manifest and mix report of a finished five-song lofi mix whose songs were drawn at random from the ballad list (period 2010–2014; positions 1, 2, 4, 6 and 7 of the draw), with an AI landscape picture. The skill reads the facts with `youtube_meta.py facts`, gathers keyword evidence (live web searches, or `live: false` with a reason when there is no web tool), writes run/youtube/youtube.json and run/youtube/evidence.json, and runs `youtube_meta.py validate` until nothing fails, which writes run/youtube.md. No title or tag says "Top 5", "BXH", "remix", "vinahouse" or "official"; the description carries the five chapter lines unchanged, credits every song and original singer, says that the lofi backing and the landscape picture were made with AI and that the voices are the original singers'; no search volume is stated anywhere.
+context:
+  scaffold_script: place-files.sh

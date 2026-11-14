@@ -1,0 +1,50 @@
+{
+  "about": "Scene parts for the anime chill landscape of each video. A scene is one place + one time + one weather + one detail; no combination is ever used twice, and the place differs from the last `cover.scene_place_gap` videos. `text` goes into m10-mixcover's prompt (English, no people); `label` is what the human reads. Words m10-mixcover blocks (child, kid, teen, minor...) must never appear here.",
+  "place": [
+    {"name": "cua-so-pho", "label": "cửa sổ phòng nhìn ra phố", "text": "a cozy attic room window with a wooden desk and potted plants, looking out over a sleepy Vietnamese city street"},
+    {"name": "mai-nha-sai-gon", "label": "mái nhà Sài Gòn", "text": "the rooftops of old Saigon apartment blocks with water tanks, laundry lines and potted bougainvillea"},
+    {"name": "ga-tau-nho", "label": "ga tàu nhỏ", "text": "a small quiet countryside railway station with an empty platform, a wooden bench and a lone signal lamp"},
+    {"name": "hoi-an", "label": "phố cổ Hội An", "text": "an old-town street in Hoi An with yellow-walled houses, mossy tiled roofs and a calm river beside it"},
+    {"name": "doi-che", "label": "đồi chè", "text": "rolling green tea hills with neat curving rows and a small wooden hut on the slope"},
+    {"name": "dong-lua", "label": "đồng lúa", "text": "wide rice paddies with a narrow dirt path, a lone tree and distant mountains"},
+    {"name": "da-lat", "label": "rừng thông Đà Lạt", "text": "a pine forest on the hills of Da Lat with a small wooden cottage and a winding road"},
+    {"name": "bo-bien", "label": "bờ biển", "text": "a quiet sandy beach with gentle waves, a few fishing boats resting on the shore and a small lighthouse"},
+    {"name": "cafe-ven-ho", "label": "quán café ven hồ", "text": "a small lakeside cafe terrace with empty wooden chairs, string lights and a calm lake"},
+    {"name": "con-hem", "label": "con hẻm", "text": "a narrow Vietnamese alley with potted plants, bicycles parked by the doors and warm light from small windows"},
+    {"name": "cau-go", "label": "cầu gỗ trên sông", "text": "an old wooden footbridge over a slow river lined with bamboo groves"},
+    {"name": "lang-chai", "label": "làng chài", "text": "a fishing village on stilts over a calm bay with round basket boats floating nearby"},
+    {"name": "ruong-bac-thang", "label": "ruộng bậc thang", "text": "terraced rice fields on mountain slopes with a small stilt house among the clouds"},
+    {"name": "ho-guom", "label": "hồ Gươm", "text": "a peaceful lake in old Hanoi with a small red bridge and willow trees leaning over the water"},
+    {"name": "thu-vien", "label": "góc thư viện", "text": "a quiet corner of an old library with tall bookshelves, a reading desk and a big arched window"},
+    {"name": "san-thuong", "label": "sân thượng nhiều cây", "text": "a rooftop garden full of plants and hanging lanterns overlooking a glittering city skyline"},
+    {"name": "song-nuoc", "label": "sông nước miền Tây", "text": "a Mekong delta river with coconut palms on both banks and small wooden boats tied along the shore"},
+    {"name": "nha-go-nui", "label": "nhà gỗ trên núi", "text": "a small wooden house on a mountain ridge with a porch, a hammock and a view over misty valleys"},
+    {"name": "toa-tau", "label": "toa tàu đêm", "text": "the inside of an empty old train carriage with a window seat, a small table and the landscape passing outside"},
+    {"name": "vuon-hoa", "label": "vườn hoa", "text": "a quiet flower garden with a winding stone path, a small gazebo and a pond"}
+  ],
+  "time": [
+    {"name": "binh-minh", "label": "bình minh", "text": "at dawn, soft pink and gold light rising on the horizon"},
+    {"name": "hoang-hon", "label": "hoàng hôn", "text": "at sunset, warm orange and violet sky"},
+    {"name": "gio-xanh", "label": "giờ xanh", "text": "at blue hour, deep blue sky with the first lights coming on"},
+    {"name": "dem-trang", "label": "đêm trăng", "text": "at night under a large full moon, silver moonlight"},
+    {"name": "dem-sao", "label": "đêm sao", "text": "on a clear night full of stars and a faint milky way"}
+  ],
+  "weather": [
+    {"name": "mua-nhe", "label": "mưa nhẹ", "text": "light rain falling with soft reflections on wet surfaces"},
+    {"name": "suong-mu", "label": "sương mù", "text": "thin mist drifting low over the scene"},
+    {"name": "nang-nhe", "label": "trời quang", "text": "calm clear air with soft drifting clouds"},
+    {"name": "la-thu", "label": "lá thu", "text": "autumn leaves in amber and red drifting in a gentle breeze"},
+    {"name": "hoa-mai", "label": "mùa hoa", "text": "blossoming trees with petals floating in the air"},
+    {"name": "tuyet-nhe", "label": "tuyết nhẹ", "text": "light snow gently falling and dusting the ground"}
+  ],
+  "detail": [
+    {"name": "den-long", "label": "đèn lồng", "text": "warm paper lanterns glowing"},
+    {"name": "meo-ngu", "label": "mèo ngủ", "text": "a small cat sleeping curled up on a cushion"},
+    {"name": "tach-tra", "label": "tách trà", "text": "a steaming cup of tea on a wooden ledge"},
+    {"name": "xe-dap", "label": "xe đạp", "text": "an old bicycle leaning against a wall"},
+    {"name": "dom-dom", "label": "đom đóm", "text": "fireflies glowing softly in the air"},
+    {"name": "may-quay-dia", "label": "máy quay đĩa", "text": "a vintage record player with a vinyl record"},
+    {"name": "chim-bay", "label": "đàn chim", "text": "a flock of small birds flying far in the sky"},
+    {"name": "cay-xanh", "label": "chậu cây", "text": "lush potted plants and hanging vines"}
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "banned_phrases": [
+    {"pattern": "\\bofficial\\b", "why": "video không phải bản chính thức của nghệ sĩ hay của NCT"},
+    {"pattern": "(mv|video|audio|bản)\\s+chính\\s+thức", "why": "không được viết như thể đây là bản chính thức của nghệ sĩ"},
+    {"pattern": "no\\s*copyright|non[- ]?copyright|copyright\\s*free|free\\s*copyright|\\bncs\\b", "why": "bài gốc có bản quyền; không được ghi là không bản quyền"},
+    {"pattern": "không\\s+(dính\\s+)?bản\\s+quyền|khong\\s+ban\\s+quyen|miễn\\s+phí\\s+bản\\s+quyền", "why": "bài gốc có bản quyền; không được ghi là không bản quyền"},
+    {"pattern": "bản\\s+quyền\\s+thuộc\\s+(về\\s+)?(m10|kênh|chúng\\s+tôi)", "why": "kênh không sở hữu bản quyền bài gốc"},
+    {"pattern": "vina\\s*house|nhạc\\s+sàn|nhac\\s+san|\\bedm\\b|\\bdj\\b", "why": "bản phối là lofi chill; kênh chỉ gọi đúng tên lofi chill, không ghi vinahouse, nhạc sàn, EDM hay DJ"},
+    {"pattern": "\\bremix\\b", "why": "kênh M10 lofi chill gọi bản phối là lofi chill, không gọi là remix (remix là kênh vinahouse)"},
+    {"pattern": "\\bbxh\\b|bảng\\s+xếp\\s+hạng|bang\\s+xep\\s+hang|\\bchart\\b|xếp\\s+hạng|\\bhot\\s+nhất|\\bhot\\s+nhat", "why": "bài được bốc ngẫu nhiên từ danh sách ballad của kênh, không phải bảng xếp hạng: không ghi BXH, xếp hạng hay \"hot nhất\""}
+  ]
+}

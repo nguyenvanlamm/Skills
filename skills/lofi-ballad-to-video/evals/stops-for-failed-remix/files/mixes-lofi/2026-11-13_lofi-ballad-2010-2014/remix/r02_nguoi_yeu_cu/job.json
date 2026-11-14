@@ -1,0 +1,9 @@
+{
+  "key": "fixture",
+  "job_id": "0123456789ab",
+  "attempts": 2,
+  "status": "failed",
+  "target_bpm": "auto",
+  "error_type": "cuda_oom",
+  "error": "CUDA out of memory while generating the backing (fixture)"
+}

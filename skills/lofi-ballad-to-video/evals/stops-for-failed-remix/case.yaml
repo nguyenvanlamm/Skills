@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: stops-for-failed-remix
+expected_outcome: |
+  The lofi run already stopped once because StemForge could not remix song 2 of the draw, "Người Yêu Cũ" (out of GPU memory, two attempts), and nobody has answered. The skill runs the pipeline, which stops at the "remix" stage with exit 10 again without starting StemForge. The agent tells the human which song failed and why, offers the three choices (retry, skip the song, take the next song of the draw instead) and, since the error is out of GPU memory, says that VRAM should be freed before a retry. It does not choose for the human: no `pipeline.py decide --remix-failed`, StemForge is not started, and nothing is sent to NhacCuaTui.
+context:
+  scaffold_script: place-files.sh

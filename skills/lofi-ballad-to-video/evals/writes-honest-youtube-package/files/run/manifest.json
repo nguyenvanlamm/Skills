@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "chart": {
+    "tag": "BALLAD_LIST",
+    "title": "Ballad Việt · Giai đoạn 2010–2014",
+    "date": "2026-11-13",
+    "url": null,
+    "nct_run_id": 1,
+    "kind": "song_list",
+    "period": "2010–2014"
+  },
+  "requested_count": 5,
+  "window": 7,
+  "exact_top": false,
+  "tracks": [
+    {
+      "id": 1,
+      "rank": 1,
+      "title": "Nhật Ký Của Mẹ",
+      "artist": "Hiền Thục",
+      "label": "Hiền Thục - Nhật Ký Của Mẹ",
+      "chart_title": "Nhật Ký Của Mẹ",
+      "chart_artist": "Hiền Thục",
+      "chart_url": "https://www.nhaccuatui.com/song/fixture1",
+      "distributor": "Hãng Thử",
+      "release_information": "Phát hành: 2012-05-01; Nhà phân phối: Hãng Thử",
+      "composers": [
+        "Nguyễn Văn Chung"
+      ],
+      "slug": "r01_x",
+      "bpm": 82.0,
+      "key": "A minor",
+      "source": {
+        "path": "x.mp3",
+        "kind": "nct_original",
+        "duration": 300.0
+      }
+    },
+    {
+      "id": 2,
+      "rank": 2,
+      "title": "Người Yêu Cũ",
+      "artist": "Khởi My",
+      "label": "Khởi My - Người Yêu Cũ",
+      "chart_title": "Người Yêu Cũ",
+      "chart_artist": "Khởi My",
+      "chart_url": "https://www.nhaccuatui.com/song/fixture2",
+      "distributor": "Hãng Thử",
+      "release_information": "Phát hành: 2012-05-01; Nhà phân phối: Hãng Thử",
+      "composers": [
+        "Phan Mạnh Quỳnh"
+      ],
+      "slug": "r02_x",
+      "bpm": 82.0,
+      "key": "A minor",
+      "source": {
+        "path": "x.mp3",
+        "kind": "nct_original",
+        "duration": 300.0
+      }
+    },
+    {
+      "id": 3,
+      "rank": 4,
+      "title": "Vì Sao",
+      "artist": "Khởi My",
+      "label": "Khởi My - Vì Sao",
+      "chart_title": "Vì Sao",
+      "chart_artist": "Khởi My",
+      "chart_url": "https://www.nhaccuatui.com/song/fixture4",
+      "distributor": "Hãng Thử",
+      "release_information": "Phát hành: 2012-05-01; Nhà phân phối: Hãng Thử",
+      "composers": "Chưa xác minh",
+      "slug": "r04_x",
+      "bpm": 82.0,
+      "key": "A minor",
+      "source": {
+        "path": "x.mp3",
+        "kind": "nct_original",
+        "duration": 300.0
+      }
+    },
+    {
+      "id": 4,
+      "rank": 6,
+      "title": "Em Của Ngày Hôm Qua",
+      "artist": "Sơn Tùng M-TP",
+      "label": "Sơn Tùng M-TP - Em Của Ngày Hôm Qua",
+      "chart_title": "Em Của Ngày Hôm Qua",
+      "chart_artist": "Sơn Tùng M-TP",
+      "chart_url": "https://www.nhaccuatui.com/song/fixture6",
+      "distributor": "Hãng Thử",
+      "release_information": "Phát hành: 2012-05-01; Nhà phân phối: Hãng Thử",
+      "composers": [
+        "Sơn Tùng M-TP"
+      ],
+      "slug": "r06_x",
+      "bpm": 82.0,
+      "key": "A minor",
+      "source": {
+        "path": "x.mp3",
+        "kind": "nct_original",
+        "duration": 300.0
+      }
+    },
+    {
+      "id": 5,
+      "rank": 7,
+      "title": "Chắc Ai Đó Sẽ Về",
+      "artist": "Sơn Tùng M-TP",
+      "label": "Sơn Tùng M-TP - Chắc Ai Đó Sẽ Về",
+      "chart_title": "Chắc Ai Đó Sẽ Về",
+      "chart_artist": "Sơn Tùng M-TP",
+      "chart_url": "https://www.nhaccuatui.com/song/fixture7",
+      "distributor": "Hãng Thử",
+      "release_information": "Phát hành: 2012-05-01; Nhà phân phối: Hãng Thử",
+      "composers": [
+        "Sơn Tùng M-TP"
+      ],
+      "slug": "r07_x",
+      "bpm": 82.0,
+      "key": "A minor",
+      "source": {
+        "path": "x.mp3",
+        "kind": "nct_original",
+        "duration": 300.0
+      }
+    }
+  ],
+  "playlist": [
+    {
+      "position": 1,
+      "track": 1,
+      "chapter": "00:00",
+      "chapter_seconds": 0
+    },
+    {
+      "position": 2,
+      "track": 2,
+      "chapter": "06:08",
+      "chapter_seconds": 368
+    },
+    {
+      "position": 3,
+      "track": 3,
+      "chapter": "11:29",
+      "chapter_seconds": 689
+    },
+    {
+      "position": 4,
+      "track": 4,
+      "chapter": "16:52",
+      "chapter_seconds": 1012
+    },
+    {
+      "position": 5,
+      "track": 5,
+      "chapter": "22:20",
+      "chapter_seconds": 1340
+    }
+  ]
+}

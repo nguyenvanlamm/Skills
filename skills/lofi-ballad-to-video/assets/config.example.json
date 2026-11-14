@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "repos": {
+    "downloader": "/path/to/tiktok-nct-downloader",
+    "stemforge": "/path/to/StemForge",
+    "mixcover": "/path/to/m10-mixcover",
+    "visualizer": "/path/to/m10-visualizer"
+  },
+  "nct": {
+    "live_access": null,
+    "list_tag": "BALLAD_LIST",
+    "interval_s": 60,
+    "home": null
+  },
+  "songlist": {
+    "path": "Assets/danh_sach_nhac_ballad_viet_nam.json",
+    "pool": 50
+  },
+  "selection": {
+    "count": 12,
+    "min_duration_s": 90,
+    "max_duration_s": 600,
+    "max_size_mb": 200,
+    "on_missing": "ask",
+    "max_rank": 50,
+    "manual_artist": "list"
+  },
+  "remix": {
+    "target_bpm": "source",
+    "source_center_bpm": 80,
+    "target_key": "auto",
+    "quality": "high",
+    "host": "127.0.0.1",
+    "port": 8766,
+    "acestep_port": 8001,
+    "separator": null,
+    "max_attempts": 2,
+    "warn_tempo_stretch": 1.25,
+    "job_timeout_s": 2400,
+    "stall_s": 600,
+    "start_timeout_s": 180,
+    "poll_s": 3,
+    "cancel_wait_s": 120,
+    "cleanup_jobs": null
+  },
+  "mix": {
+    "transition": "overlap",
+    "overlap_bars": 4,
+    "lead_in_bars": 2,
+    "tail_bars": 2,
+    "vocal_activity_min": 0.5,
+    "edge_activity_min": 0.1,
+    "dj_bars": 4,
+    "start_fade_s": 1.0,
+    "curve": "tri",
+    "crossfade_s": 6.0,
+    "cut_fade_ms": 20,
+    "max_beat_offset_ms": 60,
+    "min_beat_correlation": 0.25,
+    "target_lufs": -14.0,
+    "lufs_tolerance": 1.5,
+    "true_peak_max_dbtp": -1.0,
+    "normalize": true,
+    "normalize_min_db": 0.1,
+    "silence_db": -50,
+    "silence_min_s": 1.5,
+    "preview_pad_s": 10
+  },
+  "cover": {
+    "title": "{count} BẢN BALLAD VIỆT LOFI CHILL",
+    "title_inexact": "{count} BẢN BALLAD VIỆT LOFI CHILL",
+    "subtitle": "Ballad Việt {period} · Lofi Chill",
+    "confirmed": false,
+    "review": false,
+    "preset": "lofi",
+    "thumb_style": "poster",
+    "thumb_tracks": 10,
+    "poster_tracks": 3,
+    "poster_column_width": 0.44,
+    "poster_title_min_size": 0.1,
+    "poster_track_max": 0.054,
+    "poster_track_min": 0.044,
+    "seed": null,
+    "max_art_similarity": 0.75,
+    "scene_place_gap": 6,
+    "seed_retries": 1,
+    "image": null,
+    "dry_run": false,
+    "label": "{artist} - {title}"
+  },
+  "video": {
+    "look": "visualizer",
+    "preset": "lofi",
+    "logo": "assets/transparent.png",
+    "fps": 60,
+    "size": "1920x1080",
+    "workers": 0,
+    "background_still": true,
+    "tracklist": "side",
+    "side_title": "ballad việt lofi chill",
+    "side_column_width": 0.24,
+    "side_title_min_size": 0.037,
+    "side_track_max": 0.026,
+    "side_track_min": 0.016,
+    "max_side_diff": 20,
+    "min_bars_diff": 3.0,
+    "max_center_diff": 4.0,
+    "cover_zoom_amount": 0.008,
+    "min_cover_ssim": 0.8,
+    "duration_tolerance_s": 0.1,
+    "loudness_tolerance_lu": 0.5,
+    "true_peak_max_dbtp": 0.0
+  },
+  "panel": {
+    "stall_warn_s": 300
+  },
+  "youtube": {
+    "language": "vi",
+    "channel": "M10 lofi chill",
+    "max_review_rounds": 2
+  }
+}

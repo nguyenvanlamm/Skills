@@ -1,0 +1,230 @@
+{
+  "period": "Giai đoạn 2010–2014",
+  "slug": "2010-2014",
+  "label": "2010–2014",
+  "seed": 20261113,
+  "count": 2,
+  "fresh": 20,
+  "period_size": 40,
+  "notes": [],
+  "songs": [
+    {
+      "position": 1,
+      "title": "Nhật Ký Của Mẹ",
+      "artists": [
+        "Hiền Thục"
+      ],
+      "composers": [
+        "Nguyễn Văn Chung"
+      ],
+      "key": "nhat ky cua me|hien thuc"
+    },
+    {
+      "position": 2,
+      "title": "Người Yêu Cũ",
+      "artists": [
+        "Khởi My"
+      ],
+      "composers": [
+        "Phan Mạnh Quỳnh"
+      ],
+      "key": "nguoi yeu cu|khoi my"
+    },
+    {
+      "position": 3,
+      "title": "Gửi Cho Anh",
+      "artists": [
+        "Khởi My"
+      ],
+      "composers": [
+        "Khởi My"
+      ],
+      "key": "gui cho anh|khoi my"
+    },
+    {
+      "position": 4,
+      "title": "Vì Sao",
+      "artists": [
+        "Khởi My"
+      ],
+      "composers": "Chưa xác minh",
+      "key": "vi sao|khoi my"
+    },
+    {
+      "position": 5,
+      "title": "Cơn Mưa Ngang Qua",
+      "artists": [
+        "Sơn Tùng M-TP"
+      ],
+      "composers": [
+        "Sơn Tùng M-TP"
+      ],
+      "key": "con mua ngang qua|son tung m-tp"
+    },
+    {
+      "position": 6,
+      "title": "Em Của Ngày Hôm Qua",
+      "artists": [
+        "Sơn Tùng M-TP"
+      ],
+      "composers": [
+        "Sơn Tùng M-TP"
+      ],
+      "key": "em cua ngay hom qua|son tung m-tp"
+    },
+    {
+      "position": 7,
+      "title": "Chắc Ai Đó Sẽ Về",
+      "artists": [
+        "Sơn Tùng M-TP"
+      ],
+      "composers": [
+        "Sơn Tùng M-TP"
+      ],
+      "key": "chac ai do se ve|son tung m-tp"
+    },
+    {
+      "position": 8,
+      "title": "Nắng Ấm Xa Dần",
+      "artists": [
+        "Sơn Tùng M-TP"
+      ],
+      "composers": [
+        "Sơn Tùng M-TP"
+      ],
+      "key": "nang am xa dan|son tung m-tp"
+    },
+    {
+      "position": 9,
+      "title": "Lặng Thầm Yêu",
+      "artists": [
+        "Minh Vương M4U"
+      ],
+      "composers": [
+        "Minh Vương"
+      ],
+      "key": "lang tham yeu|minh vuong m4u"
+    },
+    {
+      "position": 10,
+      "title": "Nỗi Đau Xót Xa",
+      "artists": [
+        "Minh Vương M4U"
+      ],
+      "composers": [
+        "Minh Vương"
+      ],
+      "key": "noi dau xot xa|minh vuong m4u"
+    },
+    {
+      "position": 11,
+      "title": "Chạm Vào Nỗi Nhớ",
+      "artists": [
+        "Minh Vương M4U"
+      ],
+      "composers": [
+        "Minh Vương"
+      ],
+      "key": "cham vao noi nho|minh vuong m4u"
+    },
+    {
+      "position": 12,
+      "title": "Cơn Mưa Tình Yêu",
+      "artists": [
+        "Hà Anh Tuấn",
+        "Phương Linh"
+      ],
+      "composers": [
+        "Mạnh Quân"
+      ],
+      "key": "con mua tinh yeu|ha anh tuan"
+    },
+    {
+      "position": 13,
+      "title": "Ngày Hát Đôi",
+      "artists": [
+        "Hà Anh Tuấn",
+        "Phương Linh"
+      ],
+      "composers": [
+        "Huy Tuấn"
+      ],
+      "key": "ngay hat doi|ha anh tuan"
+    },
+    {
+      "position": 14,
+      "title": "Buổi Sáng Ở Ciao Cafe",
+      "artists": [
+        "Hà Anh Tuấn"
+      ],
+      "composers": [
+        "Quốc Bảo"
+      ],
+      "key": "buoi sang o ciao cafe|ha anh tuan"
+    },
+    {
+      "position": 15,
+      "title": "Lời Yêu Nào",
+      "artists": [
+        "Hà Anh Tuấn"
+      ],
+      "composers": "Chưa xác minh",
+      "key": "loi yeu nao|ha anh tuan"
+    },
+    {
+      "position": 16,
+      "title": "Đừng Làm Anh Đau",
+      "artists": [
+        "Minh Hằng"
+      ],
+      "composers": "Chưa xác minh",
+      "key": "dung lam anh dau|minh hang"
+    },
+    {
+      "position": 17,
+      "title": "Một Vòng Trái Đất",
+      "artists": [
+        "Minh Hằng",
+        "Tim"
+      ],
+      "composers": [
+        "Nhất Trung"
+      ],
+      "key": "mot vong trai dat|minh hang"
+    },
+    {
+      "position": 18,
+      "title": "Không Cảm Xúc",
+      "artists": [
+        "Hồ Quang Hiếu"
+      ],
+      "composers": [
+        "Nguyễn Đình Vũ"
+      ],
+      "key": "khong cam xuc|ho quang hieu"
+    },
+    {
+      "position": 19,
+      "title": "Con Bướm Xuân",
+      "artists": [
+        "Hồ Quang Hiếu"
+      ],
+      "composers": [
+        "Châu Đăng Khoa"
+      ],
+      "key": "con buom xuan|ho quang hieu"
+    },
+    {
+      "position": 20,
+      "title": "Tìm Em",
+      "artists": [
+        "Hồ Quang Hiếu"
+      ],
+      "composers": [
+        "Châu Đăng Khoa"
+      ],
+      "key": "tim em|ho quang hieu"
+    }
+  ],
+  "list_path": "/home/lam/Documents/projects/Youtube/Youtube-music/Assets/danh_sach_nhac_ballad_viet_nam.json"
+}

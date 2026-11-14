@@ -1,0 +1,83 @@
+{
+  "chapters": [
+    {
+      "position": 1,
+      "track": 1,
+      "seconds": 0,
+      "stamp": "00:00",
+      "label": "Hiền Thục - Nhật Ký Của Mẹ",
+      "title": "Nhật Ký Của Mẹ"
+    },
+    {
+      "position": 2,
+      "track": 2,
+      "seconds": 368,
+      "stamp": "06:08",
+      "label": "Khởi My - Người Yêu Cũ",
+      "title": "Người Yêu Cũ"
+    },
+    {
+      "position": 3,
+      "track": 3,
+      "seconds": 689,
+      "stamp": "11:29",
+      "label": "Khởi My - Vì Sao",
+      "title": "Vì Sao"
+    },
+    {
+      "position": 4,
+      "track": 4,
+      "seconds": 1012,
+      "stamp": "16:52",
+      "label": "Sơn Tùng M-TP - Em Của Ngày Hôm Qua",
+      "title": "Em Của Ngày Hôm Qua"
+    },
+    {
+      "position": 5,
+      "track": 5,
+      "seconds": 1340,
+      "stamp": "22:20",
+      "label": "Sơn Tùng M-TP - Chắc Ai Đó Sẽ Về",
+      "title": "Chắc Ai Đó Sẽ Về"
+    }
+  ],
+  "total_seconds": 1655,
+  "duration": 1654.72,
+  "tracks": [
+    {
+      "position": 1,
+      "track": 1,
+      "title": "Nhật Ký Của Mẹ",
+      "start_seconds": 0.0
+    },
+    {
+      "position": 2,
+      "track": 2,
+      "title": "Người Yêu Cũ",
+      "start_seconds": 368.0
+    },
+    {
+      "position": 3,
+      "track": 3,
+      "title": "Vì Sao",
+      "start_seconds": 689.0
+    },
+    {
+      "position": 4,
+      "track": 4,
+      "title": "Em Của Ngày Hôm Qua",
+      "start_seconds": 1012.0
+    },
+    {
+      "position": 5,
+      "track": 5,
+      "title": "Chắc Ai Đó Sẽ Về",
+      "start_seconds": 1340.0
+    }
+  ],
+  "transitions": [],
+  "loudness": {
+    "integrated_lufs": -14.0,
+    "true_peak_dbtp": -1.1
+  }
+}
