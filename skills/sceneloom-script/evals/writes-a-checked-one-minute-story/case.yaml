@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: writes-a-checked-one-minute-story
+expected_outcome: |
+  A new sceneloom project is created in the truyen-ke genre with about one minute of length. The skill writes script.json itself, imports it with `sceneloom script import` and fixes every FAIL line until the import prints OK, so the script step is done. The script has about 10 scenes, opens on the most gripping moment, keeps picture text in English and narration in Vietnamese. The reply shows the title, hook, summary, chapters and cast and asks before drawing any picture; no image, clip or audio step is run.

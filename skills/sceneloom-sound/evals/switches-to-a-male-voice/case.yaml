@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: switches-to-a-male-voice
+expected_outcome: |
+  The newest project already has a voice for every line (fixture "audio", made with the mock provider). The skill sets a male Vietnamese Edge voice (vi-VN-NamMinhNeural) for this project (`sceneloom voice <id> vi-VN-NamMinhNeural`; the genre's "voice" field or "edge_voice" in settings.json also count), runs the audio step with `--provider mock` (which remakes every line whose voice changed), and checks that the voice files are new. The reply says that the mock voice is only a test tone, so the male voice can only be heard after a real run with the Edge voice provider.

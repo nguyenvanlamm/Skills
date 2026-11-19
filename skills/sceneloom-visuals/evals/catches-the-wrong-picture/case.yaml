@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: catches-the-wrong-picture
+expected_outcome: |
+  The newest project (fixture "flux": the real 10-scene demo "Chiếc Đèn Lồng Của Mai", drawn with FLUX) has two pictures that contradict their scene text: scene 6 shows Mai holding two lit lanterns although the script has one lantern whose candle has just gone out, and scene 3 shows the grandfather standing on the pier although the script has him rowing away in the boat. The skill makes the images contact sheet (or opens the scene pictures), compares every picture with its scene in script.txt, marks the wrong scenes with `sceneloom redo <id> --scenes ...`, and runs no image generation. The reply lists every marked scene with what is wrong in it.

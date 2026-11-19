@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: draws-then-looks-at-every-picture
+expected_outcome: |
+  The skill checks the script step is done, runs the entities, images and clips steps with `--provider mock`, makes contact sheets with `sceneloom sheet` for entities and for images, and opens them with the Read tool. It reports honestly that mock pictures are placeholder cards (so nothing can be judged against the script), how many pictures and clips were made, and where the sheets are, and it offers the sound step next.
