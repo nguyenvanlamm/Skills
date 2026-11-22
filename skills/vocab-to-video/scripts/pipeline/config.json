@@ -4,16 +4,29 @@
     "lea": {
       "name": "Léa",
       "voice": "fr-FR-VivienneMultilingualNeural",
-      "image": "lea.png",
       "color": "#FF8A5B",
-      "side": "left"
+      "side": "left",
+      "look": {
+        "skin": "fair",
+        "outfit": "sweater",
+        "color": "#E0A22B",
+        "hair": "long",
+        "hair_col": "#6B3F22"
+      }
     },
     "hugo": {
       "name": "Hugo",
       "voice": "fr-FR-RemyMultilingualNeural",
-      "image": "hugo.png",
       "color": "#4FC3F7",
-      "side": "right"
+      "side": "right",
+      "look": {
+        "skin": "tan",
+        "outfit": "hoodie",
+        "color": "#2F4A7A",
+        "hair": "short",
+        "hair_col": "#1C1B22",
+        "glasses": true
+      }
     }
   },
   "levels": {
@@ -116,6 +129,11 @@
         "en"
       ]
     ]
+  },
+  "upload": {
+    "contains_synthetic_media": false,
+    "short_delay_minutes": 0,
+    "short_link_label": "▶️ Le dialogue complet : {url}"
   },
   "hook": {
     "max_words": 12

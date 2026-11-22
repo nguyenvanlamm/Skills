@@ -30,6 +30,8 @@
 - `short`: the line range (1-based, inclusive) cut into the 30-60 second vertical video for Shorts
   and TikTok (see "Short cut" below).
 - `lines`: speakers `lea` and `hugo` only, strictly alternating. Either may start.
+- `scenes` (and optionally `cast`): the storyboard of the cartoon, written after the lines. Its
+  format and rules are in `references/scene-rules.md`.
 
 ## Hook (first 3 seconds)
 

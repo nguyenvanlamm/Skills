@@ -28,9 +28,9 @@ from tts import synth_lines
 from validate_dialogue import validate
 
 # output name -> (composition, size, timeline it is rendered from)
-FORMATS = {"16x9": ("Dialogue16x9", (1920, 1080), "episode"),
-           "9x16": ("Dialogue9x16", (1080, 1920), "episode"),
-           "short_9x16": ("Dialogue9x16", (1080, 1920), "short")}
+FORMATS = {"16x9": ("Toon16x9", (1920, 1080), "episode"),
+           "9x16": ("Toon9x16", (1080, 1920), "episode"),
+           "short_9x16": ("Toon9x16", (1080, 1920), "short")}
 STEPS = ["validate", "tts", "build", "publish", "thumbnail", "render", "check"]
 
 
@@ -59,6 +59,15 @@ def finish(code: int) -> None:
         prog["status"] = "failed"
     prog["updated_at"] = time.time()
     write_json(LIVE["path"], LIVE["state"])
+
+
+def design_digest() -> bytes:
+    """A fingerprint of the video code: when the drawing changes, stills and videos are made again."""
+    h = hashlib.sha256()
+    for f in sorted((VIDEO / "src").rglob("*")):
+        if f.is_file():
+            h.update(f.relative_to(VIDEO).as_posix().encode() + f.read_bytes())
+    return h.digest()
 
 
 def image_size(path: Path) -> tuple[int, int]:
@@ -157,7 +166,9 @@ def run_pipeline() -> int:
     meta = read_json(d / "metadata.json")
     base = f"{d.parent.name}_{dialogue['level']}"
     (d / "out").mkdir(exist_ok=True)
-    shared = {"level": dialogue["level"], "vocab": episode["vocab"], "speakers": episode["speakers"]}
+    shared = {"level": dialogue["level"], "vocab": episode["vocab"], "speakers": episode["speakers"],
+              "cast": episode["cast"], "fonts": True}
+    design = design_digest()
     stills = state["steps"].get("thumbnail", {}).get("files", {})
     for comp, name, text, size in (
             ("Thumbnail16x9", "thumbnail", meta["thumbnail_text"], (1280, 720)),
@@ -165,8 +176,7 @@ def run_pipeline() -> int:
         props = {"text": text, **shared}
         out = d / "out" / f"{base}_{name}.jpg"
         # Redraw when the text changes or when the thumbnail design itself changes.
-        digest = hashlib.sha256(json.dumps(props, sort_keys=True).encode()
-                                + (VIDEO / "src" / "Thumbnail.tsx").read_bytes()).hexdigest()[:16]
+        digest = hashlib.sha256(json.dumps(props, sort_keys=True).encode() + design).hexdigest()[:16]
         if stills.get(name) != digest or not out.is_file():
             write_json(d / f"{name}_props.json", props)
             proc = subprocess.run(
@@ -200,7 +210,7 @@ def run_pipeline() -> int:
         expect_s = read_json(props)["durationMs"] / 1000
         # A video is up to date only if its timeline, its audio track and the video design are unchanged.
         digest = hashlib.sha256(props.read_bytes() + (d / "public" / f"{source}.wav").read_bytes()
-                                + (VIDEO / "src" / "Dialogue.tsx").read_bytes()).hexdigest()[:16]
+                                + design).hexdigest()[:16]
         out = out_dir / f"{name}_{fmt}.mp4"
         if rendered.get(fmt) == digest and out.is_file():
             print(f"[render] {fmt}: up to date")

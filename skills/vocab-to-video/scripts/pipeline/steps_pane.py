@@ -9,7 +9,8 @@ at a glance which step the work is at.
 
 EPISODE is an episode folder (it holds words.txt and one folder per level). The agent's own steps
 (words, dialogues, keywords, metadata) are read from the files that exist; the pipeline steps of
-each level come from <LEVEL>/state.json, which run.py updates as it works. `open` exits 69 when
+each level come from <LEVEL>/state.json, which run.py updates as it works; a level that upload.py
+has touched gets one more row, read from <LEVEL>/out/uploaded.json. `open` exits 69 when
 herdr is not available, after printing the block. Modelled on
 remix-chart-to-video/scripts/steps_pane.py. Standard library only: run it with plain python3.
 """
@@ -151,8 +152,17 @@ def render(episode, columns, color, now=None):
             running.append(f'{lv} {run}')
         if error:
             errors.append(f'{lv}: {error}')
+        pipeline_rows = rows
+        sent = read_json(os.path.join(folder, 'out', 'uploaded.json'))
+        if sent:                        # upload.py has run for this level: the row appears only then
+            ids = [k for k in ('long', 'short') if (sent.get(k) or {}).get('id')]
+            busy = any((sent.get(k) or {}).get('session') for k in ('long', 'short'))
+            when = ((sent.get('long') or {}).get('publish_at') or '')[:16].replace('T', ' ')
+            detail = f'{len(ids)}/2' + (f' · {when[5:]} UTC' if when else '')
+            rows = rows + [('Đăng YouTube', 'done' if len(ids) == 2 else 'running' if busy else 'todo', detail)]
+            blocks[-1] = (lv, title, rows)
         checks = (state.get('steps') or {}).get('check') or {}
-        if rows and all(status == 'done' for _, status, _ in rows) and checks:
+        if pipeline_rows and all(status == 'done' for _, status, _ in pipeline_rows) and checks:
             bad = sum(1 for c in checks.values() if c.get('problems'))
             results.append(f'{lv} {"FAIL" if bad else "PASS"} ({len(checks)} video)')
 

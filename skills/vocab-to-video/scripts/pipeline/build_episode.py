@@ -8,6 +8,7 @@ import wave
 from pathlib import Path
 
 from common import ASSETS, tokens, vocab_hits, write_json
+from scenes import default_cast, mouth_track, resolve_shots
 from tts import map_words
 
 RATE = 48_000
@@ -60,7 +61,11 @@ def normalise(src: Path, dst: Path, target: float) -> float:
 
 def build(level_dir: Path, dialogue: dict, line_meta: list[dict], cfg: dict, log=print,
           name: str = "episode") -> dict:
-    """Write <name>.json and public/<name>.wav from the given lines (index 0 is the opening hook)."""
+    """Write <name>.json and public/<name>.wav from the given lines (index 0 is the opening hook).
+
+    The timeline holds the lines with their word timings, the storyboard as timed shots, and the
+    mouth shape for every frame.
+    """
     t = cfg["timing_ms"]
     public = level_dir / "public"
     (public / "fonts").mkdir(parents=True, exist_ok=True)
@@ -106,17 +111,12 @@ def build(level_dir: Path, dialogue: dict, line_meta: list[dict], cfg: dict, log
     with wave.open(str(public / audio)) as w:
         duration_ms = round(w.getnframes() / w.getframerate() * 1000)
 
-    speakers = []
-    for sid, s in cfg["speakers"].items():
-        src = ASSETS / "speakers" / s["image"]
-        if not src.is_file():
-            raise RuntimeError(f"missing portrait {src}; run portraits.py first")
-        shutil.copy2(src, public / s["image"])
-        speakers.append({"id": sid, "name": s["name"], "image": s["image"], "color": s["color"],
-                         "side": s["side"]})
+    speakers = [{"id": sid, "name": s["name"], "color": s["color"], "side": s["side"]}
+                for sid, s in cfg["speakers"].items()]
     for font in sorted((ASSETS / "fonts").glob("*.ttf")):
         shutil.copy2(font, public / "fonts" / font.name)
 
+    shots = resolve_shots(dialogue, cfg, lines_out, [m["index"] for m in line_meta], duration_ms, log)
     episode = {
         "title": dialogue["title"],
         "level": dialogue["level"],
@@ -124,11 +124,14 @@ def build(level_dir: Path, dialogue: dict, line_meta: list[dict], cfg: dict, log
         "durationMs": duration_ms,
         "audio": audio,
         "speakers": speakers,
+        "cast": default_cast(cfg, dialogue),
         "vocab": [v["word"] for v in dialogue["vocab"]],
         "lines": lines_out,
+        "shots": shots,
+        "mouth": mouth_track(public / audio, cfg["fps"], duration_ms),
     }
     write_json(level_dir / f"{name}.json", episode)
     if inexact:
         log(f"  WARN word timings interpolated on lines {inexact}")
-    log(f"  {name}: {duration_ms / 1000:.1f}s, {len(lines_out)} lines, {lufs:.1f} LUFS")
+    log(f"  {name}: {duration_ms / 1000:.1f}s, {len(lines_out)} lines, {len(shots)} shots, {lufs:.1f} LUFS")
     return episode

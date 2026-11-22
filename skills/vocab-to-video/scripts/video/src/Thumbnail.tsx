@@ -1,5 +1,7 @@
 import { loadFont } from "@remotion/fonts";
-import { AbsoluteFill, Img, staticFile, useVideoConfig } from "remotion";
+import { AbsoluteFill, staticFile, useVideoConfig } from "remotion";
+import { Puppet } from "./toon/Puppet";
+import { HEAD_CY, Look, makeLook } from "./toon/rig";
 import { Speaker } from "./types";
 
 export type ThumbnailProps = {
@@ -7,6 +9,9 @@ export type ThumbnailProps = {
   level: string;
   vocab: string[];
   speakers: Speaker[];
+  cast?: Record<string, Look>;
+  /** True when the episode's public folder (with the fonts) is mounted. */
+  fonts?: boolean;
 };
 
 const FONT = "Be Vietnam Pro";
@@ -27,7 +32,8 @@ const ensureFonts = (available: boolean) => {
   );
 };
 
-const Face: React.FC<{ speaker: Speaker; size: number }> = ({ speaker, size }) => (
+/** A character's head and shoulders in a round frame, facing the middle of the picture. */
+const Face: React.FC<{ speaker: Speaker; look?: Look; size: number }> = ({ speaker, look, size }) => (
   <div
     style={{
       width: size,
@@ -36,21 +42,21 @@ const Face: React.FC<{ speaker: Speaker; size: number }> = ({ speaker, size }) =
       overflow: "hidden",
       border: `${Math.round(size * 0.03)}px solid ${speaker.color}`,
       boxShadow: `0 0 ${size * 0.25}px ${speaker.color}77`,
-      backgroundColor: "#1b2340",
+      backgroundColor: "#F3E6C8",
       flexShrink: 0,
     }}
   >
-    {speaker.image ? (
-      <Img src={staticFile(speaker.image)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-    ) : null}
+    <svg viewBox={`-160 ${HEAD_CY - 150} 320 320`} width="100%" height="100%">
+      <Puppet look={makeLook(look)} x={0} y={0} s={1} face={speaker.side === "left" ? 0.45 : -0.45} light={speaker.side === "left" ? -1 : 1} />
+    </svg>
   </div>
 );
 
 /** One still image: YouTube thumbnail (landscape) or Shorts/TikTok cover (portrait). */
-export const Thumbnail: React.FC<ThumbnailProps> = ({ text, level, vocab, speakers }) => {
+export const Thumbnail: React.FC<ThumbnailProps> = ({ text, level, vocab, speakers, cast, fonts }) => {
   const { width, height } = useVideoConfig();
   const vertical = height > width;
-  ensureFonts(speakers.some((s) => s.image));
+  ensureFonts(Boolean(fonts));
 
   // "MOT · Dialogue A2" -> first part white, the rest yellow, one part per line.
   const parts = text.split(/\s*[·|]\s*/).filter(Boolean);
@@ -124,9 +130,9 @@ export const Thumbnail: React.FC<ThumbnailProps> = ({ text, level, vocab, speake
   );
   const faces = (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Face speaker={speakers[0]} size={face} />
+      <Face speaker={speakers[0]} look={cast?.[speakers[0].id]} size={face} />
       <div style={{ marginLeft: vertical ? 40 : -70, marginTop: vertical ? 0 : 130 }}>
-        <Face speaker={speakers[1]} size={face} />
+        <Face speaker={speakers[1]} look={cast?.[speakers[1].id]} size={face} />
       </div>
     </div>
   );

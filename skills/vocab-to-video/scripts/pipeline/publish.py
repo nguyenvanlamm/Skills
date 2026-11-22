@@ -4,7 +4,7 @@ Input:  <LEVEL>/metadata.json (written by the agent, see the skill's references/
 Output: <LEVEL>/out/publish.json (every field, machine-readable) and out/publish.md (copy-paste).
 
 Chapters, the vocabulary list and the transcript are generated from the episode timeline, so they
-always match the video. Nothing is uploaded.
+always match the video. Nothing is uploaded here; upload.py sends these fields when asked to.
 
 Usage: uv run python publish.py <episodes/NAME/LEVEL>
 """
@@ -197,7 +197,7 @@ def build_publish(level_dir: Path, dialogue: dict, episode: dict, cfg: dict) -> 
             "thumbnail_file": f"{base}_thumbnail.jpg",
             "thumbnail_text": thumb, "chapters": [{"time": stamp(ms), "label": lb} for ms, lb in chaps],
             "audio_language": pcfg["language"], "license": "Standard YouTube License",
-            "visibility": "private (set by hand when uploading)", **common_fields,
+            "visibility": "private", **common_fields,
         },
         "youtube_shorts": {
             "file": f"{base}_short_9x16.mp4", "full_length_file": f"{base}_9x16.mp4", "title": sh_title, "description": shorts_description,

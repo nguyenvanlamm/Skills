@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 from common import LEVELS, load_config, read_json, tokens, vocab_hits
+from scenes import validate_scenes
 
 ALLOWED = re.compile(r"^[0-9A-Za-zÀ-ÖØ-öø-ÿŒœÆæ\s'’\-.,;:!?«»…()€%]+$")
 
@@ -89,6 +90,9 @@ def validate(dialogue: dict, cfg: dict) -> tuple[list[str], list[str], dict]:
     lo, hi = rules["turns"]
     if not lo <= len(lines) <= hi:
         warnings.append(f"{len(lines)} turns; {level} usually has {lo}-{hi}")
+    scene_errors, scene_warnings = validate_scenes(dialogue, cfg)
+    errors += scene_errors
+    warnings += scene_warnings
     return errors, warnings, {"words": total_words, "turns": len(lines), "vocab_uses": all_counts}
 
 
