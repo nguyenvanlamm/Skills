@@ -1,4 +1,0 @@
-schema_version: "1.1"
-name: reports-what-it-could-not-hear
-expected_outcome: |
-  The skill runs `sceneloom run <id> --only audio --provider mock`, then reads `sceneloom status` to see how many lines have a voice and whether there is music. Its reply states those counts, says the mock voice is a test tone and not speech, gives the paths of a few voice files and of the music file for the user to listen to, and does not claim to have judged how anything sounds.

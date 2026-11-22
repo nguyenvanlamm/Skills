@@ -1,4 +1,0 @@
-schema_version: "1.1"
-name: runs-to-the-one-stop-without-posting
-expected_outcome: |
-  The skill runs `sceneloom doctor`, creates a project in the tieu-pham genre from the idea, writes script.json with speaking characters that each have a voice and scenes that use `lines`, and imports it until `sceneloom script import` prints OK. Without asking the human anything on the way, it draws the pictures and opens the contact sheets, runs clips, audio and edit, opens the final sheet, writes seo.json with `shorts` and `tiktok` blocks and imports it until OK. It then stops once: it gives the path of final.mp4, says the clips are slow zooms and the material is placeholder made by the mock provider, shows the Shorts and TikTok texts, and asks which platforms to post to. `sceneloom publish` is run at most with --dry-run.

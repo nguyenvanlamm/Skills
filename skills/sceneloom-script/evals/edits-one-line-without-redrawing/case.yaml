@@ -1,4 +1,0 @@
-schema_version: "1.1"
-name: edits-one-line-without-redrawing
-expected_outcome: |
-  The skill finds the newest project with `sceneloom list`, exports its script, changes only the narration of scene 2, and imports it again until it prints OK. The picture fields of every scene are unchanged, so scene pictures and clips are kept, and the reply says which later steps need to run again (audio for that line, then edit).

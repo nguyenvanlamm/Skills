@@ -1,4 +1,0 @@
-schema_version: "1.1"
-name: assembles-and-writes-honest-package
-expected_outcome: |
-  The skill runs the edit step, makes the final contact sheet and opens it, then prints `sceneloom seo facts`, writes seo.json, and runs `sceneloom seo import` until it prints OK, which writes seo.txt and the thumbnails; it opens the thumbnails. The description says the video was made with AI tools and holds no chapter list of its own. The reply gives the paths of final.mp4, seo.txt and the thumbnails and states what is imperfect. Nothing is uploaded.
