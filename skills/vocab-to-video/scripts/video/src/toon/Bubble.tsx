@@ -17,18 +17,18 @@ const PAD_Y = 20;
 export type BubbleSpot =
   | { kind: "above"; x: number; y: number }
   | { kind: "side"; x: number; y: number; dir: 1 | -1 }
-  | { kind: "free"; y: number };
+  | { kind: "free"; y: number; from: "top" | "bottom" };
 
 /** Text size for a line: short lines are big, long ones shrink so the bubble stays off the faces. */
 export const bubbleType = (line: Line, vertical: boolean) => {
   const chars = line.text.length;
-  const base = vertical ? (chars <= 40 ? 58 : chars <= 80 ? 50 : 44) : chars <= 40 ? 52 : chars <= 90 ? 44 : 38;
+  const base = vertical ? (chars <= 40 ? 58 : chars <= 80 ? 50 : 44) : chars <= 40 ? 54 : chars <= 90 ? 48 : 42;
   return line.kind === "hook" ? Math.round(base * 1.12) : base;
 };
 
 /**
- * Speech bubble with the karaoke caption: words turn solid as they are spoken and new words
- * carry a yellow marker stroke. It pops out of the speaker and its tail points back at them.
+ * Speech bubble with the karaoke caption: words turn from grey to black as they are spoken and
+ * new words carry a yellow marker stroke. No word changes size, so the spacing never moves. It pops out of the speaker and its tail points back at them.
  */
 export const Bubble: React.FC<{
   line: Line;
@@ -38,7 +38,8 @@ export const Bubble: React.FC<{
   maxW: number;
   frameW: number;
   frameH: number;
-}> = ({ line, t, vertical, spot, maxW, frameW, frameH }) => {
+  opacity?: number;
+}> = ({ line, t, vertical, spot, maxW, frameW, frameH, opacity = 1 }) => {
   const hook = line.kind === "hook";
   const fontSize = bubbleType(line, vertical);
   const margin = vertical ? 36 : 48;
@@ -82,12 +83,12 @@ export const Bubble: React.FC<{
       </svg>
     );
   } else {
-    box = { left: (frameW - width) / 2, top: spot.y };
-    origin = "50% 0%";
+    box = { left: (frameW - width) / 2, ...(spot.from === "bottom" ? { bottom: spot.y } : { top: spot.y }) };
+    origin = spot.from === "bottom" ? "50% 100%" : "50% 0%";
   }
 
   return (
-    <div style={{ position: "absolute", width, ...box }}>
+    <div style={{ position: "absolute", width, opacity, ...box }}>
       <div
         style={{
           position: "relative",
@@ -110,17 +111,16 @@ export const Bubble: React.FC<{
       >
         {line.words.map((w, i) => {
           const said = interpolate(t, [w.startMs - 50, w.startMs + 70], [0, 1], clamp);
-          const speaking = t >= w.startMs - 30 && t < w.endMs ? 1 : 0;
+          // Words not yet spoken are grey but readable ahead; the hook is dark from the first frame.
+          const alpha = (hook ? 0.75 : 0.55) + (hook ? 0.25 : 0.45) * said;
           return (
             <span
               key={i}
               style={{
                 display: "inline-block",
                 fontWeight: w.isVocab || hook ? 800 : 600,
-                color: INK,
-                // Words not yet spoken are grey; the hook stays readable from the first frame.
-                opacity: (hook ? 0.7 : 0.36) + (hook ? 0.3 : 0.64) * said,
-                transform: `scale(${1 + 0.06 * speaking})`,
+                // Only the letters fade: the yellow marker of a new word is solid all along.
+                color: `rgba(24,22,27,${alpha})`,
                 backgroundColor: w.isVocab ? VOCAB : undefined,
                 borderRadius: w.isVocab ? fontSize * 0.2 : undefined,
                 padding: w.isVocab ? `0 ${fontSize * 0.14}px` : undefined,

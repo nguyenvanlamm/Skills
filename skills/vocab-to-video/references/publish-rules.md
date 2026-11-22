@@ -2,7 +2,8 @@
 
 You write `<LEVEL>/metadata.json`; `scripts/pipeline/publish.py` checks it against the platform limits and
 assembles the final fields in `<LEVEL>/out/publish.md` and `publish.json`. The script adds the
-chapters (first use of each new word), the vocabulary list, the full transcript, the footer and
+chapters (the first use of each new word; YouTube needs chapters 10 seconds apart, so a word
+first said sooner than that after the one before gets none, and the script names it), the vocabulary list, the full transcript, the footer and
 the hashtags to the YouTube description itself, so do not write those into `intro`.
 
 ## Start from real search data
@@ -64,8 +65,8 @@ phrases in tags and hashtags are welcome.
 | `shorts.hashtags` | 3-5 | Include `#Shorts`. |
 | `tiktok.caption` | 2200 characters with hashtags; level + `français` in the first 100 | 100-200 characters: main phrase, a one-line hook about the story, a call to act (listen, repeat, comment). One emoji at most two. |
 | `tiktok.hashtags` | 3-5, no `#fyp`-style tags | TikTok may cap captions at 5 hashtags. Two broad (`#learnfrench`, `#apprendrelefrancais`), one or two niche (`#frenchlesson`, `#fle`), one for the level (`#DELFA2`). Write TikTok hashtags without accents: that is how these tags are mostly used. |
-| `tiktok.cover_text` | 40 characters | Level + theme; it is typed onto the cover in the TikTok app. |
-| `thumbnail_text` | 32 characters; must not contain the level | Text drawn on the thumbnail and cover images (the level badge is added automatically). A headline of 1-2 words in capitals (the key word or theme, longest word 12 letters at most), then optionally ` · ` and a short subtitle: `DÉMÉNAGER · Le logement`. |
+| `tiktok.cover_text` | 40 characters | Level + theme. It is not drawn on any image: it is the optional caption the user can type over the cover inside the TikTok app, so it must not repeat `thumbnail_text`. |
+| `thumbnail_text` | 32 characters; must not contain the level | Text drawn on the thumbnail and cover images (the level badge is added automatically, and the next new words as small chips, so don't list words here). A headline of 1-2 words in capitals (the key word or theme, longest word 12 letters at most), then optionally ` · ` and a short subtitle: `DÉMÉNAGER · Le logement`. |
 | `vocab_notes` | one per vocabulary word, same `word` as in `dialogue.json` | A short definition in simple French, at the level of the episode (A2 notes use A2 words). No translation. |
 
 ## General rules

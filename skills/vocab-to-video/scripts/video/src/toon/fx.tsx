@@ -34,16 +34,19 @@ export const PopLabel: React.FC<{
   );
 };
 
-/** Place tag that slides in at the bottom left of the stage; u = seconds since the shot began. */
-export const Tag: React.FC<{ text: string; u: number; x: number; y: number }> = ({ text, u, x, y }) => {
-  const a = easeOut(u * 3);
+/**
+ * Place tag that slides in at the start of a shot and leaves after a few seconds;
+ * u = seconds since the shot began, k = pixels per design unit.
+ */
+export const Tag: React.FC<{ text: string; u: number; x: number; y: number; k?: number }> = ({ text, u, x, y, k = 1 }) => {
+  const a = easeOut(u * 3) * (1 - easeOut((u - 3.8) * 3));
   if (a <= 0) return null;
   const w = text.length * 44 * 0.56 + 64;
   return (
-    <g transform={`translate(${-50 * (1 - a)} 0)`} opacity={a}>
-      <rect x={x} y={y - 52} width={w} height={70} rx={10} fill="rgb(10,12,26)" opacity={0.8} />
-      <rect x={x} y={y - 52} width={10} height={70} fill="#F2C14E" />
-      <text x={x + 34} y={y} fontFamily={HAND} fontWeight={700} fontSize={44} fill="#FFF6DC">
+    <g transform={`translate(${x - 50 * (1 - easeOut(u * 3)) * k} ${y}) scale(${k})`} opacity={a}>
+      <rect x={0} y={-52} width={w} height={70} rx={10} fill="rgb(10,12,26)" opacity={0.8} />
+      <rect x={0} y={-52} width={10} height={70} fill="#F2C14E" />
+      <text x={34} y={0} fontFamily={HAND} fontWeight={700} fontSize={44} fill="#FFF6DC">
         {text}
       </text>
     </g>

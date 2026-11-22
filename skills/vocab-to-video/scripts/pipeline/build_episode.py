@@ -128,7 +128,7 @@ def build(level_dir: Path, dialogue: dict, line_meta: list[dict], cfg: dict, log
         "vocab": [v["word"] for v in dialogue["vocab"]],
         "lines": lines_out,
         "shots": shots,
-        "mouth": mouth_track(public / audio, cfg["fps"], duration_ms),
+        "mouth": mouth_track(public / audio, cfg["fps"], duration_ms, lines_out),
     }
     write_json(level_dir / f"{name}.json", episode)
     if inexact:

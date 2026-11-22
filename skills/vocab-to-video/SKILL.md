@@ -67,32 +67,41 @@ Uploading to YouTube is a separate step (10) that runs only when the user asks f
    uv run python run.py <episodes>/<name>/<LEVEL>
    ```
 
-   Steps inside: validate → tts → build → publish → thumbnail → render → check. Rendering takes a few minutes per video,
-   so run the two levels in the background and wait for them.
+   Steps inside: validate → tts → build → publish → thumbnail → render → check. `validate` also
+   checks `metadata.json`, so a text that is too long stops the run before any speech is made.
+   Rendering takes a few minutes per video, so run the two levels in the background and wait for
+   them; they take turns at the renderer by themselves.
 7. **Fix and rerun when a step fails.** The script prints `FAIL` lines that say what to change:
    - validation errors (word missing, line too long, word count out of range): edit `dialogue.json`;
    - storyboard errors (a line no scene covers, an unknown pose or set, a cue word that is not
      said in the scene): fix `scenes` in `dialogue.json`; the message names the scene;
    - audio shorter than 120 s or longer than 180 s: add or remove turns, keeping every new word;
    - short cut outside 30-60 s: widen or narrow the `short` line range;
-   - `[publish]` errors (title too long, level or keyword missing, tag budget, hashtag format):
-     edit `metadata.json`.
+   - upload-text errors, printed by `[validate]` or `[publish]` (title too long, level or keyword
+     missing, tag budget, hashtag format): edit `metadata.json`.
    If you change the dialogue after writing `metadata.json`, reread the metadata: the intro and
    the vocabulary notes must still describe the final text. Reread the storyboard too: line
    numbers shift when you add or remove a turn, and cue words may be gone.
-   `WARN shot N lasts ...s; split the scene` is not a failure, but act on it.
-   Rerunning is cheap: unchanged lines keep their audio and up-to-date videos are not rendered again.
-   Use `--until thumbnail` to stop before rendering while you adjust the texts.
-8. **Look at the images.** After `check`, open the thumbnail, the cover and the three JPEGs per
-   video listed under `<LEVEL>/check/` with the Read tool. On the thumbnail the headline must not
-   touch the characters or run off the edge; if it does, shorten `thumbnail_text` and rerun. In the
-   video frames confirm that the speech bubble points at the speaker and stays inside the picture,
-   new words have a yellow marker, no bubble, label or tag covers a face, and the characters stand
-   inside the picture in both formats. If a bubble is too big, shorten that line; if a label is
-   in the way, move it to another scene; rerun.
-   Three frames don't show every scene: for a moment you want to see, render one frame from
-   `<skill>/scripts/video/` (frame = seconds × 60; `Toon9x16` for the vertical format):
-   `npx remotion still Toon16x9 /tmp/f.jpg --frame=1800 --props=<LEVEL>/episode.json --public-dir=<LEVEL>/public`.
+   `WARN` lines are not failures, but act on them: a shot that lasts too long or too short, a
+   cue word said twice in its scene, a beat that lands on a character who is not speaking, the
+   hook speaker still walking in.
+   Rerunning is cheap: audio is reused for every line whose text did not change, wherever it
+   moved, and up-to-date videos are not rendered again.
+   Use `--until thumbnail` to stop before rendering while you adjust the texts (`--until build`
+   needs no `metadata.json` yet).
+8. **Look at the images.** After `check`, open the thumbnail, the cover and every contact sheet
+   the run listed (`sheet ...`, in `<LEVEL>/check/`) with the Read tool. A sheet shows one frame
+   per shot, in order; the same frames, larger, are in `<LEVEL>/check/<video name>/`, named by
+   shot number and second: open those for any shot that looks wrong on the sheet. On the
+   thumbnail the headline must not touch the characters or run off the edge; if it does, shorten
+   `thumbnail_text` and rerun. In every shot confirm that the speech bubble points at the speaker
+   and stays inside the picture, new words have a yellow marker, no bubble, label or tag covers
+   a face or another text, the characters stand inside the picture in both formats, and each
+   face fits what is being said. If a bubble is too big, shorten that line; if a label is in the
+   way, move it to another scene; if a reaction is on the wrong line, fix its cue; rerun.
+   For a moment the sheets don't show, render one frame from `<skill>/scripts/video/` (frame =
+   seconds × 60; `Toon9x16` for the vertical format; the paths must be absolute):
+   `npx remotion still Toon16x9 /tmp/f.jpg --frame=1800 --props=<episodes>/<name>/<LEVEL>/episode.json --public-dir=<episodes>/<name>/<LEVEL>/public`.
 9. **Report** the six video paths (`<LEVEL>/out/*.mp4`), each one's duration, the dialogue titles,
    the thumbnail and cover paths, the path of each `out/publish.md` with its YouTube title, and any warning the script printed. Say plainly if something failed or was skipped.
 10. **Upload to YouTube, only when the user asks.** Steps 1-9 never upload. This step sends, per
@@ -107,7 +116,9 @@ Uploading to YouTube is a separate step (10) that runs only when the user asks f
     - The user gives the publish time; if they did not, ask. Write it with its time zone. Never
       pick a time yourself. `--short-publish-at` gives the Short its own time.
     - Run `plan` first: it calls nothing and prints what would be sent. Run `push` only when
-      `plan` ends with `RESULT: PASS` and step 8 found nothing wrong.
+      `plan` ends with `RESULT: PASS` and step 8 found nothing wrong. `plan` refuses a video
+      that is older than its dialogue or was not checked after its last render: run `run.py`
+      to the end again, never work around it.
     - If `plan` warns that YouTube is not connected, the user has to do the one-time setup in
       `references/upload-setup.md` (it needs their Google account in a browser); tell them the
       steps and stop there.
@@ -143,7 +154,7 @@ uv run python publish.py <episodes>/<name>/A2
 # upload: sign in once, then dry run, then send (--only long|short for one video)
 uv run python upload.py auth
 uv run python upload.py plan <episodes>/<name>/A2 --publish-at 2026-11-25T18:00:00+01:00
-# the upload tests (fake YouTube, no network)
+# the tests (storyboard, text checks, speech cache, fake YouTube; no network)
 uv run python -m unittest discover -s tests
 # one output only (16x9, 9x16 or short_9x16)
 uv run python run.py <episodes>/<name>/A2 --format short_9x16

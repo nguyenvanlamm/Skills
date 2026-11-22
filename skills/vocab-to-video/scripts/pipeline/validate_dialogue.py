@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-from common import LEVELS, load_config, read_json, tokens, vocab_hits
+from common import LEVELS, letters, load_config, read_json, tokens, vocab_hits
 from scenes import validate_scenes
 
 ALLOWED = re.compile(r"^[0-9A-Za-zÀ-ÖØ-öø-ÿŒœÆæ\s'’\-.,;:!?«»…()€%]+$")
@@ -24,12 +24,24 @@ def validate(dialogue: dict, cfg: dict) -> tuple[list[str], list[str], dict]:
     rules = cfg["levels"][level]
     lines = dialogue.get("lines") or []
     vocab = dialogue.get("vocab") or []
-    if not dialogue.get("title"):
+    title = dialogue.get("title")
+    if not isinstance(title, str) or not title.strip():
         errors.append("title is missing")
-    if not vocab:
-        errors.append("vocab is empty")
-    if not lines:
+    elif len(title) > 44:
+        warnings.append(f"title is {len(title)} characters; over about 40 it crowds the top of the video")
+    if not isinstance(vocab, list) or not vocab:
+        return errors + ["vocab is empty: it must be a list of {\"word\": ..., \"forms\": [...]}"], warnings, {}
+    for n, v in enumerate(vocab, 1):
+        if not (isinstance(v, dict) and isinstance(v.get("word"), str) and v["word"].strip()
+                and isinstance(v.get("forms") or [], list) and all(isinstance(f, str) for f in v.get("forms") or [])):
+            return errors + [f"vocab entry {n} must be {{\"word\": \"...\", \"forms\": [\"...\"]}}"], warnings, {}
+    if not isinstance(lines, list) or not lines:
         return errors + ["lines is empty"], warnings, {}
+    for i, line in enumerate(lines, 1):
+        if not (isinstance(line, dict) and isinstance(line.get("text") or "", str)):
+            return errors + [f"line {i} must be {{\"speaker\": \"...\", \"text\": \"...\"}}"], warnings, {}
+    if not isinstance(dialogue.get("hook") or {}, dict) or not isinstance(dialogue.get("short") or {}, dict):
+        return errors + ["hook and short must be objects"], warnings, {}
 
     known = set(cfg["speakers"])
     total_words = 0
@@ -46,16 +58,26 @@ def validate(dialogue: dict, cfg: dict) -> tuple[list[str], list[str], dict]:
             errors.append(f"line {i}: characters not allowed {bad}")
         if i > 1 and speaker == lines[i - 2].get("speaker"):
             errors.append(f"line {i}: same speaker as line {i - 1}; speakers must alternate")
+        if not letters(text):
+            errors.append(f"line {i}: no words, only punctuation")
+        if re.search(r"\d", re.sub(r"\b(?:A[12]|B[12]|C[12])\b", "", text)):
+            warnings.append(f"line {i}: digits are read unpredictably by the voice; write the number as words")
+        if re.search(r"[()]", text):
+            warnings.append(f"line {i}: brackets are spoken as a pause at best; no asides or stage directions")
         toks = tokens(text)
         total_words += len(toks)
         if len(toks) > rules["max_words_per_line"]:
             errors.append(f"line {i}: {len(toks)} words, limit is {rules['max_words_per_line']}")
         _, counts = vocab_hits(toks, vocab)
+        fresh = [word for word, n in counts.items() if n and not all_counts[word]]
+        if len(fresh) > 2:
+            warnings.append(f"line {i}: {len(fresh)} new words at once {fresh}; at most two per turn, "
+                            "or the learner cannot tell them apart")
         for word, n in counts.items():
             all_counts[word] += n
 
     hook = dialogue.get("hook") or {}
-    hook_text = (hook.get("text") or "").strip()
+    hook_text = hook.get("text").strip() if isinstance(hook.get("text"), str) else ""
     if not hook_text:
         errors.append("hook is missing: one short spoken line that opens the video")
     else:

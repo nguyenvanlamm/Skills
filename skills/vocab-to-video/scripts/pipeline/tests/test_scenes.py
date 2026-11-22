@@ -92,8 +92,56 @@ class FindWord(unittest.TestCase):
         self.assertEqual(scenes.find_word("samedi", TEXTS), (1, 3))
         self.assertEqual(scenes.find_word("école", TEXTS), (4, 3))       # l'école
         self.assertEqual(scenes.find_word("Ça va", TEXTS), (0, 2))       # two words in a row
-        self.assertEqual(scenes.find_word("déménagement", TEXTS), (1, 2))  # same first five letters
+        self.assertEqual(scenes.find_word("déménagé", TEXTS[:2]), (1, 2))  # another form of the verb
+        self.assertIsNone(scenes.find_word("déménagement", TEXTS))  # another word
         self.assertIsNone(scenes.find_word("loyer", TEXTS))
+
+
+class Cues(unittest.TestCase):
+    def test_a_word_inside_another_word_is_not_a_match(self):
+        self.assertIsNone(scenes.find_word("loyer", ["Je vais employer un ami."]))
+        self.assertIsNone(scenes.find_word("comme", ["Comment ça va ?"]))
+
+    def test_elision_before_a_short_word_and_typed_without_accents(self):
+        self.assertEqual(scenes.find_word("un an", ["C'est un bail d'un an."]), (0, 3))
+        self.assertEqual(scenes.find_word("ecole", ["Je vais à l'école demain."]), (0, 3))
+        self.assertEqual(scenes.find_word("à école", ["Je vais à l'école demain."]), (0, 2))
+        self.assertEqual(scenes.find_word("Ca va", ["Salut ! Ça va ?"]), (0, 1))
+
+    def test_a_beat_for_a_character_lands_on_their_own_line(self):
+        lines = [{"speaker": "lea", "text": "Je paie sept cents euros."},
+                 {"speaker": "hugo", "text": "Sept cents euros !"}]
+        self.assertEqual(scenes.pick_hit("sept cents", lines, "hugo"), ((1, 0), 1))
+        self.assertEqual(scenes.pick_hit("sept cents", lines, None), ((0, 2), 2))
+
+    def test_a_repeated_cue_word_is_reported(self):
+        d = dialogue([{**WIDE, "lines": [1, 6], "beats": [{"at": "vais", "pose": "wave"}]}])
+        _, warnings = scenes.validate_scenes(d, CFG)
+        self.assertTrue(any("is said 2 times" in w for w in warnings), warnings)
+
+    def test_a_beat_with_no_who_on_an_offscreen_word_is_reported(self):
+        d = dialogue([{**WIDE, "lines": [1, 1]},
+                      {"kind": "closeup", "lines": [2, 2], "chars": [{"id": "lea"}],
+                       "beats": [{"at": "déménager", "emotion": "shocked"}]},
+                      {**WIDE, "lines": [3, 6]}])
+        _, warnings = scenes.validate_scenes(d, CFG)
+        self.assertTrue(any("is not in the picture" in w for w in warnings), warnings)
+
+    def test_in_the_short_cut_a_cue_never_moves_to_another_line(self):
+        # "déménager" is said in line 2; the cut keeps lines 5-6, where line 6 says "déménagé".
+        d = dialogue([{**WIDE, "lines": [1, 6], "labels": [{"at": "déménager", "text": "déménager"}]}])
+        lines, indices, total = timeline(d, with_hook=False, keep={5, 6})
+        shots = scenes.resolve_shots(d, CFG, lines, indices, total, log=lambda s: None)
+        self.assertEqual(shots[0]["labels"], [])
+
+    def test_a_seconds_cue_past_the_end_is_pulled_back(self):
+        d = dialogue([{**WIDE, "lines": [1, 6], "beats": [{"at": "+900", "who": "lea", "pose": "wave"}]}])
+        lines, indices, total = timeline(d)
+        said = []
+        shots = scenes.resolve_shots(d, CFG, lines, indices, total, log=said.append)
+        beat = next(b for b in shots[0]["beats"] if b.get("pose") == "wave")
+        self.assertLess(beat["atMs"], shots[0]["endMs"])
+        self.assertTrue(any("after the end" in s for s in said))
 
 
 class AutoScenes(unittest.TestCase):
@@ -182,6 +230,25 @@ class Mouth(unittest.TestCase):
         self.assertEqual(set(track[36:58]), {"2"})
         self.assertEqual(set(track[68:88]), {"1"})
         self.assertEqual(set(track[100:]), {"0"})
+
+    def test_a_quiet_voice_opens_its_mouth_as_wide_as_a_loud_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            wav = Path(tmp) / "a.wav"
+            rate = 48_000
+            pcm = array.array("h")
+            for amp in (20_000, 0, 3_000):  # a loud line, a pause, a quiet line: one second each
+                pcm.extend(int(amp * math.sin(2 * math.pi * 220 * i / rate)) for i in range(rate))
+            with wave.open(str(wav), "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(rate)
+                w.writeframes(pcm.tobytes())
+            lines = [{"startMs": 0, "endMs": 1000}, {"startMs": 2000, "endMs": 3000}]
+            flat = scenes.mouth_track(wav, 30, 3000)
+            fair = scenes.mouth_track(wav, 30, 3000, lines)
+            self.assertNotIn("2", flat[62:88])
+            self.assertEqual(set(fair[62:88]), {"2"})
+            self.assertEqual(set(fair[35:55]), {"0"})
 
 
 if __name__ == "__main__":

@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import os
+import time
 from pathlib import Path
 
 from common import letters, read_json, tokens, write_json
@@ -40,7 +42,6 @@ class EdgeProvider:
                 last = RuntimeError("empty audio or no word boundaries")
             except Exception as exc:  # network errors from the online service
                 last = exc
-            import time
             time.sleep(1.5 * (attempt + 1))
         raise RuntimeError(f"Edge TTS failed after {retries} tries: {last}")
 
@@ -103,10 +104,30 @@ def map_words(text: str, bounds: list[dict], clip_ms: float) -> tuple[list[dict]
 
 
 def synth_lines(dialogue: dict, cfg: dict, out_dir: Path, provider: str = "edge", log=print) -> list[dict]:
-    """Create lines/NNN.mp3 + NNN.json for every line; unchanged lines are reused."""
+    """Create lines/NNN.mp3 + NNN.json for every line.
+
+    Audio already made is reused by what was said (voice, speed, text), not by line number: a
+    turn added in the middle costs one call, not one per line after it. A file is only put in
+    place once it is complete, so a failed call never leaves audio that looks finished.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     prov = PROVIDERS[provider]()
     rate = cfg["levels"][dialogue["level"]]["rate"]
+    have: dict[str, tuple[bytes, list[dict]]] = {}
+    for meta in sorted(out_dir.glob("*.json")):
+        mp3 = meta.with_suffix(".mp3")
+        try:
+            data = read_json(meta)
+            if mp3.is_file() and mp3.stat().st_size > 0 and data.get("digest") and data.get("bounds"):
+                have[data["digest"]] = (mp3.read_bytes(), data["bounds"])
+        except (OSError, ValueError, AttributeError):
+            continue  # a broken leftover is simply made again
+
+    def put(path: Path, content: bytes) -> None:
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_bytes(content)
+        os.replace(tmp, path)
+
     results = []
     made = 0
     items = list(enumerate(dialogue["lines"], 1))
@@ -117,16 +138,24 @@ def synth_lines(dialogue: dict, cfg: dict, out_dir: Path, provider: str = "edge"
         text = line["text"].strip()
         digest = hashlib.sha256(f"{prov.name}|{voice}|{rate}|{text}".encode()).hexdigest()[:16]
         mp3, meta = out_dir / f"{i:03d}.mp3", out_dir / f"{i:03d}.json"
-        if mp3.is_file() and meta.is_file() and read_json(meta).get("digest") == digest:
-            results.append(read_json(meta))
-            continue
-        bounds = prov.synth(text, voice, rate, mp3)
+        if digest in have:
+            audio, bounds = have[digest]
+        else:
+            tmp = out_dir / f"{i:03d}.part"
+            try:
+                bounds = prov.synth(text, voice, rate, tmp)
+                audio = tmp.read_bytes()
+            finally:
+                tmp.unlink(missing_ok=True)
+            have[digest] = (audio, bounds)
+            made += 1
+            log(f"  tts {i:03d}/{len(dialogue['lines'])} {line['speaker']}")
         data = {"index": i, "speaker": line["speaker"], "text": text, "voice": voice, "rate": rate,
                 "digest": digest, "bounds": bounds}
+        meta.unlink(missing_ok=True)  # between the two writes the line counts as not made
+        put(mp3, audio)
         write_json(meta, data)
         results.append(data)
-        made += 1
-        log(f"  tts {i:03d}/{len(dialogue['lines'])} {line['speaker']}")
     if not dialogue.get("hook"):
         (out_dir / "000.mp3").unlink(missing_ok=True)
         (out_dir / "000.json").unlink(missing_ok=True)

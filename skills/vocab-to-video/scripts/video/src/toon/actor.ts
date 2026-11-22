@@ -66,26 +66,32 @@ export const actorAt = (
   let bob = 2 + 2 * Math.sin(t * 3 + ph);
   let tilt = 1.4 * Math.sin(t * 2.2 + ph);
   const { walk, enter, exit } = a.char;
+  let walked = 0; // distance covered so far: the legs step with it, so feet never slide
   if (walk) {
     const u = K(t, t0 + 0.1, Math.max(0.5, t1 - t0 - 0.4));
     x = lerp(walk[0], walk[1], u);
+    walked = Math.abs(x - walk[0]);
     walking = u > 0 && u < 1;
   } else if (enter) {
     const u = K(t, t0, 1.1);
-    x = lerp(enter === "left" ? -260 : W + 260, a.x, easeOut(u));
+    const from = enter === "left" ? -260 : W + 260;
+    x = lerp(from, a.x, easeOut(u));
+    walked = Math.abs(x - from);
     walking = u < 0.97;
   }
   let leaving = false;
   if (exit) {
     const u = K(t, t1 - 1.1, 1.0);
     if (u > 0) {
+      const from = x;
       x = lerp(x, exit === "left" ? -300 : W + 300, u * u);
+      walked += Math.abs(x - from);
       walking = true;
       leaving = true;
     }
   }
   if (walking) {
-    const p = (t - t0) * 11;
+    const p = walked / 17; // one step every 53 px
     legs = walkLegs(p);
     bob = 7 * Math.abs(Math.sin(p));
     tilt = 3 * Math.sin(p);

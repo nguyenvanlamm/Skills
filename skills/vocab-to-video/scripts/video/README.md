@@ -8,7 +8,9 @@
 - `src/toon/`: the drawing code. Everything is a pure function of the frame number.
   - `Puppet.tsx`, `rig.ts`, `rig.json`: the character and its pose and emotion tables.
   - `actor.ts`: what a character does at a given moment (beats, idle, walk, lips).
-  - `sets/`: the places. `shots.ts`: how each shot kind places its characters.
+  - `sets/`: the places. `shots.ts`: what each shot kind decides: where the characters stand,
+    whether the camera follows them, where the bubble and the labels go. `Stage.tsx` asks the
+    layout and never the kind.
   - `Stage.tsx`: set + characters + lighting + camera. `fx.tsx`: labels and tags.
   - `Bubble.tsx`: the speech bubble with the karaoke text.
   - `Sheet.tsx`: composition `PuppetSheet`, every pose and emotion on one page.
@@ -16,10 +18,13 @@
 Adding a set or a shot kind: write it, register it in `sets/index.ts` or `shots.ts`, and add its
 name to `rig.json` (the dialogue validator reads the names from there).
 
+Run one Remotion command at a time: two at once fight over the bundler cache and one dies
+(`run.py` queues them itself).
+
 ```bash
 npm install            # once
 npm run lint           # eslint + tsc
-npx remotion studio --props=<LEVEL>/episode.json --public-dir=<LEVEL>/public
+npx remotion studio --props=/abs/path/<LEVEL>/episode.json --public-dir=/abs/path/<LEVEL>/public
 npx remotion still PuppetSheet /tmp/sheet.png
 ```
 

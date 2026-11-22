@@ -70,7 +70,19 @@ def check_hashtags(tags: list[str], lo: int, hi: int, where: str, problems: list
         problems.append(f"{where}: duplicate hashtags")
 
 
-def build_publish(level_dir: Path, dialogue: dict, episode: dict, cfg: dict) -> tuple[list[str], list[str]]:
+def precheck(level_dir: Path, dialogue: dict, cfg: dict) -> list[str]:
+    """The problems of metadata.json that can be seen before any audio exists (all but the
+    chapters, which need real times). Nothing is written."""
+    lines = [{"speaker": l["speaker"], "text": l["text"],
+              "words": [{"startMs": n * 6000 + k * 200} for k, _ in enumerate(tokens(l["text"]))]}
+             for n, l in enumerate(dialogue["lines"])]
+    speakers = [{"id": sid, "name": s["name"]} for sid, s in cfg["speakers"].items()]
+    problems, _ = build_publish(level_dir, dialogue, {"lines": lines, "speakers": speakers}, cfg, write=False)
+    return problems
+
+
+def build_publish(level_dir: Path, dialogue: dict, episode: dict, cfg: dict,
+                  write: bool = True) -> tuple[list[str], list[str]]:
     problems: list[str] = []
     warnings: list[str] = []
     pcfg = cfg["publish"]
@@ -122,6 +134,9 @@ def build_publish(level_dir: Path, dialogue: dict, episode: dict, cfg: dict) -> 
 
     uses = first_uses(dialogue, episode)
     chaps = chapters(uses, pcfg["chapter_start_label"])
+    left_out = [w for w in uses if w not in {label for _, label in chaps}]
+    if left_out and len(chaps) >= 3:
+        warnings.append(f"no chapter for {left_out}: first said less than 10 s after the chapter before")
     names = {s["id"]: s["name"] for s in episode["speakers"]}
     parts = [intro, ""]
     if len(chaps) >= 3:
@@ -184,7 +199,7 @@ def build_publish(level_dir: Path, dialogue: dict, episode: dict, cfg: dict) -> 
         if "<" in text or ">" in text:
             problems.append(f"{name}: the characters < and > are rejected by the platforms")
 
-    if problems:
+    if problems or not write:
         return problems, warnings
 
     base = f"{level_dir.parent.name}_{level}"

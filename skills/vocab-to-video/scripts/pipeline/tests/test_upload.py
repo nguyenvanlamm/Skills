@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import upload  # noqa: E402
 import youtube  # noqa: E402
-from common import load_config, read_json, write_json  # noqa: E402
+from common import load_config, read_json, render_digest, write_json  # noqa: E402
 
 NOW = datetime(2026, 11, 21, 12, 0, tzinfo=timezone.utc)
 WHEN = "2026-11-25T18:00:00+01:00"
@@ -63,8 +63,14 @@ def make_level(root: Path) -> Path:
         "youtube_shorts": {"file": f"{base}_short_9x16.mp4", "title": "Tu comprends ce dialogue A2 ?",
                            "description": "Un extrait.\n\n#français #Shorts", "hashtags": ["#français", "#Shorts"],
                            **common}})
-    write_json(d / "state.json", {"steps": {"check": {"16x9": {"problems": []}, "9x16": {"problems": []},
-                                                      "short_9x16": {"problems": []}}}})
+    (d / "public").mkdir()
+    for source in ("episode", "short"):
+        write_json(d / f"{source}.json", {"durationMs": 1000})
+        (d / "public" / f"{source}.wav").write_bytes(b"RIFF" + source.encode())
+    digests = {"16x9": render_digest(d, "episode"), "9x16": render_digest(d, "episode"),
+               "short_9x16": render_digest(d, "short")}
+    write_json(d / "state.json", {"steps": {"render": {"files": digests},
+                                            "check": {f: {"problems": [], "digest": g} for f, g in digests.items()}}})
     (d / "out" / f"{base}_16x9.mp4").write_bytes(b"L" * 3000)
     (d / "out" / f"{base}_short_9x16.mp4").write_bytes(b"S" * 1000)
     (d / "out" / f"{base}_thumbnail.jpg").write_bytes(b"JPEG")
@@ -88,6 +94,21 @@ class UploadTest(unittest.TestCase):
         jobs, problems = self.jobs(done, **kw)
         self.assertEqual(problems, [])
         return done, upload.push(self.d, jobs, done, self.cfg, yt, say=lambda s: None)
+
+    def test_video_older_than_the_dialogue_is_refused(self):
+        # The dialogue was edited and the run stopped before rendering: new timeline, old video.
+        write_json(self.d / "episode.json", {"durationMs": 2000})
+        _, problems = self.jobs({})
+        self.assertEqual(len(problems), 1)
+        self.assertIn("long: ", problems[0])
+        self.assertIn("older than the dialogue", problems[0])
+
+    def test_video_rendered_again_but_not_checked_is_refused(self):
+        state = read_json(self.d / "state.json")
+        state["steps"]["check"]["short_9x16"]["digest"] = "an older render"
+        write_json(self.d / "state.json", state)
+        _, problems = self.jobs({})
+        self.assertEqual([p.split(":")[0] for p in problems], ["short"])
 
     def test_sends_both_videos_private_and_scheduled(self):
         yt = FakeYouTube()

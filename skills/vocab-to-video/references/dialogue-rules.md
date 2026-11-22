@@ -61,7 +61,8 @@ shown as a large headline.
 | A2 | 240-360 (aim for 300) | 22-34 | 22 | slowed 10% |
 | B1 | 300-440 (aim for 400) | 18-30 | 28 | normal |
 
-These totals give roughly 130 seconds. A short word list still needs a full-length dialogue:
+The aimed-for totals give about 135-150 seconds; B1 near its upper limit of 440 words comes
+close to the 180-second ceiling, so stay near 400. A short word list still needs a full-length dialogue:
 reuse the new words in fresh contexts instead of adding harder words.
 
 ## Language level
@@ -95,4 +96,7 @@ reuse the new words in fresh contexts instead of adding harder words.
 - French punctuation with a space before `? ! : ;`. Plain apostrophes or typographic ones are both
   fine. No emoji, no brackets, no stage directions, no speaker names inside `text`.
 - No English words, no abbreviations (`M.`, `etc.`), no acronyms.
+- The script fails on a missing or unused word, a line over the word limit and a wrong total. It
+  only warns (`WARN`) on a title over about 40 characters, digits, brackets, more than two new
+  words in one turn and a word used once: read the warnings and fix them, they are rules too.
 - Don't put one speaker's name in every line; once or twice in the whole dialogue is enough.

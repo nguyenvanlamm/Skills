@@ -1,7 +1,9 @@
 """Shared helpers: paths, config, tokenising French text, vocabulary matching."""
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
 import unicodedata
 from pathlib import Path
@@ -26,7 +28,31 @@ def read_json(path: Path) -> dict:
 
 
 def write_json(path: Path, data) -> None:
-    Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    """Written to a temporary file and moved into place, so a killed run never leaves half a file."""
+    path = Path(path)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def design_digest() -> bytes:
+    """A fingerprint of everything that decides how a frame looks: the video code, its pinned
+    dependencies and render settings, and the fonts. When it changes, stills and videos are made again."""
+    h = hashlib.sha256()
+    files = [f for f in (VIDEO / "src").rglob("*") if f.is_file()]
+    files += [VIDEO / "package-lock.json", VIDEO / "remotion.config.ts", *(ASSETS / "fonts").glob("*.ttf")]
+    for f in sorted(files):
+        if f.is_file():
+            h.update(f.relative_to(ROOT).as_posix().encode() + f.read_bytes())
+    return h.digest()
+
+
+def render_digest(level_dir: Path, source: str, design: bytes | None = None) -> str:
+    """What a rendered video was made from: its timeline, its audio track and the video design."""
+    level_dir = Path(level_dir)
+    return hashlib.sha256((level_dir / f"{source}.json").read_bytes()
+                          + (level_dir / "public" / f"{source}.wav").read_bytes()
+                          + (design if design is not None else design_digest())).hexdigest()[:16]
 
 
 def tokens(text: str) -> list[str]:
@@ -61,11 +87,16 @@ def word_variants(token: str) -> set[str]:
 
 
 def vocab_hits(toks: list[str], vocab: list[dict]) -> tuple[list[bool], dict[str, int]]:
-    """Mark which tokens belong to a vocabulary form; count hits per vocabulary word."""
+    """Mark which tokens belong to a vocabulary form; count hits per vocabulary word.
+
+    A use is counted once however many of the word's forms match it ("habitue" and "m'habitue"
+    are the same use of "s'habituer").
+    """
     marks = [False] * len(toks)
     counts = {v["word"]: 0 for v in vocab}
     variants = [word_variants(t) for t in toks]
     for v in vocab:
+        seen: set[int] = set()
         for form in sorted(set(v.get("forms") or [v["word"]]), key=len, reverse=True):
             parts = [norm(p) for p in form.split()]
             parts = [p for p in parts if p]
@@ -74,7 +105,9 @@ def vocab_hits(toks: list[str], vocab: list[dict]) -> tuple[list[bool], dict[str
             for i in range(len(toks) - len(parts) + 1):
                 if all(p in variants[i + k] or ELISION.sub("", p) in variants[i + k]
                        for k, p in enumerate(parts)):
-                    counts[v["word"]] += 1
+                    if not seen & set(range(i, i + len(parts))):
+                        counts[v["word"]] += 1
                     for k in range(len(parts)):
                         marks[i + k] = True
+                        seen.add(i + k)
     return marks, counts

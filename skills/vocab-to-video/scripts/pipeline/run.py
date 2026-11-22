@@ -12,18 +12,21 @@ from __future__ import annotations
 
 import argparse
 import builtins
+import fcntl
 import hashlib
 import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
+import traceback
 from pathlib import Path
 
 from build_episode import build
-from check_video import check
-from publish import build_publish
-from common import VIDEO, load_config, read_json, write_json
+from check_video import check, shot_moments
+from publish import build_publish, precheck
+from common import VIDEO, design_digest, load_config, read_json, render_digest, write_json
 from tts import synth_lines
 from validate_dialogue import validate
 
@@ -61,13 +64,18 @@ def finish(code: int) -> None:
     write_json(LIVE["path"], LIVE["state"])
 
 
-def design_digest() -> bytes:
-    """A fingerprint of the video code: when the drawing changes, stills and videos are made again."""
-    h = hashlib.sha256()
-    for f in sorted((VIDEO / "src").rglob("*")):
-        if f.is_file():
-            h.update(f.relative_to(VIDEO).as_posix().encode() + f.read_bytes())
-    return h.digest()
+def remotion(*args: str) -> int:
+    """Run one Remotion command. Only one runs at a time on this machine: two at once (the two
+    levels of an episode started together) fight over the bundler's cache and one of them dies,
+    and a render uses every core anyway."""
+    lock = Path(tempfile.gettempdir()) / "vocab-to-video-remotion.lock"
+    with open(lock, "w") as held:
+        try:
+            fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            print("  waiting for another render on this machine to finish")
+            fcntl.flock(held, fcntl.LOCK_EX)
+        return subprocess.run(["npx", "remotion", *args, "--log=error"], cwd=VIDEO).returncode
 
 
 def image_size(path: Path) -> tuple[int, int]:
@@ -89,7 +97,11 @@ def run_pipeline() -> int:
     cfg = load_config()
     dialogue = read_json(d / "dialogue.json")
     state_path = d / "state.json"
-    state = read_json(state_path) if state_path.is_file() else {"steps": {}}
+    try:
+        state = read_json(state_path) if state_path.is_file() else {"steps": {}}
+    except ValueError:  # a state file cut short by a crash: start again, the work files are still there
+        state = {"steps": {}}
+    state.setdefault("steps", {})
 
     state["progress"] = {"status": "running", "current": None, "detail": "", "done": [], "error": None,
                          "until": args.until, "pid": os.getpid(), "started_at": time.time(),
@@ -119,6 +131,15 @@ def run_pipeline() -> int:
         for e in errors:
             print(f"  FAIL {e}")
         return 1
+    print(f"  {stats['words']} words, {stats['turns']} turns; uses of each new word: {stats['vocab_uses']}")
+    if args.until not in ("tts", "build"):
+        # The upload texts are checked now, before a minute of speech is made for nothing.
+        problems = precheck(d, dialogue, cfg)
+        if problems:
+            for p in problems:
+                print(f"  FAIL {p}")
+            print("  Fix metadata.json and run again.")
+            return 1
     mark("validate", **stats)
 
     begin("tts")
@@ -147,6 +168,8 @@ def run_pipeline() -> int:
         print(f"  FAIL the short cut is {short_s:.1f}s; target is {lo}-{hi}s. "
               f"{'Widen' if short_s < lo else 'Narrow'} the 'short' line range in dialogue.json and run again.")
         return 1
+    if args.until == "build":
+        return 0
 
     begin("publish")
     print("[publish]")
@@ -160,14 +183,18 @@ def run_pipeline() -> int:
         return 1
     mark("publish", file=str(d / "out" / "publish.md"))
     print(f"  upload fields: {d / 'out' / 'publish.md'}")
+    if args.until == "publish":
+        return 0
 
     begin("thumbnail")
     print("[thumbnail]")
     meta = read_json(d / "metadata.json")
     base = f"{d.parent.name}_{dialogue['level']}"
     (d / "out").mkdir(exist_ok=True)
+    opening = episode["shots"][0] if episode["shots"] else {}
     shared = {"level": dialogue["level"], "vocab": episode["vocab"], "speakers": episode["speakers"],
-              "cast": episode["cast"], "fonts": True}
+              "cast": episode["cast"], "fonts": True,
+              "scene": {k: opening[k] for k in ("set", "time", "wall", "shop") if k in opening}}
     design = design_digest()
     stills = state["steps"].get("thumbnail", {}).get("files", {})
     for comp, name, text, size in (
@@ -179,12 +206,10 @@ def run_pipeline() -> int:
         digest = hashlib.sha256(json.dumps(props, sort_keys=True).encode() + design).hexdigest()[:16]
         if stills.get(name) != digest or not out.is_file():
             write_json(d / f"{name}_props.json", props)
-            proc = subprocess.run(
-                ["npx", "remotion", "still", comp, str(out), f"--props={d / f'{name}_props.json'}",
-                 f"--public-dir={d / 'public'}", "--image-format=jpeg", "--jpeg-quality=92", "--log=error"],
-                cwd=VIDEO)
-            if proc.returncode != 0:
-                print(f"  FAIL remotion still exited {proc.returncode}")
+            code = remotion("still", comp, str(out), f"--props={d / f'{name}_props.json'}",
+                            f"--public-dir={d / 'public'}", "--image-format=jpeg", "--jpeg-quality=92")
+            if code != 0:
+                print(f"  FAIL remotion still exited {code}")
                 return 1
             stills[name] = digest
             mark("thumbnail", files=stills)
@@ -194,7 +219,7 @@ def run_pipeline() -> int:
             print(f"  FAIL {out.name}: {got[0]}x{got[1]}, {kb} KB (need {size[0]}x{size[1]}, under 2 MB)")
             return 1
         print(f"  {out} ({got[0]}x{got[1]}, {kb} KB)")
-    if args.until in ("build", "publish", "thumbnail"):
+    if args.until == "thumbnail":
         return 0
 
     out_dir = d / "out"
@@ -207,21 +232,24 @@ def run_pipeline() -> int:
         begin("render", f"{fmt} {n}/{len(formats)}")
         comp, size, source = FORMATS[fmt]
         props = d / f"{source}.json"
-        expect_s = read_json(props)["durationMs"] / 1000
+        timeline = read_json(props)
+        expect_s = timeline["durationMs"] / 1000
         # A video is up to date only if its timeline, its audio track and the video design are unchanged.
-        digest = hashlib.sha256(props.read_bytes() + (d / "public" / f"{source}.wav").read_bytes()
-                                + design).hexdigest()[:16]
+        digest = render_digest(d, source, design)
+        checks = state["steps"].setdefault("check", {})
         out = out_dir / f"{name}_{fmt}.mp4"
         if rendered.get(fmt) == digest and out.is_file():
             print(f"[render] {fmt}: up to date")
         else:
             print(f"[render] {fmt} -> {out}")
             t0 = time.time()
-            proc = subprocess.run(
-                ["npx", "remotion", "render", comp, str(out), f"--props={props}",
-                 f"--public-dir={d / 'public'}", "--log=error"], cwd=VIDEO)
-            if proc.returncode != 0:
-                print(f"  FAIL remotion render exited {proc.returncode}")
+            # From here on the old video and its check say nothing about the file in out/.
+            rendered.pop(fmt, None)
+            checks.pop(fmt, None)
+            write_json(state_path, state)
+            code = remotion("render", comp, str(out), f"--props={props}", f"--public-dir={d / 'public'}")
+            if code != 0:
+                print(f"  FAIL remotion render exited {code}")
                 return 1
             rendered[fmt] = digest
             mark("render", files=rendered)
@@ -229,14 +257,17 @@ def run_pipeline() -> int:
         if args.until == "render":
             continue
         begin("render", f"{fmt} {n}/{len(formats)} kiểm tra")
-        problems, vstats = check(out, size, expect_s, cfg["loudness_lufs"], d / "check", cfg["fps"])
+        problems, vstats = check(out, size, expect_s, cfg["loudness_lufs"], d / "check", cfg["fps"],
+                                 shot_moments(timeline))
         print(f"[check] {fmt}: {vstats['duration_s']}s, {vstats.get('fps')} fps, {vstats.get('lufs')} LUFS")
         for p in problems:
             print(f"  FAIL {p}")
-        for f in vstats["frames"]:
-            print(f"  frame {f}")
+        for f in vstats["sheets"]:
+            print(f"  sheet {f}")
+        if vstats["frames"]:
+            print(f"  one frame per shot ({len(vstats['frames'])}): {Path(vstats['frames'][0]).parent}")
         failed = failed or bool(problems)
-        state["steps"].setdefault("check", {})[fmt] = {"problems": problems, **vstats}
+        checks[fmt] = {"problems": problems, "digest": digest, **vstats}
         write_json(state_path, state)
     print("RESULT: FAIL" if failed else "RESULT: PASS")
     return 1 if failed else 0
@@ -247,6 +278,10 @@ def main() -> int:
     try:
         code = run_pipeline()
         return code
+    except Exception as exc:  # a failed download, a missing tool, a broken file: say it as a FAIL line
+        traceback.print_exc()
+        print(f"FAIL {type(exc).__name__}: {str(exc).strip() or 'no message'}")
+        return 1
     finally:
         finish(code)
 

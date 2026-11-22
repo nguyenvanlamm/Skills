@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import youtube
-from common import load_config, read_json, write_json
+from common import load_config, read_json, render_digest, write_json
 
 KINDS = ("long", "short")
 URLS = {"long": "https://www.youtube.com/watch?v={id}", "short": "https://www.youtube.com/shorts/{id}"}
@@ -58,12 +58,15 @@ def build_jobs(level_dir: Path, cfg: dict, done: dict, kinds: tuple[str, ...], p
     out = level_dir / "out"
     try:
         pub = read_json(out / "publish.json")
-        checks = read_json(level_dir / "state.json")["steps"]["check"]
+        steps = read_json(level_dir / "state.json")["steps"]
+        checks = steps["check"]
     except (OSError, ValueError, KeyError):
         return {}, [f"{level_dir} is not finished: run run.py to the end first (out/publish.json and the video checks are needed)"]
     ucfg = cfg["upload"]
     yt, sh = pub["youtube"], pub["youtube_shorts"]
     sources = {"long": ("16x9", yt), "short": ("short_9x16", sh)}
+    timelines = {"16x9": "episode", "short_9x16": "short"}
+    rendered = steps.get("render", {}).get("files", {})
     jobs: dict = {}
 
     times: dict[str, datetime | None] = {}
@@ -88,6 +91,16 @@ def build_jobs(level_dir: Path, cfg: dict, done: dict, kinds: tuple[str, ...], p
                 problems.append(f"{kind}: {block['file']} was never checked; run run.py again")
             elif checks[fmt].get("problems"):
                 problems.append(f"{kind}: {block['file']} failed its checks: {checks[fmt]['problems']}")
+            else:
+                # The file in out/ must be the one that was checked, made from the dialogue as it is
+                # now: after an edit and a run stopped early, the texts are new and the video is old.
+                try:
+                    current = render_digest(level_dir, timelines[fmt])
+                except OSError:
+                    current = None
+                if not (current and current == rendered.get(fmt) == checks[fmt].get("digest")):
+                    problems.append(f"{kind}: {block['file']} is older than the dialogue or the video design, "
+                                    "or was not checked after its last render; run run.py to the end again")
             if not path.is_file():
                 problems.append(f"{kind}: missing {path}")
             if times[kind] is None and not bad_time:

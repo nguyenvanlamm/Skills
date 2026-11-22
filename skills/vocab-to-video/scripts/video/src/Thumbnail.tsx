@@ -1,7 +1,9 @@
 import { loadFont } from "@remotion/fonts";
 import { AbsoluteFill, staticFile, useVideoConfig } from "remotion";
 import { Puppet } from "./toon/Puppet";
+import { H, W } from "./toon/draw";
 import { HEAD_CY, Look, makeLook } from "./toon/rig";
+import { SETS } from "./toon/sets";
 import { Speaker } from "./types";
 
 export type ThumbnailProps = {
@@ -10,6 +12,8 @@ export type ThumbnailProps = {
   vocab: string[];
   speakers: Speaker[];
   cast?: Record<string, Look>;
+  /** The place the episode opens in: drawn, dimmed, behind the text. */
+  scene?: { set?: string; time?: string; wall?: string; shop?: string };
   /** True when the episode's public folder (with the fonts) is mounted. */
   fonts?: boolean;
 };
@@ -53,7 +57,7 @@ const Face: React.FC<{ speaker: Speaker; look?: Look; size: number }> = ({ speak
 );
 
 /** One still image: YouTube thumbnail (landscape) or Shorts/TikTok cover (portrait). */
-export const Thumbnail: React.FC<ThumbnailProps> = ({ text, level, vocab, speakers, cast, fonts }) => {
+export const Thumbnail: React.FC<ThumbnailProps> = ({ text, level, vocab, speakers, cast, scene, fonts }) => {
   const { width, height } = useVideoConfig();
   const vertical = height > width;
   ensureFonts(Boolean(fonts));
@@ -71,7 +75,11 @@ export const Thumbnail: React.FC<ThumbnailProps> = ({ text, level, vocab, speake
     column / (subtitle * 0.6 * 0.62),
   );
   const face = vertical ? 400 : 270;
-  const chips = vocab.slice(0, 3);
+  // The headline already shows one word: the chips are the next ones, never the same word twice.
+  const plain = (v: string) => v.toLowerCase().replace(/[^a-zà-öø-ÿœæ]/g, "");
+  const chips = vocab.filter((v) => !plain(parts[0] ?? "").includes(plain(v))).slice(0, vertical ? 4 : 3);
+  const place = scene?.set && SETS[scene.set] ? SETS[scene.set] : null;
+  const time = scene?.time === "dusk" || scene?.time === "night" ? scene.time : "day";
   const unit = width / (vertical ? 1080 : 1280);
 
   const badge = (
@@ -130,10 +138,11 @@ export const Thumbnail: React.FC<ThumbnailProps> = ({ text, level, vocab, speake
   );
   const faces = (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Face speaker={speakers[0]} look={cast?.[speakers[0].id]} size={face} />
-      <div style={{ marginLeft: vertical ? 40 : -70, marginTop: vertical ? 0 : 130 }}>
-        <Face speaker={speakers[1]} look={cast?.[speakers[1].id]} size={face} />
-      </div>
+      {speakers.slice(0, 2).map((sp, i) => (
+        <div key={sp.id} style={i ? { marginLeft: vertical ? 40 : -50, marginTop: vertical ? 0 : 150 } : undefined}>
+          <Face speaker={sp} look={cast?.[sp.id]} size={face} />
+        </div>
+      ))}
     </div>
   );
 
@@ -145,9 +154,23 @@ export const Thumbnail: React.FC<ThumbnailProps> = ({ text, level, vocab, speake
         backgroundImage: `radial-gradient(circle at ${vertical ? "50% 62%" : "80% 55%"}, #2a3a7a 0%, transparent 55%), linear-gradient(160deg, #16204a 0%, ${BG} 70%)`,
       }}
     >
+      {place ? (
+        <>
+          <svg width={width} height={height} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" style={{ position: "absolute" }}>
+            <place.Draw o={{ time, wall: scene?.wall, shop: scene?.shop }} />
+          </svg>
+          <AbsoluteFill
+            style={{
+              backgroundImage: vertical
+                ? `linear-gradient(180deg, ${BG}F2 0%, ${BG}D9 45%, ${BG}B3 100%)`
+                : `linear-gradient(90deg, ${BG}F5 0%, ${BG}E0 55%, ${BG}8C 100%)`,
+            }}
+          />
+        </>
+      ) : null}
       {vertical ? (
         <AbsoluteFill
-          style={{ padding: "300px 70px 380px", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center" }}
+          style={{ padding: "230px 70px 330px", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center" }}
         >
           {badge}
           {title}

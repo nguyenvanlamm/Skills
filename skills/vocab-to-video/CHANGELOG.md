@@ -1,5 +1,56 @@
 # Changelog
 
+## v2.1.0 — 2026-11-22
+
+Fixes from an independent review: a first-time run of the skill, a review of the pipeline and a
+review of the drawing code.
+
+Picture
+- Walk scenes stay in the frame: in 9:16 the camera follows the walkers; the paths start and
+  end inside the picture; the legs step with the distance covered, so feet no longer slide.
+- The 9:16 frame shows the characters 12% larger and less empty sky and floor.
+- Bubble text: no word changes size any more (words used to touch: "prendl'appartement");
+  words not yet spoken are a readable grey, and the yellow marker of a new word is solid from
+  the start; larger type in 16:9.
+- A bubble never follows the picture into the next shot, fades with a whip pan, and follows a
+  speaker who is walking in or out instead of pointing at an empty spot.
+- Labels are placed on the frame, not in the set: the push-in no longer moves them into the
+  title. Wide shots: over the listener, gliding across when the speaker changes. Closeups:
+  behind the character. A bubble with no speaker in a closeup goes to the bottom, off the face.
+- The place tag leaves after four seconds; in 9:16 it sits under the title, not on the legs.
+- The whip pan stays inside the drawn set; night light pools follow a moving character; the
+  `worried` face keeps its mouth shut, so a listener no longer seems to talk.
+- Thumbnail and cover: the opening set, dimmed, behind the text; the headline word is not
+  repeated as a chip; any number of speakers.
+- Lip movement is judged per line, so the quieter voice opens its mouth as wide as the other.
+
+Pipeline
+- `upload.py plan/push` refuse a video that is older than its dialogue or the video design, or
+  that was rendered again and not checked.
+- Cues: a word inside another word no longer matches (`loyer` in `employer`); elision works for
+  short words (`un an` in `d'un an`); accents may be left out; a beat with `who` lands on that
+  character's own line; in the short cut a cue of a line that was cut is dropped instead of
+  moving to a similar word. `+seconds` must be a plain number and is kept inside the shot.
+- The validator answers malformed input with `FAIL` lines instead of a traceback, and checks
+  `zoom`, `x`, `y`, `s`, `face`, `skin`, duplicate characters. New warnings: a cue said twice, a
+  beat on a speaker who is not in the picture, the hook speaker walking in, `tiphat` without a
+  hat, two labels in a scene, a shot under 1.2 s, digits, brackets, a long title, more than two
+  new words in a turn. A vocabulary use matched by two forms counts once.
+- `metadata.json` is checked during `validate`, before any speech is made. `--until build` and
+  `--until publish` stop where they say.
+- `check` writes one frame per shot and tiles them into contact sheets, instead of three frames
+  per video. A chapter that could not be placed is named.
+- Speech is reused by content, so adding turns costs only their own calls; a failed call can no
+  longer leave half a file that passes for finished audio. `state.json` and every JSON file are
+  written atomically. Errors end as a `FAIL` line the steps pane can show.
+- Two runs on one machine take turns at the renderer (they used to crash each other's bundler
+  cache). Videos are also rendered again when the fonts, `package-lock.json` or
+  `remotion.config.ts` change.
+- Tests: 52 (were 24).
+
+Not changed: the shop sign is still cropped in 9:16 street shots, a label can sit over a set
+prop (clock, sun), outfits and hair are still if-chains in `Puppet.tsx`.
+
 ## v2.0.0 — 2026-11-22
 
 The video is now a 2D cartoon instead of two portraits and a waveform.
