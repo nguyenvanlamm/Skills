@@ -141,5 +141,14 @@
   "short_duration_s": [
     30,
     60
-  ]
+  ],
+  "storyboard": {
+    "provider": "none",
+    "url": "http://127.0.0.1:11434",
+    "model": "",
+    "retries": 3,
+    "temperature": 0.4,
+    "num_ctx": 8192,
+    "timeout_s": 300
+  }
 }

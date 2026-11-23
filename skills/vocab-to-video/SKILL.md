@@ -49,6 +49,10 @@ Uploading to YouTube is a separate step (10) that runs only when the user asks f
    Then add the storyboard (`scenes`) to the same file, following `references/scene-rules.md`:
    where each run of lines happens, which shot it is, and what each character does on which
    word. Write it after the lines are final, because cues are words of the text.
+   When `scripts/pipeline/config.json` → `storyboard.provider` is not `none`, a model on this
+   machine writes `scenes` for a file that has none, at the start of step 6
+   (`references/local-model.md`). You may then leave `scenes` out; still read what it wrote
+   (it is saved into `dialogue.json`) and look at the contact sheets in step 8.
 4. **Fetch search data**, once per episode, from `<skill>/scripts/pipeline/`, with 3-5 theme queries:
 
    ```bash
@@ -156,6 +160,8 @@ uv run python upload.py auth
 uv run python upload.py plan <episodes>/<name>/A2 --publish-at 2026-11-25T18:00:00+01:00
 # the tests (storyboard, text checks, speech cache, fake YouTube; no network)
 uv run python -m unittest discover -s tests
+# only write the storyboard with the model on this machine (when one is set up), then stop
+uv run python run.py <episodes>/<name>/A2 --storyboard-only
 # one output only (16x9, 9x16 or short_9x16)
 uv run python run.py <episodes>/<name>/A2 --format short_9x16
 # every pose and emotion on one page (from <skill>/scripts/video/)

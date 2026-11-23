@@ -104,6 +104,8 @@ Keys: `skin` (`light`, `fair`, `tan`, `olive`, `brown`, `dark`), `outfit` (`suit
   first word of the answer (`{"at": "<that word>", "who": "lea", "pose": "idle"}`).
 - A dialogue with no `scenes` at all still renders, as wide shots and close-ups in one room. Use
   that only for a quick test: a written storyboard is what makes the episode worth watching.
+  When a storyboard model is set up (`local-model.md`), `run.py` asks it for `scenes` first and
+  falls back on those plain shots only if its answer never passes these rules.
 
 ## Pacing
 

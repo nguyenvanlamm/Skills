@@ -1,5 +1,33 @@
 # Changelog
 
+## v2.2.0 — 2026-11-24
+
+A storyboard model that runs on this machine. Off by default: the storyboard is still written
+by hand, and nothing changes until `config.json` → `storyboard.provider` is set.
+
+Pipeline
+- `storyboard.py`: asks a local model (Ollama) for `scenes`, with the answer held to a JSON
+  schema built from the rig, so poses, sets and characters are always valid names. The answer
+  goes through the same validator as a hand-written storyboard; its errors and warnings go back
+  to the model for up to three more tries, stopping early when the model repeats itself. When
+  the tries run out on wrong cue words, those beats are dropped and those labels moved to the
+  scene that says the word, instead of losing the whole storyboard. No model, no server or no
+  valid answer: a `WARN` and the plain generated storyboard, as before.
+- `run.py` calls it before `validate` when `dialogue.json` has no `scenes`, saves the result in
+  the file, and never replaces a storyboard already there. `--storyboard-only` stops after it.
+
+Training (`scripts/train/`, its own `uv` project)
+- `make_dataset.py`: checked dialogues to chat examples, with a fixed evaluation set and repair
+  lessons (a storyboard with typical mistakes, the checker's words, the right answer).
+- `finetune.py`: a QLoRA adapter on `Qwen/Qwen3.5-9B` in 4-bit; fits a 12 GB card.
+- `export.py`: merges the adapter into the base, converts to GGUF, quantizes, registers in Ollama.
+- `eval_storyboard.py`: valid, first try, salvaged, tries, time and the shape of the storyboards
+  next to the plain one and the hand-written one.
+- `dataset-brief.md`: the brief for writing training dialogues in parallel batches.
+- Measured on 12 held-out dialogues, the best run (about 700 training dialogues) gives a valid
+  storyboard for all 12 in about 90 s each, with fewer gestures than hand-written ones.
+- `references/local-model.md`: install, train, export, measure, train again.
+
 ## v2.1.0 — 2026-11-22
 
 Fixes from an independent review: a first-time run of the skill, a review of the pipeline and a

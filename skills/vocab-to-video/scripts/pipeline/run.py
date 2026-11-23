@@ -26,6 +26,7 @@ from pathlib import Path
 from build_episode import build
 from check_video import check, shot_moments
 from publish import build_publish, precheck
+from storyboard import write_scenes
 from common import VIDEO, design_digest, load_config, read_json, render_digest, write_json
 from tts import synth_lines
 from validate_dialogue import validate
@@ -91,6 +92,8 @@ def run_pipeline() -> int:
     ap.add_argument("level_dir", type=Path)
     ap.add_argument("--until", choices=STEPS[1:], default="check")
     ap.add_argument("--format", choices=list(FORMATS), action="append")
+    ap.add_argument("--storyboard-only", action="store_true",
+                    help="write the storyboard with the local model, check the dialogue, and stop")
     args = ap.parse_args()
 
     d = args.level_dir.resolve()
@@ -124,6 +127,19 @@ def run_pipeline() -> int:
 
     begin("validate")
     print(f"[validate] {d}")
+    sb = cfg.get("storyboard") or {}
+    if not dialogue.get("scenes") and sb.get("provider", "none") != "none" and isinstance(dialogue.get("lines"), list):
+        # No storyboard was written by hand: the model on this machine writes one, once. It is
+        # saved in dialogue.json, so later runs (and a human) work from the same scenes.
+        print(f"  no `scenes`: asking {sb.get('model')} for a storyboard")
+        try:
+            scenes = write_scenes(dialogue, cfg, log=print)
+        except (KeyError, TypeError, AttributeError):
+            scenes = None  # a dialogue too broken to describe; the validator below says why
+        if scenes:
+            dialogue["scenes"] = scenes
+            write_json(d / "dialogue.json", dialogue)
+            print(f"  storyboard: {len(scenes)} scenes written to dialogue.json")
     errors, warnings, stats = validate(dialogue, cfg)
     for w in warnings:
         print(f"  WARN {w}")
@@ -132,6 +148,9 @@ def run_pipeline() -> int:
             print(f"  FAIL {e}")
         return 1
     print(f"  {stats['words']} words, {stats['turns']} turns; uses of each new word: {stats['vocab_uses']}")
+    if args.storyboard_only:
+        mark("validate", **stats)
+        return 0
     if args.until not in ("tts", "build"):
         # The upload texts are checked now, before a minute of speech is made for nothing.
         problems = precheck(d, dialogue, cfg)
