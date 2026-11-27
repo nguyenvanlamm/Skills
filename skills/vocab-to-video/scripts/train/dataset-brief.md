@@ -30,6 +30,14 @@ good direction, so make them good, not merely valid:
 - across your episodes use every set and time of day, some `walk` scenes, some `enter`/`exit`,
   and a wide range of poses and emotions. Do not use the pose `tiphat`, and do not add `cast`.
 
+These bars are checked after the batch and a file that misses one is sent back (the validator
+does not catch them):
+- 2.5 to 3.2 beats per scene on average in every file, each chosen by reading the line: no
+  keyword list or random choice of pose and emotion;
+- the beats of a scene listed in the order their cue words are spoken;
+- all 8 words labelled, each in the scene of its first use. Write the dialogue so that no two
+  new words first appear in the same line, and split a scene that holds two first uses.
+
 Check every file, from `<skill>/scripts/pipeline/`:
   uv run python validate_dialogue.py <output>/<slug>/<LEVEL>/dialogue.json
 and edit until it prints `RESULT: PASS` with NO `WARN` line at all (warnings count as failures

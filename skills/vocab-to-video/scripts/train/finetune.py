@@ -40,6 +40,9 @@ def main() -> int:
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--max-tokens", type=int, default=8192,
                     help="longer examples are left out (a repair lesson is about 6500 tokens)")
+    ap.add_argument("--init-adapter", type=Path,
+                    help="start from this adapter (an earlier run's <run>/adapter) instead of a fresh one; "
+                         "--rank must match it")
     ap.add_argument("--dry", action="store_true")
     args = ap.parse_args()
 
@@ -68,6 +71,16 @@ def main() -> int:
         model, r=args.rank, lora_alpha=args.rank, lora_dropout=0, bias="none",
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
         use_gradient_checkpointing="unsloth", random_state=3407, max_seq_length=args.max_tokens)
+    if args.init_adapter:
+        from peft import set_peft_model_state_dict
+        from safetensors.torch import load_file
+        weights = load_file(str(args.init_adapter / "adapter_model.safetensors"))
+        loaded = set_peft_model_state_dict(model, weights)
+        missing = [k for k in loaded.missing_keys if "lora_" in k]
+        if loaded.unexpected_keys or missing:
+            raise SystemExit(f"adapter does not fit: {len(missing)} missing, "
+                             f"{len(loaded.unexpected_keys)} unexpected, e.g. {(missing + loaded.unexpected_keys)[:3]}")
+        print(f"started from {args.init_adapter} ({len(weights)} tensors)")
 
     def collate(batch: list[dict]) -> dict:
         width = max(len(b["input_ids"]) for b in batch)
@@ -84,7 +97,8 @@ def main() -> int:
     model.save_pretrained(str(args.out / "adapter"))
     tokenizer.save_pretrained(str(args.out / "adapter"))
     peak = torch.cuda.max_memory_allocated() / 2**30
-    summary = {"base": args.base, "examples": len(kept), "epochs": args.epochs, "rank": args.rank,
+    summary = {"base": args.base, "init_adapter": str(args.init_adapter) if args.init_adapter else None,
+               "lr": args.lr, "examples": len(kept), "epochs": args.epochs, "rank": args.rank,
                "loss": round(result.training_loss, 4), "minutes": round((time.time() - began) / 60, 1),
                "peak_vram_gb": round(peak, 1),
                "log": [h for h in trainer.state.log_history if "loss" in h]}

@@ -84,16 +84,25 @@ Everything lives in `scripts/train/` (its own `uv` project: torch, unsloth, tran
 
 ## Training again later
 
-Every run starts from the base model, not from the last adapter: add new themes to `<data>`,
+A run starts from the base model unless `--init-adapter <run>/adapter` is given; then it carries
+on from that adapter (same `--rank`). One more epoch at `--lr 1e-4` from r3's adapter on r3's data
+(r4) took first try from 33% to 50% over two passes; a second such epoch (r5) gained nothing.
+Training from the base model on 1211 dialogues instead of 707 (r7) tied r4 (50%) on these 12
+dialogues, and one more epoch from r7 (r8) stayed there too: more of the same kind of data did not
+help by itself. With new data, start from the base model: add new themes to `<data>`,
 rerun `make_dataset.py` (the evaluation set stays the same), train with a new `--out`, export
 under a new tag (`storyboard-qwen35:r4`), measure, and compare the rows. Keep `_jsonl/eval.jsonl`
 and each run's `training.json` and `eval-<run>.json`: they are what makes the next run
 comparable. On a 12 GB card about 700 dialogues plus 30% repair lessons took 5.3 hours for
-two epochs, at 8.2 GB.
+two epochs, at 8.2 GB; 1211 dialogues plus repairs took 8.4 hours. `export.py` needs about 45 GB
+of free disk while it runs (merged weights, a bf16 GGUF, the Q4 file and Ollama's copy of it); with
+less, `llama-quantize` stops with "iostream error".
 
 ## What to look at before turning it on
 
-- `valid` close to 1 and `first_try` high: each extra try costs about half a minute.
+- `valid` close to 1 and `first_try` high: each extra try costs about half a minute. The model
+  samples with no seed, so one pass over 12 dialogues can swing by 4 in `first_try`: measure each
+  run twice before comparing.
 - `beats_per_scene`, `poses`, `label_cover` close to the reference row: a valid but empty
   storyboard is not better than the plain one.
 - Render one or two episodes with a model storyboard and look at the contact sheets.
