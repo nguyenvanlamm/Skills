@@ -1,0 +1,45 @@
+{
+  "title": "Vì sao bầu trời có màu xanh?",
+  "resolution": [1920, 1080],
+  "fps": 30,
+  "voice": "vi-VN-HoaiMyNeural",
+  "style": {
+    "bg": "#0f172a",
+    "fg": "#f8fafc",
+    "muted": "#cbd5e1",
+    "accent": "#fbbf24"
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "layout": "title",
+      "chapter": "Mở đầu",
+      "heading": "Vì sao bầu trời có màu xanh?",
+      "narration": "Ánh sáng Mặt Trời có màu trắng. Vậy tại sao ngẩng đầu lên, bạn lại thấy cả bầu trời xanh ngắt? Câu trả lời nằm ở chính lớp không khí bạn đang hít thở."
+    },
+    {
+      "id": "anh-sang-trang",
+      "chapter": "Ánh sáng trắng gồm những gì",
+      "kicker": "Phần 1",
+      "heading": "Ánh sáng trắng là hỗn hợp của mọi màu",
+      "body": "Đỏ có bước sóng dài nhất.\nTím và xanh lam có bước sóng ngắn nhất.",
+      "narration": "Ánh sáng trắng thực ra là hỗn hợp của tất cả các màu cầu vồng. Mỗi màu là một bước sóng khác nhau: đỏ dài nhất, còn xanh lam và tím thì ngắn nhất."
+    },
+    {
+      "id": "tan-xa",
+      "chapter": "Tán xạ Rayleigh",
+      "kicker": "Phần 2",
+      "heading": "Phân tử khí tán xạ màu xanh mạnh hơn nhiều",
+      "body": "Bước sóng càng ngắn, ánh sáng càng bị hắt đi mọi hướng.",
+      "narration": "Khi đi vào khí quyển, ánh sáng va vào các phân tử khí nhỏ xíu. Bước sóng càng ngắn thì càng bị hắt ra mọi hướng. Ánh sáng xanh lam bị tán xạ mạnh gấp nhiều lần ánh sáng đỏ, nên nó phủ kín cả bầu trời."
+    },
+    {
+      "id": "ket",
+      "layout": "title",
+      "chapter": "Kết",
+      "heading": "Bầu trời xanh là ánh nắng bị hắt về phía bạn",
+      "narration": "Vậy nên màu xanh trên đầu bạn chính là ánh nắng đã bị không khí hắt về phía mắt bạn.",
+      "pause": 1.0
+    }
+  ]
+}
